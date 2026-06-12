@@ -12,7 +12,7 @@ build/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
-
+backend/.test_tmp/
 # OS
 .DS_Store
 

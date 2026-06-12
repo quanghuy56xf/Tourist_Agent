@@ -151,6 +151,16 @@ export async function getUngroupedItems(): Promise<UngroupedItemsResponse> {
   return res.json();
 }
 
+export async function getItem(itemId: number): Promise<GroupItem> {
+  const res = await fetch(`${API_URL}/api/objects/${itemId}`, {
+    headers: NGROK_HEADERS,
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được thông tin vật thể"));
+  }
+  return res.json();
+}
+
 export async function updateItem(
   itemId: number,
   data: {
@@ -211,4 +221,80 @@ export async function deleteItemImage(
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Xóa ảnh thất bại"));
   }
+}
+
+export interface GenerateResponse {
+  item_id: number;
+
+  content: string;
+  persona: string;
+  language: string;
+}
+
+export async function generateContent(
+  itemId: number,
+  persona: string = "Mặc định",
+  language: string = "Tiếng Việt"
+): Promise<GenerateResponse> {
+  const res = await fetch(`${API_URL}/api/generate`, {
+    method: "POST",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: itemId, persona, language }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Sinh nội dung thất bại"));
+  }
+  return res.json();
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  content: string;
+}
+
+export async function chatWithAI(
+  itemId: number,
+  message: string,
+  history: ChatMessage[],
+  persona: string = "Mặc định",
+  language: string = "Tiếng Việt"
+): Promise<ChatResponse> {
+  const res = await fetch(`${API_URL}/api/chat`, {
+    method: "POST",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: itemId, message, history, persona, language }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Chat thất bại"));
+  }
+  return res.json();
+}
+
+export async function fetchTTSAudio(text: string, language: string = "vi"): Promise<string> {
+  const res = await fetch(`${API_URL}/api/tts`, {
+    method: "POST",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language: language === "Tiếng Việt" ? "vi" : "en" }),
+  });
+  if (!res.ok) {
+    throw new Error("Lỗi tải âm thanh");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+// Export a generic fetchApi for frontend use
+export async function fetchApi(path: string, options?: RequestInit) {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...NGROK_HEADERS, ...options?.headers },
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "API request failed"));
+  }
+  return res.json();
 }

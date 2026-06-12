@@ -1,0 +1,23 @@
+[project]
+name = "c2-app-060-backend"
+version = "0.1.0"
+description = "Backend API for DinoV2 Object Search"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "transformers>=4.36.0",
+    "pillow>=10.0.0",
+    "chromadb>=0.4.22",
+    "sqlalchemy>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "langchain",
+    "langchain-community",
+    "langchain-google-genai",
+    "rank_bm25",
+    "sentence-transformers",
+    "gTTS"
+]

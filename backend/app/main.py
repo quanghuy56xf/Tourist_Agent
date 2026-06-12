@@ -5,17 +5,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import CORS_ALLOW_ALL, CORS_ORIGINS, UPLOAD_DIR
-from app.routers import groups, objects, register, search
-from app.services import embedding
-from app.services.database import init_db
+from app.core.config import (
+    CORS_ALLOW_ALL,
+    CORS_ORIGINS,
+    MODEL_WARMUP_ENABLED,
+    UPLOAD_DIR,
+)
+from app.modules.objects import groups_router as groups, objects_router as objects, register_router as register
+from app.modules.vision import router as search
+from app.modules.llm import chat_router, story_router, tts_router
+from app.modules.vision import embedding
+from app.core.database import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-    embedding.warmup()
+    if MODEL_WARMUP_ENABLED:
+        embedding.warmup()
     yield
 
 
@@ -33,6 +41,9 @@ app.include_router(register.router)
 app.include_router(groups.router)
 app.include_router(objects.router)
 app.include_router(search.router)
+app.include_router(story_router.router)
+app.include_router(chat_router.router)
+app.include_router(tts_router.router)
 
 Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

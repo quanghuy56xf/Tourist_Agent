@@ -1,100 +1,110 @@
-# Starter Code Template — Cohort 2
+# AI Heritage Guide
 
-Empty starter template for AI20K Build Cohort 2 team repositories. Includes pre-configured AI usage logging hooks for Claude Code, Cursor, Codex, Gemini CLI, Antigravity, and GitHub Copilot.
+Ứng dụng nhận diện hiện vật bằng ảnh và tạo nội dung giới thiệu bằng AI.
 
-## Structure
+## Công Nghệ
 
-```
-├── scripts/
-│   ├── _pyrun.sh             # Cross-platform Python launcher (bash)
-│   ├── _pyrun.cmd            # Cross-platform Python launcher (Windows)
-│   ├── setup_hooks.sh        # One-time pre-push hook installer (POSIX)
-│   ├── setup_hooks.ps1       # One-time pre-push hook installer (Windows)
-│   ├── log_hook.py           # AI tool hook handler (Claude / Cursor / Codex / Gemini / Copilot)
-│   ├── log_antigravity.py    # Auto-log hook for Antigravity
-│   ├── log_manual.py         # Manual log for ChatGPT / web tools
-│   └── submit_log.py         # Submits logs on git push
-├── .agents/                  # Antigravity rules + workflows
-├── .claude/  .codex/  .cursor/  .gemini/  .github/hooks/   # Per-tool hook configs
-├── .env.example
-├── JOURNAL.md                # Weekly journal — product journey & learnings
-└── WORKLOG.md                # Technical decisions, task assignments, brainstorming
-```
+- Frontend: Next.js 14, TypeScript, Tailwind CSS.
+- Backend: FastAPI, SQLAlchemy.
+- Metadata: SQLite.
+- Tìm kiếm ảnh: DINOv2 + Chroma.
+- RAG văn bản: Chroma + BM25.
+- Sinh nội dung: Google Gemini.
+- Chuyển văn bản thành giọng nói: gTTS.
 
-## Getting Started
+## Luồng Chính
 
-### 1. Clone and install pre-push hook
+1. Admin đăng ký item và ảnh nhiều góc.
+2. Backend lưu metadata trong SQLite, ảnh trong `uploads/` và embedding ảnh trong Chroma.
+3. Người dùng chụp ảnh để tìm top item gần nhất.
+4. Story/chat luôn dùng `Item.description` làm context nền.
+5. Hybrid RAG bổ sung tài liệu khi index và model khả dụng.
+6. Nếu RAG lỗi, story/chat vẫn có thể hoạt động bằng description.
 
-**Linux / macOS / Git Bash:**
-```bash
-git clone <repo-url>
-cd <repo>
-bash scripts/setup_hooks.sh
-```
+## Chạy Local
 
-**Windows PowerShell:**
+### Backend
+
 ```powershell
-git clone <repo-url>
-cd <repo>
-powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
+cd backend
+uv sync
+.\.venv\Scripts\Activate.ps1
+copy .env.example .env
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-### 2. Configure environment
+### Frontend
 
-```bash
-cp .env.example .env       # macOS / Linux / Git Bash
-# copy .env.example .env   # Windows cmd
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
-Fill in `AI_LOG_SERVER` and `AI_LOG_API_KEY` (provided by the course).
+- Frontend: `http://localhost:3000`
+- Swagger: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/health`
 
-### 3. Build your project
+## Cấu Hình Quan Trọng
 
-This is an empty starter — pick any language/framework. The hooks are language-agnostic; they only need Python on the host (any of `python3`, `python`, or `py` works).
+```env
+GOOGLE_API_KEY=
+LLM_MODEL=gemini-2.5-flash
+LLM_TIMEOUT_SECONDS=60
+LLM_MAX_RETRIES=2
+MODEL_WARMUP_ENABLED=false
 
-## Weekly Journal
-
-Update **[JOURNAL.md](./JOURNAL.md)** at the end of every week:
-
-- Features shipped
-- AI tools used and how they helped
-- Hardest problem of the week and how you solved it
-- What you'd do differently
-- Plan for next week
-
-> JOURNAL.md **must be updated** before each PR — it is your learning record for the course.
-
-## Worklog
-
-Update **[WORKLOG.md](./WORKLOG.md)** whenever your team makes a technical decision or changes direction:
-
-- **Technical decisions** — why this approach over alternatives?
-- **Task assignments** — who does what, by when
-- **Brainstorming** — options considered, pros / cons, conclusion
-- **Important bugs** — root cause and fix
-
-## AI Logging
-
-Prompts and tool calls are **automatically logged** when you use any supported AI tool (Claude Code, Cursor, Codex, Gemini, Antigravity, Copilot). No manual steps needed after running `setup_hooks`.
-
-For ChatGPT or other web tools, log manually:
-
-```bash
-# POSIX
-bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "<what you did>"
-
-# Windows
-scripts\_pyrun.cmd scripts\log_manual.py --tool chatgpt --prompt "<what you did>"
+ADMIN_AUTH_ENABLED=false
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=replace-with-a-strong-password
 ```
 
-### Python requirements
+Khi `ADMIN_AUTH_ENABLED=true`, các endpoint thay đổi group, item và ảnh yêu cầu HTTP Basic Auth. Endpoint đọc, search, story, chat và TTS vẫn public.
 
-The hook system needs **one** of: `python3`, `python`, or `py` on PATH.
+## Chạy Test
 
-| OS | Recommended install |
-|---|---|
-| Windows | Python 3 from [python.org](https://www.python.org/downloads/) — installer adds both `python` and `py` to PATH |
-| Ubuntu / Debian | `sudo apt install python3` (already preinstalled on most distros) |
-| macOS | `brew install python3` or use system Python 3 |
+Test offline không tải model thật và không gọi provider:
 
-The `scripts/_pyrun.*` wrappers detect whichever is available — students do not need to alias `python3` → `python`.
+```powershell
+cd backend
+pytest -m "not integration"
+```
+
+Test provider/model thật là opt-in:
+
+```powershell
+$env:RUN_EXTERNAL_LLM_TESTS="true"
+$env:RUN_REAL_RAG_TESTS="true"
+pytest -m integration -v
+```
+
+Build frontend:
+
+```powershell
+cd frontend
+npm.cmd run build
+```
+
+## Kiểm Tra Và Repair RAG Index
+
+Audit không thay đổi dữ liệu:
+
+```powershell
+cd backend
+$env:PYTHONPATH="."
+python scripts/repair_rag_index.py --data-dir data
+```
+
+Repair duplicate vectors:
+
+```powershell
+python scripts/repair_rag_index.py --data-dir data --apply
+```
+
+Script chỉ tự repair khi mọi chunk đều đã có vector. Trước khi sửa, script backup `rag_chroma`, `chunks.pkl` và `bm25_index.pkl` vào `backend/data/backups/`.
+
+## Tài Liệu
+
+- [Kiến trúc](docs/architecture_and_tech_stack.md)
+- [API](docs/api.md)
+- [Implementation plan](docs/superpowers/plans/2026-06-12-stabilize-api-rag-llm.md)

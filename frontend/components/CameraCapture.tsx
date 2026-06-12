@@ -144,9 +144,10 @@ export default function CameraCapture({
       )}
       {!frozen && (
         <button
+          id="camera-capture-btn"
           type="button"
           onClick={handleCapture}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 px-10 py-4 bg-blue-600 hover:bg-blue-700 rounded-full font-bold text-lg shadow-lg transition-colors"
+          className="hidden" // Hiding this because we built a custom overlay UI in page.tsx
         >
           Quét vật thể
         </button>

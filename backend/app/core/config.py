@@ -1,0 +1,47 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+def _read_bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise ValueError(f"{name} must be either 'true' or 'false'")
+
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'data' / 'app.db'}")
+CHROMA_PATH = os.getenv("CHROMA_PATH", str(BASE_DIR / "data" / "chroma"))
+
+# RAG paths and keys
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+RAG_CHROMA_PATH = os.getenv("RAG_CHROMA_PATH", str(BASE_DIR / "data" / "rag_chroma"))
+RAG_BM25_PATH = os.getenv("RAG_BM25_PATH", str(BASE_DIR / "data" / "rag" / "bm25_index.pkl"))
+RAG_CHUNKS_PATH = os.getenv("RAG_CHUNKS_PATH", str(BASE_DIR / "data" / "rag" / "chunks.pkl"))
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads"))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.75"))
+SEARCH_TOP_K = int(os.getenv("SEARCH_TOP_K", "20"))
+SEARCH_TOP_N = int(os.getenv("SEARCH_TOP_N", "3"))
+USE_AUGMENTATION = _read_bool_env("USE_AUGMENTATION", True)
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+CORS_ALLOW_ALL = _read_bool_env("CORS_ALLOW_ALL", False)
+MODEL_WARMUP_ENABLED = _read_bool_env("MODEL_WARMUP_ENABLED", False)
+ADMIN_AUTH_ENABLED = _read_bool_env("ADMIN_AUTH_ENABLED", False)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")

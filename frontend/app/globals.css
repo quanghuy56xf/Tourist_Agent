@@ -28,7 +28,7 @@ body {
 .camera-fullscreen-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 0;
   background: #000;
   overflow: hidden;
 }
