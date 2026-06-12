@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+/* Laptop / desktop: khung ngang 16:9 */
+.camera-inline-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #000;
+}
+
+.camera-inline-video,
+.camera-inline-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Điện thoại: overlay full màn hình */
+.camera-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #000;
+  overflow: hidden;
+}
+
+.camera-fullscreen-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  object-fit: cover;
+  transform: translate(-50%, -50%);
+}
+
+/* Cầm dọc: xoay stream ngang cho phủ full màn hình */
+@media (orientation: portrait) {
+  .camera-fullscreen-video--rotated {
+    width: 100dvh;
+    height: 100vw;
+    max-width: none;
+    max-height: none;
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  .camera-fullscreen-video--normal {
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (orientation: landscape) and (max-width: 767px) {
+  .camera-fullscreen-video--rotated,
+  .camera-fullscreen-video--normal {
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.camera-fullscreen-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

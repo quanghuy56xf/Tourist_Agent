@@ -11,9 +11,28 @@ build/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+*.egg-info/
 
 # OS
 .DS_Store
 
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
+
+
+# Backend data
+backend/data/
+backend/uploads/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Cloudflare tunnel credentials
+cloudflared/config.yml
+cloudflared/*.json

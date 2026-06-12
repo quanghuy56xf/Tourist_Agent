@@ -1,0 +1,18 @@
+# Named Tunnel — domain co dinh tren Cloudflare
+#
+# CACH NHANH: chay script tu dong
+#   .\scripts\setup-named-tunnel.ps1
+#
+# CACH THU CONG:
+#   1. cloudflared tunnel login
+#   2. cloudflared tunnel create dinov2-app
+#   3. cloudflared tunnel route dns dinov2-app app.tenban.com
+#   4. Copy file nay thanh config.yml, dien TUNNEL_ID
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:\Users\<USER>\.cloudflared\<TUNNEL_ID>.json
+
+ingress:
+  - hostname: app.tenban.com
+    service: http://localhost:3000
+  - service: http_status:404

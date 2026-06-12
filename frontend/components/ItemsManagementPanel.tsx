@@ -1,0 +1,386 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import ItemCard from "@/components/ItemCard";
+import {
+  deleteItem,
+  deleteItemImage,
+  getGroupItems,
+  getUngroupedItems,
+  GroupItem,
+  GroupSummary,
+  updateItem,
+  updateItemImage,
+} from "@/lib/api";
+import { getActiveGroup, setActiveGroup } from "@/lib/activeGroup";
+import { compressImage } from "@/lib/imageCompress";
+
+type BrowseFilter = number | "ungrouped" | null;
+
+interface ItemsManagementPanelProps {
+  groups: GroupSummary[];
+  refreshToken: number;
+  onChanged: () => void;
+  onActiveGroupChange?: (groupId: number | null) => void;
+}
+
+export default function ItemsManagementPanel({
+  groups,
+  refreshToken,
+  onChanged,
+  onActiveGroupChange,
+}: ItemsManagementPanelProps) {
+  const [browseFilter, setBrowseFilter] = useState<BrowseFilter>(() => {
+    const active = getActiveGroup();
+    return active?.id ?? null;
+  });
+  const [items, setItems] = useState<GroupItem[]>([]);
+  const [browseLabel, setBrowseLabel] = useState("");
+  const [ungroupedCount, setUngroupedCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [assignGroupId, setAssignGroupId] = useState<number | "">("");
+  const [listVersion, setListVersion] = useState(0);
+
+  const refreshCounts = useCallback(async () => {
+    try {
+      const ungrouped = await getUngroupedItems();
+      setUngroupedCount(ungrouped.items.length);
+    } catch {
+      setUngroupedCount(0);
+    }
+  }, []);
+
+  const loadItems = useCallback(async () => {
+    if (browseFilter === null) {
+      setItems([]);
+      setBrowseLabel("");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      if (browseFilter === "ungrouped") {
+        const data = await getUngroupedItems();
+        setItems(data.items);
+        setBrowseLabel("Chưa có nhóm");
+        setUngroupedCount(data.items.length);
+      } else {
+        const data = await getGroupItems(browseFilter);
+        setItems(data.items);
+        setBrowseLabel(data.group_name);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được danh sách");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [browseFilter]);
+
+  useEffect(() => {
+    refreshCounts();
+  }, [refreshCounts, refreshToken]);
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditDescription("");
+  };
+
+  useEffect(() => {
+    setExpandedId(null);
+    cancelEdit();
+    loadItems();
+  }, [loadItems, refreshToken]);
+
+  useEffect(() => {
+    if (groups.length > 0 && assignGroupId === "") {
+      setAssignGroupId(groups[0].id);
+    }
+  }, [groups, assignGroupId]);
+
+  const startEdit = (item: GroupItem) => {
+    setEditingId(item.id);
+    setExpandedId(item.id);
+    setEditName(item.name);
+    setEditDescription(item.description);
+  };
+
+  const handleSave = async (itemId: number) => {
+    if (!editName.trim() || !editDescription.trim()) {
+      setError("Tên và mô tả không được để trống");
+      return;
+    }
+    setBusyId(itemId);
+    setError(null);
+    try {
+      await updateItem(itemId, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+      });
+      cancelEdit();
+      await loadItems();
+      await refreshCounts();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cập nhật thất bại");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDeleteItem = async (item: GroupItem) => {
+    if (!confirm(`Xóa vĩnh viễn "${item.name}"? Hành động này không thể hoàn tác.`))
+      return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      await deleteItem(item.id);
+      cancelEdit();
+      setExpandedId(null);
+      setListVersion((v) => v + 1);
+      await loadItems();
+      await refreshCounts();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa thất bại");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReplaceImage = async (itemId: number, angle: string) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setBusyId(itemId);
+      setError(null);
+      try {
+        const compressed = await compressImage(file);
+        await updateItemImage(itemId, angle, compressed);
+        await loadItems();
+        onChanged();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Thay ảnh thất bại");
+      } finally {
+        setBusyId(null);
+      }
+    };
+    input.click();
+  };
+
+  const handleDeleteImage = async (itemId: number, angle: string) => {
+    if (!confirm(`Xóa ảnh này?`)) return;
+    setBusyId(itemId);
+    setError(null);
+    try {
+      await deleteItemImage(itemId, angle);
+      await loadItems();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa ảnh thất bại");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRemoveFromGroup = async (item: GroupItem) => {
+    if (!confirm(`Gỡ "${item.name}" khỏi nhóm "${browseLabel}"?`)) return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      await updateItem(item.id, { remove_from_group: true });
+      await loadItems();
+      await refreshCounts();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gỡ nhóm thất bại");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleAssignToGroup = async (item: GroupItem) => {
+    if (!assignGroupId) {
+      setError("Chọn nhóm đích trước khi gán");
+      return;
+    }
+    const target = groups.find((g) => g.id === assignGroupId);
+    if (!target) return;
+
+    setBusyId(item.id);
+    setError(null);
+    try {
+      await updateItem(item.id, { group_id: assignGroupId });
+      await loadItems();
+      await refreshCounts();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gán nhóm thất bại");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const renderGroupActions = (item: GroupItem) => {
+    if (browseFilter === "ungrouped") {
+      return (
+        <>
+          <select
+            value={assignGroupId}
+            onChange={(e) =>
+              setAssignGroupId(e.target.value ? Number(e.target.value) : "")
+            }
+            className="flex-1 min-w-[140px] px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg"
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={busyId === item.id || groups.length === 0}
+            onClick={() => handleAssignToGroup(item)}
+            className="px-4 py-1.5 text-sm rounded-lg bg-emerald-800/50 hover:bg-emerald-800/70 text-emerald-200 disabled:opacity-50"
+          >
+            Gán vào nhóm
+          </button>
+        </>
+      );
+    }
+
+    if (typeof browseFilter === "number") {
+      return (
+        <button
+          type="button"
+          disabled={busyId === item.id}
+          onClick={() => handleRemoveFromGroup(item)}
+          className="px-4 py-1.5 text-sm rounded-lg bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 disabled:opacity-50"
+        >
+          Gỡ khỏi nhóm
+        </button>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <section className="rounded-xl border border-slate-700 bg-slate-900/40 overflow-hidden">
+      <div className="p-4 border-b border-slate-800 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Quản lý vật thể</h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Chọn nhóm để xem và chỉnh sửa danh sách vật thể
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            Chọn nhóm để xem &amp; đăng ký vật thể
+          </label>
+          <select
+            value={browseFilter === null ? "" : String(browseFilter)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) {
+                setBrowseFilter(null);
+              } else if (v === "ungrouped") {
+                setBrowseFilter("ungrouped");
+              } else {
+                const groupId = Number(v);
+                const group = groups.find((g) => g.id === groupId);
+                setBrowseFilter(groupId);
+                if (group) {
+                  setActiveGroup({ id: group.id, name: group.name });
+                  onActiveGroupChange?.(group.id);
+                }
+              }
+            }}
+            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+          >
+            <option value="">— Chọn nhóm để xem vật thể —</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name} ({group.item_count} vật thể)
+              </option>
+            ))}
+            <option value="ungrouped">
+              Chưa có nhóm ({ungroupedCount} vật thể)
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4 min-h-[80px]">
+        {error && (
+          <div className="p-3 rounded-lg text-sm bg-red-900/30 text-red-400 border border-red-800">
+            {error}
+          </div>
+        )}
+
+        {browseFilter === null ? (
+          <p className="text-sm text-slate-500 text-center py-6">
+            Chọn một nhóm hoặc &quot;Chưa có nhóm&quot; ở trên để hiển thị danh
+            sách vật thể.
+          </p>
+        ) : loading ? (
+          <p className="text-sm text-slate-400 text-center py-6">
+            Đang tải vật thể...
+          </p>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-6">
+            {browseFilter === "ungrouped"
+              ? "Không có vật thể nào chưa thuộc nhóm."
+              : `Nhóm "${browseLabel}" chưa có vật thể nào.`}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-slate-400">
+              <span className="text-slate-300 font-medium">{browseLabel}</span>
+              {" · "}
+              {items.length} vật thể — bấm thẻ để mở rộng
+            </p>
+            <div className="space-y-3">
+              {items.map((item) => (
+                <ItemCard
+                  key={`${item.id}-${listVersion}`}
+                  item={item}
+                  expanded={expandedId === item.id}
+                  onToggle={() =>
+                    setExpandedId((cur) => (cur === item.id ? null : item.id))
+                  }
+                  isEditing={editingId === item.id}
+                  isBusy={busyId === item.id}
+                  editName={editName}
+                  editDescription={editDescription}
+                  onEditNameChange={setEditName}
+                  onEditDescriptionChange={setEditDescription}
+                  onStartEdit={() => startEdit(item)}
+                  onCancelEdit={cancelEdit}
+                  onSave={() => handleSave(item.id)}
+                  onDelete={() => handleDeleteItem(item)}
+                  onReplaceImage={(angle) => handleReplaceImage(item.id, angle)}
+                  onDeleteImage={(angle) => handleDeleteImage(item.id, angle)}
+                  groupActions={renderGroupActions(item)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
