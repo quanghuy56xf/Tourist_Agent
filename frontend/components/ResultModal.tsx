@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchMatch, resolveImageUrl } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface ResultModalProps {
   found: boolean;
@@ -30,6 +31,7 @@ export default function ResultModal({
   message,
   onClose,
 }: ResultModalProps) {
+  const router = useRouter();
   const hasResults = results.length > 0;
 
   return (
@@ -96,9 +98,15 @@ export default function ResultModal({
                         isBest={index === 0 && found}
                       />
                     </div>
-                    <p className="text-slate-400 text-xs leading-relaxed line-clamp-3">
+                    <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 mb-2">
                       {item.description}
                     </p>
+                    <button 
+                      onClick={() => router.push(`/item/${item.item_id}`)}
+                      className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md transition-colors font-medium inline-flex items-center gap-1 shadow-lg shadow-blue-900/20"
+                    >
+                      <span>✨</span> Khám phá với AI
+                    </button>
                   </div>
                 </div>
               );

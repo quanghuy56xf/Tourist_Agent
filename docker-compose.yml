@@ -17,6 +17,17 @@ services:
       - SEARCH_TOP_N=3
       - USE_AUGMENTATION=true
       - CORS_ALLOW_ALL=true
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gemini-2.5-flash}
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-60}
+      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-2}
+      - RAG_CHROMA_PATH=./data/rag_chroma
+      - RAG_BM25_PATH=./data/rag/bm25_index.pkl
+      - RAG_CHUNKS_PATH=./data/rag/chunks.pkl
+      - MODEL_WARMUP_ENABLED=false
+      - ADMIN_AUTH_ENABLED=${ADMIN_AUTH_ENABLED:-false}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
   frontend:
     build: ./frontend
