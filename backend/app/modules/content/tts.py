@@ -8,7 +8,7 @@ from app.modules.content.personas import language_to_tts_code
 
 logger = logging.getLogger(__name__)
 
-TTS_TIMEOUT_SECONDS = 20
+TTS_TIMEOUT_SECONDS = 5
 
 
 def _synthesize_speech_inner(text: str, language: str) -> tuple[bytes, str]:

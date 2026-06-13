@@ -36,3 +36,5 @@ frontend/.env.local
 # Cloudflare tunnel credentials
 cloudflared/config.yml
 cloudflared/*.json
+
+data/
