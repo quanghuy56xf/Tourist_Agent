@@ -11,6 +11,8 @@ from app.core.database import get_db
 import app.main as main_module
 from app.main import app
 from app.models.item import Base
+from app.models.content_variant import ItemContentVariant  # noqa: F401
+from app.models.group_document import GroupDocument  # noqa: F401
 from app.modules.vision import embedding
 
 
@@ -39,8 +41,15 @@ def client(
     def override_get_db():
         yield db_session
 
+    test_session_local = sessionmaker(
+        bind=db_session.get_bind(),
+        autocommit=False,
+        autoflush=False,
+    )
     monkeypatch.setattr(embedding, "warmup", Mock())
     monkeypatch.setattr(main_module, "init_db", Mock())
+    monkeypatch.setattr("app.core.database.SessionLocal", test_session_local)
+    monkeypatch.setattr("app.modules.content.prewarm.SessionLocal", test_session_local)
     app.dependency_overrides[get_db] = override_get_db
     try:
         with TestClient(app) as test_client:

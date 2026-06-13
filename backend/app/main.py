@@ -14,6 +14,8 @@ from app.core.config import (
 from app.modules.objects import groups_router as groups, objects_router as objects, register_router as register
 from app.modules.vision import router as search
 from app.modules.llm import chat_router, story_router, tts_router
+from app.modules.content import router as content_router
+from app.modules.rag import group_documents_router
 from app.modules.vision import embedding
 from app.core.database import init_db
 
@@ -39,7 +41,9 @@ app.add_middleware(
 
 app.include_router(register.router)
 app.include_router(groups.router)
+app.include_router(group_documents_router.router)
 app.include_router(objects.router)
+app.include_router(content_router.router)
 app.include_router(search.router)
 app.include_router(story_router.router)
 app.include_router(chat_router.router)

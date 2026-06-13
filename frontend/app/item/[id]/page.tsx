@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getItem, generateContent, GroupItem, resolveImageUrl, fetchTTSAudio, chatWithAI, ChatMessage } from "@/lib/api";
+import { getItem, getItemContent, GroupItem, resolveImageUrl, chatWithAI, ChatMessage } from "@/lib/api";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -19,6 +19,7 @@ export default function ItemDetailPage() {
   // Audio state
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [hasAudio, setHasAudio] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -56,9 +57,13 @@ export default function ItemDetailPage() {
         setLoadingItem(false);
 
         try {
-          const generated = await generateContent(itemId, persona, language);
+          const itemContent = await getItemContent(itemId, persona, language);
           if (!cancelled) {
-            setContent(generated.content);
+            setContent(itemContent.content);
+            setHasAudio(itemContent.has_audio);
+            setAudioUrl(
+              itemContent.audio_url ? resolveImageUrl(itemContent.audio_url) : null
+            );
           }
         } catch (storyError) {
           if (!cancelled) {
@@ -97,32 +102,29 @@ export default function ItemDetailPage() {
   }, [chatHistory]);
 
   const handlePlayAudio = async () => {
+    if (!hasAudio || !audioUrl) {
+      alert("Không có âm thanh cho nội dung này");
+      return;
+    }
+
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
       return;
     }
 
-    if (audioUrl && audioRef.current) {
-      audioRef.current.play();
-      setIsPlaying(true);
-      return;
-    }
-
     try {
-      setLoadingAudio(true);
-      const url = await fetchTTSAudio(content, language);
-      setAudioUrl(url);
       if (!audioRef.current) {
-        audioRef.current = new Audio(url);
+        audioRef.current = new Audio(audioUrl);
         audioRef.current.onended = () => setIsPlaying(false);
       } else {
-        audioRef.current.src = url;
+        audioRef.current.src = audioUrl;
       }
-      audioRef.current.play();
+      setLoadingAudio(true);
+      await audioRef.current.play();
       setIsPlaying(true);
-    } catch (err) {
-      alert("Không thể tải âm thanh");
+    } catch {
+      alert("Không thể phát âm thanh");
     } finally {
       setLoadingAudio(false);
     }
@@ -204,7 +206,8 @@ export default function ItemDetailPage() {
               </div>
               <button 
                 onClick={handlePlayAudio}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 font-medium rounded-full active:scale-95 transition-transform"
+                disabled={!hasAudio || loadingContent}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 font-medium rounded-full active:scale-95 transition-transform disabled:opacity-50"
               >
                 {loadingAudio ? (
                   <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>

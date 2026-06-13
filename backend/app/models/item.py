@@ -6,6 +6,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from app.models.group import Group
+    from app.models.content_variant import ItemContentVariant
 
 
 class Base(DeclarativeBase):
@@ -27,3 +28,7 @@ class Item(Base):
     )
 
     group: Mapped["Group | None"] = relationship(back_populates="items")
+    content_variants: Mapped[list["ItemContentVariant"]] = relationship(
+        back_populates="item",
+        cascade="all, delete-orphan",
+    )

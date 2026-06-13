@@ -29,6 +29,7 @@ def chat_with_ai(
         item_id=item.id,
         item_name=item.name,
         item_description=item.description,
+        group_id=item.group_id,
         retriever=try_get_rag_retriever(),
         top_k=3,
     )

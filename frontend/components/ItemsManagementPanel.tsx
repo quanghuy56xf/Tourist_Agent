@@ -1,15 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ItemCard from "@/components/ItemCard";
 import {
+  CONTENT_LANGUAGES,
+  CONTENT_PERSONAS,
+  EDITABLE_CONTENT_LANGUAGE,
+  EDITABLE_CONTENT_PERSONA,
   deleteItem,
   deleteItemImage,
+  generateItemContentDraft,
   getGroupItems,
+  getItemContent,
   getUngroupedItems,
   GroupItem,
   GroupSummary,
+  isEditableContentVariant,
+  resolveImageUrl,
   updateItem,
+  updateItemContent,
   updateItemImage,
 } from "@/lib/api";
 import { getActiveGroup, setActiveGroup } from "@/lib/activeGroup";
@@ -30,10 +39,7 @@ export default function ItemsManagementPanel({
   onChanged,
   onActiveGroupChange,
 }: ItemsManagementPanelProps) {
-  const [browseFilter, setBrowseFilter] = useState<BrowseFilter>(() => {
-    const active = getActiveGroup();
-    return active?.id ?? null;
-  });
+  const [browseFilter, setBrowseFilter] = useState<BrowseFilter>(null);
   const [items, setItems] = useState<GroupItem[]>([]);
   const [browseLabel, setBrowseLabel] = useState("");
   const [ungroupedCount, setUngroupedCount] = useState(0);
@@ -46,6 +52,22 @@ export default function ItemsManagementPanel({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [assignGroupId, setAssignGroupId] = useState<number | "">("");
   const [listVersion, setListVersion] = useState(0);
+  const [storyContent, setStoryContent] = useState<string | null>(null);
+  const [storyLoading, setStoryLoading] = useState(false);
+  const [storySaving, setStorySaving] = useState(false);
+  const [storyGenerating, setStoryGenerating] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
+  const [hasStoryAudio, setHasStoryAudio] = useState(false);
+  const [storyAudioUrl, setStoryAudioUrl] = useState<string | null>(null);
+  const [isStoryPlaying, setIsStoryPlaying] = useState(false);
+  const [isEditingStory, setIsEditingStory] = useState(false);
+  const [editStoryContent, setEditStoryContent] = useState("");
+  const [selectedPersona, setSelectedPersona] = useState<string>(EDITABLE_CONTENT_PERSONA);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(EDITABLE_CONTENT_LANGUAGE);
+  const [regenNotice, setRegenNotice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const canEditStory = isEditableContentVariant(selectedPersona, selectedLanguage);
 
   const refreshCounts = useCallback(async () => {
     try {
@@ -88,23 +110,192 @@ export default function ItemsManagementPanel({
     refreshCounts();
   }, [refreshCounts, refreshToken]);
 
+  useEffect(() => {
+    const active = getActiveGroup();
+    if (active?.id) {
+      setBrowseFilter(active.id);
+    }
+  }, []);
+
   const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
     setEditDescription("");
   };
 
+  const stopStoryAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsStoryPlaying(false);
+  };
+
+  const clearStoryContent = () => {
+    setStoryContent(null);
+    setStoryLoading(false);
+    setStorySaving(false);
+    setStoryGenerating(false);
+    setStoryError(null);
+    setHasStoryAudio(false);
+    setStoryAudioUrl(null);
+    setIsEditingStory(false);
+    setEditStoryContent("");
+    setRegenNotice(null);
+    stopStoryAudio();
+  };
+
+  const resetStoryState = () => {
+    clearStoryContent();
+    setSelectedPersona(EDITABLE_CONTENT_PERSONA);
+    setSelectedLanguage(EDITABLE_CONTENT_LANGUAGE);
+  };
+
   useEffect(() => {
     setExpandedId(null);
     cancelEdit();
+    resetStoryState();
     loadItems();
   }, [loadItems, refreshToken]);
+
+  useEffect(() => {
+    if (expandedId === null) {
+      resetStoryState();
+      return;
+    }
+
+    let cancelled = false;
+    clearStoryContent();
+    setStoryLoading(true);
+
+    getItemContent(expandedId, selectedPersona, selectedLanguage)
+      .then((data) => {
+        if (cancelled) return;
+        setStoryContent(data.content);
+        setHasStoryAudio(data.has_audio);
+        setStoryAudioUrl(
+          data.audio_url ? resolveImageUrl(data.audio_url) : null
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setStoryError(
+          err instanceof Error ? err.message : "Không tải được mô tả"
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setStoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedId, selectedPersona, selectedLanguage]);
+
+  useEffect(() => {
+    if (isEditingStory && !canEditStory) {
+      setIsEditingStory(false);
+      setEditStoryContent("");
+    }
+  }, [canEditStory, isEditingStory]);
 
   useEffect(() => {
     if (groups.length > 0 && assignGroupId === "") {
       setAssignGroupId(groups[0].id);
     }
   }, [groups, assignGroupId]);
+
+  const startEditStory = () => {
+    setIsEditingStory(true);
+    setEditStoryContent(storyContent || "");
+  };
+
+  const cancelEditStory = () => {
+    setIsEditingStory(false);
+    setEditStoryContent("");
+  };
+
+  const handleSaveStory = async (itemId: number) => {
+    const trimmed = editStoryContent.trim();
+    if (!trimmed) {
+      setError("Nội dung mô tả không được để trống");
+      return;
+    }
+
+    setStorySaving(true);
+    setBusyId(itemId);
+    setError(null);
+    try {
+      const updated = await updateItemContent(
+        itemId,
+        trimmed,
+        EDITABLE_CONTENT_PERSONA,
+        EDITABLE_CONTENT_LANGUAGE
+      );
+      setStoryContent(updated.content);
+      setHasStoryAudio(updated.has_audio);
+      setStoryAudioUrl(
+        updated.audio_url ? resolveImageUrl(updated.audio_url) : null
+      );
+      setRegenNotice(
+        "Đã lưu persona Mặc định. Các persona/ngôn ngữ khác đang được AI sinh lại..."
+      );
+      setIsEditingStory(false);
+      setEditStoryContent("");
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setIsStoryPlaying(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cập nhật mô tả thất bại");
+    } finally {
+      setStorySaving(false);
+      setBusyId(null);
+    }
+  };
+
+  const handleGenerateStoryWithAI = async (itemId: number) => {
+    setStoryGenerating(true);
+    setBusyId(itemId);
+    setError(null);
+    try {
+      const draft = await generateItemContentDraft(
+        itemId,
+        EDITABLE_CONTENT_PERSONA,
+        EDITABLE_CONTENT_LANGUAGE
+      );
+      setEditStoryContent(draft.content);
+      setIsEditingStory(true);
+      setRegenNotice(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI không thể tạo nội dung");
+    } finally {
+      setStoryGenerating(false);
+      setBusyId(null);
+    }
+  };
+
+  const handleToggleStoryAudio = () => {
+    if (!hasStoryAudio || !storyAudioUrl) return;
+
+    if (isStoryPlaying && audioRef.current) {
+      audioRef.current.pause();
+      setIsStoryPlaying(false);
+      return;
+    }
+
+    const audio = new Audio(storyAudioUrl);
+    audioRef.current = audio;
+    audio.onended = () => setIsStoryPlaying(false);
+    audio.onerror = () => {
+      setIsStoryPlaying(false);
+      setError("Không phát được audio mô tả");
+    };
+    void audio.play().then(() => setIsStoryPlaying(true)).catch(() => {
+      setError("Không phát được audio mô tả");
+    });
+  };
 
   const startEdit = (item: GroupItem) => {
     setEditingId(item.id);
@@ -375,6 +566,29 @@ export default function ItemsManagementPanel({
                   onReplaceImage={(angle) => handleReplaceImage(item.id, angle)}
                   onDeleteImage={(angle) => handleDeleteImage(item.id, angle)}
                   groupActions={renderGroupActions(item)}
+                  storyContent={expandedId === item.id ? storyContent : null}
+                  storyLoading={expandedId === item.id && storyLoading}
+                  storySaving={expandedId === item.id && storySaving}
+                  storyGenerating={expandedId === item.id && storyGenerating}
+                  storyError={expandedId === item.id ? storyError : null}
+                  hasStoryAudio={expandedId === item.id && hasStoryAudio}
+                  isStoryPlaying={expandedId === item.id && isStoryPlaying}
+                  isEditingStory={expandedId === item.id && isEditingStory}
+                  editStoryContent={editStoryContent}
+                  onEditStoryContentChange={setEditStoryContent}
+                  onStartEditStory={startEditStory}
+                  onCancelEditStory={cancelEditStory}
+                  onSaveStory={() => handleSaveStory(item.id)}
+                  onGenerateStory={() => handleGenerateStoryWithAI(item.id)}
+                  onToggleStoryAudio={handleToggleStoryAudio}
+                  personas={CONTENT_PERSONAS}
+                  languages={CONTENT_LANGUAGES}
+                  selectedPersona={selectedPersona}
+                  selectedLanguage={selectedLanguage}
+                  onPersonaChange={setSelectedPersona}
+                  onLanguageChange={setSelectedLanguage}
+                  canEditStory={canEditStory}
+                  regenNotice={expandedId === item.id ? regenNotice : null}
                 />
               ))}
             </div>

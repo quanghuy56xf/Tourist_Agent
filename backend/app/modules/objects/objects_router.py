@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.models.item import Item
@@ -19,6 +19,7 @@ from app.modules.auth.dependencies import require_admin_if_enabled
 from app.modules.objects.groups import get_group_or_404
 from app.modules.objects.item_images import VALID_ANGLES, ingest_image
 from app.modules.objects.items import item_to_response
+from app.modules.content.prewarm import invalidate_and_prewarm_item_content
 from app.modules.rag.retriever import try_get_rag_retriever
 
 router = APIRouter(prefix="/api/objects", tags=["objects"])
@@ -59,6 +60,7 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 def update_item(
     item_id: int,
     payload: ItemUpdateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _admin: str | None = Depends(require_admin_if_enabled),
 ):
@@ -91,6 +93,8 @@ def update_item(
                 retriever.upsert_item_document(item.id, item.description)
         except Exception as exc:
             logger.warning("Failed to sync updated item to RAG: %s", exc)
+
+        background_tasks.add_task(invalidate_and_prewarm_item_content, item.id)
 
     return ItemUpdateResponse(item_id=item.id, message="success")
 

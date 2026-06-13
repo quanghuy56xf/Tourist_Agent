@@ -7,7 +7,12 @@ logger = logging.getLogger(__name__)
 
 
 class Retriever(Protocol):
-    def retrieve(self, query: str, top_k: int) -> list[Document]: ...
+    def retrieve(
+        self,
+        query: str,
+        top_k: int,
+        group_id: int | None = ...,
+    ) -> list[Document]: ...
 
 
 def build_item_context(
@@ -17,6 +22,7 @@ def build_item_context(
     item_description: str,
     retriever: Retriever | None,
     top_k: int = 5,
+    group_id: int | None = None,
 ) -> list[Document]:
     docs = [
         Document(
@@ -31,6 +37,7 @@ def build_item_context(
         retrieved = retriever.retrieve(
             f"Giới thiệu chi tiết về {item_name}.",
             top_k=top_k,
+            group_id=group_id,
         )
     except (MemoryError, OSError, RuntimeError, FileNotFoundError) as exc:
         logger.warning("RAG unavailable; using item description: %s", exc)
