@@ -13,12 +13,15 @@ interface CameraCaptureProps {
   onCapture: (blob: Blob) => void;
   frozen: boolean;
   capturedUrl: string | null;
+  /** inline = trong khung viewfinder (Figma); fullscreen = phủ màn hình trên mobile */
+  layout?: "inline" | "fullscreen";
 }
 
 export default function CameraCapture({
   onCapture,
   frozen,
   capturedUrl,
+  layout = "fullscreen",
 }: CameraCaptureProps) {
   const { t } = useVisitorLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,7 +32,7 @@ export default function CameraCapture({
   );
   const [rotationDeg, setRotationDeg] = useState(0);
 
-  const mobileFullscreen = mobile && !frozen;
+  const mobileFullscreen = layout === "fullscreen" && mobile && !frozen;
 
   const syncDevice = useCallback(() => {
     setMobile(isMobileDevice());
@@ -110,25 +113,39 @@ export default function CameraCapture({
 
   if (error) {
     return (
-      <div className="camera-inline-stage rounded-xl border border-slate-700 flex items-center justify-center p-4">
-        <p className="text-red-400 text-sm text-center">{error}</p>
+      <div
+        className={
+          layout === "inline"
+            ? "absolute inset-0 flex items-center justify-center p-4"
+            : "camera-inline-stage flex items-center justify-center rounded-xl border p-4"
+        }
+        style={layout === "inline" ? undefined : { borderColor: "var(--border)" }}
+      >
+        <p className="text-center text-sm text-red-400">{error}</p>
       </div>
     );
   }
 
-  const stageClass = mobileFullscreen
-    ? "camera-fullscreen-overlay"
-    : "camera-inline-stage rounded-xl border border-slate-700 relative overflow-hidden";
+  const stageClass =
+    layout === "inline" || frozen
+      ? "absolute inset-0 overflow-hidden"
+      : mobileFullscreen
+        ? "camera-fullscreen-overlay"
+        : "camera-inline-stage rounded-xl border border-slate-700 relative overflow-hidden";
 
-  const previewClass = mobileFullscreen
-    ? "camera-fullscreen-preview"
-    : "camera-inline-preview";
+  const previewClass =
+    layout === "inline" || !mobileFullscreen
+      ? "absolute inset-0 h-full w-full object-cover"
+      : "camera-fullscreen-preview";
 
-  const videoClass = mobileFullscreen
-    ? rotationDeg !== 0
-      ? "camera-fullscreen-video camera-fullscreen-video--rotated"
-      : "camera-fullscreen-video camera-fullscreen-video--normal"
-    : "camera-inline-video";
+  const videoClass =
+    layout === "inline" || !mobileFullscreen
+      ? "absolute inset-0 h-full w-full object-cover"
+      : mobileFullscreen
+        ? rotationDeg !== 0
+          ? "camera-fullscreen-video camera-fullscreen-video--rotated"
+          : "camera-fullscreen-video camera-fullscreen-video--normal"
+        : "camera-inline-video";
 
   return (
     <div className={stageClass}>

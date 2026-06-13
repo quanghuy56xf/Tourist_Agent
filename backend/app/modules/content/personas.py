@@ -24,3 +24,20 @@ def normalize_language(language: str) -> str:
 
 def language_to_tts_code(language: str) -> str:
     return "vi" if language == "Tiếng Việt" else "en"
+
+
+EDGE_TTS_VOICES: dict[str, str] = {
+    "Tiếng Việt": "vi-VN-HoaiMyNeural",
+    "Tiếng Anh": "en-US-JennyNeural",
+}
+
+
+def language_to_edge_voice(language: str) -> str:
+    if language in EDGE_TTS_VOICES:
+        return EDGE_TTS_VOICES[language]
+    normalized = normalize_language(language)
+    if normalized in EDGE_TTS_VOICES:
+        return EDGE_TTS_VOICES[normalized]
+    if language in ("vi", "vi-VN"):
+        return EDGE_TTS_VOICES["Tiếng Việt"]
+    return EDGE_TTS_VOICES["Tiếng Anh"]

@@ -13,6 +13,8 @@ from app.main import app
 from app.models.item import Base
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
+from app.models.tour import Tour, TourStop  # noqa: F401
+from app.models.user import User  # noqa: F401
 from app.modules.vision import embedding
 
 

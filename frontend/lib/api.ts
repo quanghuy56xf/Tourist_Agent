@@ -1,3 +1,5 @@
+import { AdminRole, getAdminSession } from "./adminAuth";
+
 // De trong = dung Next.js rewrite (hoat dong qua ngrok frontend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -10,6 +12,82 @@ const CONTENT_API_BASE = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || API_URL;
 const NGROK_HEADERS: HeadersInit = API_URL.includes("ngrok")
   ? { "ngrok-skip-browser-warning": "true" }
   : {};
+
+function apiHeaders(extra?: HeadersInit): HeadersInit {
+  const session = getAdminSession();
+  const auth: HeadersInit = session?.token
+    ? { Authorization: `Bearer ${session.token}` }
+    : {};
+  return { ...NGROK_HEADERS, ...auth, ...extra };
+}
+
+export interface AdminLoginResponse {
+  username: string;
+  role: AdminRole;
+  token: string;
+  group_ids: number[];
+}
+
+export interface ManagerUser {
+  id: number;
+  username: string;
+  role: AdminRole;
+  is_active: boolean;
+  group_ids: number[];
+  group_names: string[];
+  created_at: string;
+}
+
+export async function loginAdmin(username: string, password: string): Promise<AdminLoginResponse> {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Đăng nhập thất bại"));
+  return res.json();
+}
+
+export async function listManagerUsers(): Promise<ManagerUser[]> {
+  const res = await fetch(`${API_URL}/api/users`, { headers: apiHeaders() });
+  if (!res.ok) throw new Error(await parseApiError(res, "Không tải được danh sách tài khoản"));
+  return res.json();
+}
+
+export async function createManagerUser(payload: {
+  username: string;
+  password: string;
+  group_ids: number[];
+}): Promise<ManagerUser> {
+  const res = await fetch(`${API_URL}/api/users`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Tạo tài khoản thất bại"));
+  return res.json();
+}
+
+export async function updateManagerUser(
+  userId: number,
+  payload: { password?: string; group_ids?: number[]; is_active?: boolean }
+): Promise<ManagerUser> {
+  const res = await fetch(`${API_URL}/api/users/${userId}`, {
+    method: "PUT",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Cập nhật tài khoản thất bại"));
+  return res.json();
+}
+
+export async function deleteManagerUser(userId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/users/${userId}`, {
+    method: "DELETE",
+    headers: apiHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Xóa tài khoản thất bại"));
+}
 
 export interface RegisterResponse {
   item_id: number;
@@ -68,7 +146,7 @@ export async function registerObject(
   const res = await fetch(`${API_URL}/api/objects/register`, {
     method: "POST",
     body: formData,
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
 
   if (!res.ok) {
@@ -90,7 +168,7 @@ export async function searchObject(image: Blob): Promise<SearchResponse> {
   const res = await fetch(`${API_URL}/api/search`, {
     method: "POST",
     body: formData,
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
 
   if (!res.ok) {
@@ -114,9 +192,9 @@ async function parseApiError(res: Response, fallback: string): Promise<string> {
 }
 
 export async function listGroups(): Promise<GroupSummary[]> {
-  const res = await fetch(`${API_URL}/api/groups`, { headers: NGROK_HEADERS });
+  const res = await fetch(`${API_URL}/api/groups`, { headers: apiHeaders() });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Không tải được danh sách nhóm"));
+    throw new Error(await parseApiError(res, "Không tải được danh sách khu di tích"));
   }
   return res.json();
 }
@@ -124,11 +202,11 @@ export async function listGroups(): Promise<GroupSummary[]> {
 export async function createGroup(name: string): Promise<GroupSummary> {
   const res = await fetch(`${API_URL}/api/groups`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Tạo nhóm thất bại"));
+    throw new Error(await parseApiError(res, "Tạo khu di tích thất bại"));
   }
   return res.json();
 }
@@ -137,21 +215,21 @@ export async function getGroupItems(
   groupId: number
 ): Promise<GroupItemsResponse> {
   const res = await fetch(`${API_URL}/api/groups/${groupId}/items`, {
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Không tải được vật thể trong nhóm"));
+    throw new Error(await parseApiError(res, "Không tải được hiện vật trong khu di tích"));
   }
   return res.json();
 }
 
 export async function getUngroupedItems(): Promise<UngroupedItemsResponse> {
   const res = await fetch(`${API_URL}/api/objects/ungrouped`, {
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
     throw new Error(
-      await parseApiError(res, "Không tải được vật thể chưa có nhóm")
+      await parseApiError(res, "Không tải được hiện vật chưa có khu di tích")
     );
   }
   return res.json();
@@ -159,10 +237,10 @@ export async function getUngroupedItems(): Promise<UngroupedItemsResponse> {
 
 export async function getItem(itemId: number): Promise<GroupItem> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}`, {
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Không tải được thông tin vật thể"));
+    throw new Error(await parseApiError(res, "Không tải được thông tin hiện vật"));
   }
   return res.json();
 }
@@ -178,21 +256,21 @@ export async function updateItem(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}`, {
     method: "PUT",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Cập nhật vật thể thất bại"));
+    throw new Error(await parseApiError(res, "Cập nhật hiện vật thất bại"));
   }
 }
 
 export async function deleteItem(itemId: number): Promise<void> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}`, {
     method: "DELETE",
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Xóa vật thể thất bại"));
+    throw new Error(await parseApiError(res, "Xóa hiện vật thất bại"));
   }
 }
 
@@ -207,7 +285,7 @@ export async function updateItemImage(
   const res = await fetch(`${API_URL}/api/objects/${itemId}/images/${angle}`, {
     method: "PUT",
     body: formData,
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Cập nhật ảnh thất bại"));
@@ -222,7 +300,7 @@ export async function deleteItemImage(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}/images/${angle}`, {
     method: "DELETE",
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Xóa ảnh thất bại"));
@@ -252,7 +330,7 @@ export async function getGroupDocument(
 ): Promise<GroupDocumentDetail> {
   const res = await fetch(
     `${API_URL}/api/groups/${groupId}/documents/${documentId}`,
-    { headers: NGROK_HEADERS }
+    { headers: apiHeaders() }
   );
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Không tải được nội dung tài liệu"));
@@ -264,10 +342,10 @@ export async function listGroupDocuments(
   groupId: number
 ): Promise<GroupDocumentSummary[]> {
   const res = await fetch(`${API_URL}/api/groups/${groupId}/documents`, {
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Không tải được tài liệu nhóm"));
+    throw new Error(await parseApiError(res, "Không tải được tài liệu khu di tích"));
   }
   return res.json();
 }
@@ -342,7 +420,7 @@ export async function deleteGroupDocument(
     `${API_URL}/api/groups/${groupId}/documents/${documentId}`,
     {
       method: "DELETE",
-      headers: NGROK_HEADERS,
+      headers: apiHeaders(),
     }
   );
   if (!res.ok) {
@@ -383,10 +461,10 @@ export async function getItemContent(
 ): Promise<ItemContentResponse> {
   const params = new URLSearchParams({ persona, language });
   const res = await fetch(`${CONTENT_API_BASE}/api/objects/${itemId}/content?${params}`, {
-    headers: NGROK_HEADERS,
+    headers: apiHeaders(),
   });
   if (!res.ok) {
-    throw new Error(await parseApiError(res, "Không tải được nội dung vật thể"));
+    throw new Error(await parseApiError(res, "Không tải được nội dung hiện vật"));
   }
   return res.json();
 }
@@ -399,7 +477,7 @@ export async function updateItemContent(
 ): Promise<ItemContentResponse> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}/content`, {
     method: "PUT",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ content, persona, language }),
   });
   if (!res.ok) {
@@ -422,7 +500,7 @@ export async function generateItemContentDraft(
 ): Promise<ItemContentDraftResponse> {
   const res = await fetch(`${API_URL}/api/objects/${itemId}/content/draft`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ persona, language }),
   });
   if (!res.ok) {
@@ -444,7 +522,7 @@ export async function bulkRegenerateGroupContent(
 ): Promise<BulkRegenerateContentResponse> {
   const res = await fetch(`${API_URL}/api/groups/${groupId}/content/bulk-regenerate`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ document_ids: documentIds ?? null }),
   });
   if (!res.ok) {
@@ -468,7 +546,7 @@ export async function generateContent(
 ): Promise<GenerateResponse> {
   const res = await fetch(`${API_URL}/api/generate`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ item_id: itemId, persona, language }),
   });
   if (!res.ok) {
@@ -495,7 +573,7 @@ export async function chatWithAI(
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ item_id: itemId, message, history, persona, language }),
   });
   if (!res.ok) {
@@ -507,7 +585,7 @@ export async function chatWithAI(
 export async function fetchTTSAudio(text: string, language: string = "vi"): Promise<string> {
   const res = await fetch(`${API_URL}/api/tts`, {
     method: "POST",
-    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ text, language: language === "Tiếng Việt" ? "vi" : "en" }),
   });
   if (!res.ok) {
@@ -517,11 +595,103 @@ export async function fetchTTSAudio(text: string, language: string = "vi"): Prom
   return URL.createObjectURL(blob);
 }
 
+export interface TourStopPayload {
+  item_id: number;
+  hint_vi?: string;
+  hint_en?: string;
+}
+
+export interface TourWritePayload {
+  title_vi: string;
+  title_en: string;
+  description_vi?: string;
+  description_en?: string;
+  is_published?: boolean;
+  stops: TourStopPayload[];
+}
+
+export interface TourStopDetail {
+  item_id: number;
+  name: string;
+  description: string;
+  hint_vi: string;
+  hint_en: string;
+  image_url: string | null;
+  sort_order: number;
+}
+
+export interface TourSummary {
+  id: number;
+  title_vi: string;
+  title_en: string;
+  description_vi: string;
+  description_en: string;
+  is_published: boolean;
+  stop_count: number;
+  created_at: string;
+}
+
+export interface TourDetail extends TourSummary {
+  stops: TourStopDetail[];
+}
+
+export async function listTours(publishedOnly = true): Promise<TourSummary[]> {
+  const res = await fetch(`${API_URL}/api/tours?published_only=${publishedOnly}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load tours"));
+  return res.json();
+}
+
+export async function getTour(id: number, publishedOnly = true): Promise<TourDetail> {
+  const res = await fetch(
+    `${API_URL}/api/tours/${id}?published_only=${publishedOnly}`,
+    { headers: apiHeaders() }
+  );
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load tour"));
+  return res.json();
+}
+
+export async function listAllItems(): Promise<GroupItem[]> {
+  const res = await fetch(`${API_URL}/api/objects/all`, { headers: apiHeaders() });
+  if (!res.ok) throw new Error(await parseApiError(res, "Không tải được danh sách hiện vật"));
+  const data = await res.json();
+  return data.items ?? [];
+}
+
+export async function createTour(payload: TourWritePayload): Promise<TourDetail> {
+  const res = await fetch(`${API_URL}/api/tours`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to create tour"));
+  return res.json();
+}
+
+export async function updateTour(id: number, payload: TourWritePayload): Promise<TourDetail> {
+  const res = await fetch(`${API_URL}/api/tours/${id}`, {
+    method: "PUT",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to update tour"));
+  return res.json();
+}
+
+export async function deleteTour(id: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/tours/${id}`, {
+    method: "DELETE",
+    headers: apiHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to delete tour"));
+}
+
 // Export a generic fetchApi for frontend use
 export async function fetchApi(path: string, options?: RequestInit) {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: { ...NGROK_HEADERS, ...options?.headers },
+    headers: { ...apiHeaders(), ...options?.headers },
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "API request failed"));

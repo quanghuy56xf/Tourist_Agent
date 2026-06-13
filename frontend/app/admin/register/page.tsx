@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import ImagePreviewGrid from "@/components/ImagePreviewGrid";
 import ImageUploadField from "@/components/ImageUploadField";
+import {
+  AdminAlert,
+  AdminButton,
+  AdminCard,
+  AdminField,
+  AdminInput,
+  AdminLink,
+  AdminPage,
+  AdminPageHeader,
+  AdminTextarea,
+  alertClass,
+} from "@/components/admin/ui";
 import { ActiveGroup, getActiveGroup } from "@/lib/activeGroup";
-import { registerObject, listGroupDocuments } from "@/lib/api";
+import { listGroupDocuments, registerObject } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
 
 type Angle = "front" | "side" | "back";
@@ -18,7 +29,6 @@ const ANGLE_LABELS: Record<Angle, string> = {
 
 export default function RegisterPage() {
   const [activeGroup, setActiveGroupState] = useState<ActiveGroup | null>(null);
-
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<Partial<Record<Angle, File>>>({});
@@ -75,7 +85,7 @@ export default function RegisterPage() {
     if (!activeGroup) {
       setMessage({
         type: "error",
-        text: "Chưa chọn nhóm. Vào Quản lý nhóm để chọn nhóm trước.",
+        text: "Chưa chọn khu di tích. Chọn khu từ dropdown bên phải menu.",
       });
       return;
     }
@@ -101,7 +111,7 @@ export default function RegisterPage() {
       const result = await registerObject(formData);
       setMessage({
         type: "success",
-        text: `Đăng ký thành công vào nhóm "${activeGroup.name}"! ID: ${result.item_id}`,
+        text: `Đăng ký thành công vào "${activeGroup.name}"! ID: ${result.item_id}`,
       });
       setName("");
       setDescription("");
@@ -127,74 +137,53 @@ export default function RegisterPage() {
     }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Đăng ký vật thể</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Tải ảnh nhiều góc cho vật thể. Nhóm được chọn tại{" "}
-          <Link href="/admin/groups" className="text-blue-400 hover:underline">
-            Quản lý nhóm
-          </Link>
-          .
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Hiện vật"
+        title="Đăng ký hiện vật"
+        description="Tải ảnh nhiều góc cho hiện vật. Chọn khu di tích từ dropdown bên phải menu."
+      />
 
-      <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-        <p className="text-sm text-slate-400 mb-1">Nhóm đăng ký</p>
+      <AdminCard title="Khu di tích đăng ký">
         {activeGroup ? (
           <div className="space-y-2">
-            <p className="text-lg font-medium text-slate-100">{activeGroup.name}</p>
-            <p className="text-sm text-slate-400">
+            <p className="font-display text-lg">{activeGroup.name}</p>
+            <p className="admin-muted text-sm">
               {docCount === null
-                ? "Đang tải tài liệu nhóm..."
+                ? "Đang tải tài liệu khu di tích..."
                 : `${docCount} tài liệu đã index trong RAG`}
             </p>
-            <Link
-              href="/admin/groups"
-              className="inline-block text-sm text-emerald-400 hover:underline"
-            >
-              Quản lý tài liệu nhóm →
-            </Link>
+            <AdminLink href="/admin/groups">Quản lý tài liệu & hiện vật →</AdminLink>
           </div>
         ) : (
-          <div className="space-y-2">
-            <p className="text-amber-300 text-sm">Chưa chọn nhóm</p>
-            <Link
-              href="/admin/groups"
-              className="inline-block text-sm text-blue-400 hover:underline"
-            >
-              Chọn nhóm tại Quản lý nhóm →
-            </Link>
-          </div>
+          <AdminAlert type="warning">
+            Chưa chọn khu di tích. Chọn từ dropdown bên phải menu, hoặc{" "}
+            <AdminLink href="/admin" className="underline">
+              tạo khu mới
+            </AdminLink>
+            .
+          </AdminAlert>
         )}
-      </section>
+      </AdminCard>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">
-            Tên vật thể
-          </label>
-          <input
+        <AdminField label="Tên hiện vật">
+          <AdminInput
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ví dụ: Bình nước xanh"
-            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500"
           />
-        </div>
+        </AdminField>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">
-            Mô tả chi tiết
-          </label>
-          <textarea
+        <AdminField label="Mô tả chi tiết">
+          <AdminTextarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={6}
-            placeholder="Mô tả chi tiết vật thể..."
-            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+            placeholder="Mô tả chi tiết hiện vật..."
           />
-        </div>
+        </AdminField>
 
         <div className="grid gap-4 sm:grid-cols-3">
           {(["front", "side", "back"] as Angle[]).map((angle) => (
@@ -210,26 +199,12 @@ export default function RegisterPage() {
 
         <ImagePreviewGrid items={previewItems} />
 
-        {message && (
-          <div
-            className={`p-3 rounded-lg text-sm ${
-              message.type === "success"
-                ? "bg-green-900/30 text-green-400 border border-green-800"
-                : "bg-red-900/30 text-red-400 border border-red-800"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
+        {message && <div className={alertClass(message.type)}>{message.text}</div>}
 
-        <button
-          type="submit"
-          disabled={loading || !activeGroup}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-        >
-          {loading ? "Đang lưu..." : "Đăng ký vật thể"}
-        </button>
+        <AdminButton type="submit" disabled={loading || !activeGroup} className="w-full py-3">
+          {loading ? "Đang lưu..." : "Đăng ký hiện vật"}
+        </AdminButton>
       </form>
-    </div>
+    </AdminPage>
   );
 }

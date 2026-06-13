@@ -41,11 +41,12 @@ class RAGGenerator:
 
         base_instructions = f"""Nhiệm vụ của bạn:
 1. Trả lời câu hỏi CHỈ dựa trên các thông tin có trong Tài liệu được cung cấp ở trên.
-2. NẾU thông tin không có trong tài liệu, hãy nói "Tôi không tìm thấy thông tin trong tài liệu." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-3. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
-4. {lang_instruction}
-5. Giới hạn độ dài: câu trả lời không quá 300 từ.
-6. Length limit: the response must not exceed 300 words."""
+2. NẾU tài liệu KHÔNG nhắc cụ thể đến hiện vật trong câu hỏi hoặc không có đủ chi tiết, hãy trả lời chính xác câu: "Tôi không tìm thấy thông tin trong tài liệu." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
+3. KHÔNG dùng kiến thức bên ngoài tài liệu, KHÔNG suy diễn thêm.
+4. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
+5. {lang_instruction}
+6. Giới hạn độ dài: câu trả lời không quá 300 từ.
+7. Length limit: the response must not exceed 300 words."""
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):
@@ -65,7 +66,7 @@ class RAGGenerator:
 Tài liệu được cung cấp (Context):
 {context}
 
-Câu hỏi về vật thể cần tìm hiểu:
+Câu hỏi về hiện vật cần tìm hiểu:
 {query}
 
 {base_instructions}
@@ -105,7 +106,7 @@ Câu trả lời:"""
 
         prompt = f"""Bạn là biên tập viên nội dung thuyết minh di tích.
 
-Viết lại mô tả về vật thể "{item_name}" dựa trên nội dung gốc bên dưới.
+Viết lại mô tả về hiện vật "{item_name}" dựa trên nội dung gốc bên dưới.
 Giữ nguyên các thông tin chính xác, không thêm chi tiết không có trong bản gốc.
 {lang_instruction}
 KHÔNG thêm trích dẫn dạng [Trang X] hay [Mục ...] — văn bản sẽ được đọc thành audio.

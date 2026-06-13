@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { getItem, getItemContent, GroupItem, resolveImageUrl, chatWithAI, ChatMessage } from "@/lib/api";
+import BackButton from "@/components/visitor/BackButton";
+import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
+import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
+import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
+import { stopBrowserSpeech } from "@/lib/browserSpeech";
+import {
+  getItem,
+  getItemContent,
+  GroupItem,
+  resolveImageUrl,
+  chatWithAI,
+  ChatMessage,
+} from "@/lib/api";
+import { getItemImageUrls } from "@/lib/itemImages";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { language, t, ready: localeReady } = useVisitorLocale();
+  const { language, locale, t, ready: localeReady } = useVisitorLocale();
   const itemId = Number(params.id);
   const similarityParam = searchParams.get("similarity");
   const similarity = Number(similarityParam);
@@ -20,29 +33,28 @@ export default function ItemDetailPage() {
     similarity <= 1
       ? `${(similarity * 100).toFixed(1)}%`
       : null;
+  const tourId = searchParams.get("tour");
+  const inTour = Boolean(tourId);
 
   const [item, setItem] = useState<GroupItem | null>(null);
-  const [content, setContent] = useState<string>("");
+  const [content, setContent] = useState("");
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loadingItem, setLoadingItem] = useState(true);
   const [loadingContent, setLoadingContent] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
-  
-  // Audio state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [hasAudio, setHasAudio] = useState(false);
-  const [loadingAudio, setLoadingAudio] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Chat state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Persona
+  const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [persona, setPersona] = useState("Mặc định");
+  const [introActive, setIntroActive] = useState(false);
+
+  const stopGuidePlayback = () => {
+    heraPanelRef.current?.stopPlayback();
+    stopBrowserSpeech();
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -60,30 +72,25 @@ export default function ItemDetailPage() {
         setError("");
         setLoadingItem(true);
         setLoadingContent(true);
-
         const data = await getItem(itemId);
         if (cancelled) return;
         setItem(data);
         setLoadingItem(false);
-
         try {
           const itemContent = await getItemContent(itemId, persona, language);
           if (!cancelled) {
             setContent(itemContent.content);
-            setHasAudio(itemContent.has_audio);
             setAudioUrl(
-              itemContent.audio_url ? resolveImageUrl(itemContent.audio_url) : null
+              itemContent.has_audio && itemContent.audio_url
+                ? resolveImageUrl(itemContent.audio_url)
+                : null
             );
           }
         } catch {
-          if (!cancelled) {
-            setContent(t.item.contentError);
-          }
+          if (!cancelled) setContent(t.item.contentError);
         }
       } catch {
-        if (!cancelled) {
-          setError(t.item.loadError);
-        }
+        if (!cancelled) setError(t.item.loadError);
       } finally {
         if (!cancelled) {
           setLoadingItem(false);
@@ -101,64 +108,28 @@ export default function ItemDetailPage() {
   useEffect(() => {
     setChatHistory([]);
     setChatInput("");
-    audioRef.current?.pause();
-    audioRef.current = null;
-    setIsPlaying(false);
-    setAudioUrl(null);
-    setHasAudio(false);
   }, [language]);
 
   useEffect(() => {
-    // Auto-scroll chat
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatHistory]);
-
-  const handlePlayAudio = async () => {
-    if (!hasAudio || !audioUrl) {
-      alert(t.item.noAudio);
-      return;
-    }
-
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      return;
-    }
-
-    try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(audioUrl);
-        audioRef.current.onended = () => setIsPlaying(false);
-      } else {
-        audioRef.current.src = audioUrl;
-      }
-      setLoadingAudio(true);
-      await audioRef.current.play();
-      setIsPlaying(true);
-    } catch {
-      alert(t.item.audioError);
-    } finally {
-      setLoadingAudio(false);
-    }
-  };
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory, isChatting]);
 
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatting) return;
-    
-    const userMsg: ChatMessage = { role: "user", content: chatInput };
+    stopGuidePlayback();
+    const userMsg: ChatMessage = { role: "user", content: chatInput.trim() };
     const updatedHistory = [...chatHistory, userMsg];
-    
     setChatHistory(updatedHistory);
     setChatInput("");
     setIsChatting(true);
-
     try {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language);
       setChatHistory([...updatedHistory, { role: "assistant", content: res.content }]);
     } catch {
-      setChatHistory([...updatedHistory, { role: "assistant", content: t.item.chatConnectionError }]);
+      setChatHistory([
+        ...updatedHistory,
+        { role: "assistant", content: t.item.chatConnectionError },
+      ]);
     } finally {
       setIsChatting(false);
     }
@@ -166,124 +137,175 @@ export default function ItemDetailPage() {
 
   if (loadingItem) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-8 h-8 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
+        />
       </div>
     );
   }
 
   if (error || !item) {
     return (
-      <div className="min-h-screen p-6 bg-slate-50 flex flex-col items-center justify-center">
-        <p className="text-red-500 mb-4">{error || t.item.notFound}</p>
-        <button onClick={() => router.push('/scan')} className="px-4 py-2 bg-slate-200 rounded-lg">{t.common.back}</button>
+      <div className="flex min-h-screen flex-col items-center justify-center p-6">
+        <p className="mb-4" style={{ color: "var(--primary)" }}>
+          {error || t.item.notFound}
+        </p>
+        <BackButton onClick={() => router.push("/scan")} label={t.common.back} />
       </div>
     );
   }
 
   const imgSrc = resolveImageUrl(item.main_image_url);
+  const slideshowImages = getItemImageUrls(item);
 
   return (
-    <div className="min-h-screen bg-slate-100 pb-20">
-      {/* Top Card */}
-      <div className="bg-white rounded-b-3xl shadow-sm border-b overflow-hidden mb-6">
-        <div className="relative w-full h-64 bg-slate-200">
-          <button 
-            onClick={() => router.push('/scan')}
-            aria-label={t.common.back}
-            className="absolute top-4 left-4 z-10 w-10 h-10 bg-black/40 rounded-full flex items-center justify-center text-white backdrop-blur-md"
+    <div className="artifact-shell mx-auto flex min-h-screen max-w-phone flex-col overflow-hidden pb-24">
+      <div className="relative h-44 shrink-0 overflow-hidden">
+        <ItemHeroSlideshow
+          images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
+          active={!introActive}
+          alt={item.name}
+          fallbackLabel={t.common.noImage}
+        />
+        <div className="absolute inset-0 item-hero-scrim" />
+        <BackButton
+          onClick={() =>
+            router.push(inTour ? `/tour/${tourId}/play` : "/scan")
+          }
+          label={t.common.back}
+          variant="dark"
+          className="absolute left-4 top-4 z-10"
+        />
+        {confidence && (
+          <span
+            className="absolute right-4 top-4 z-10 rounded-full px-2.5 py-1 text-xs"
+            style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
           >
-            &larr;
-          </button>
-          <button className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/40 rounded-full flex items-center justify-center text-white backdrop-blur-md">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
-          </button>
-          {imgSrc ? (
-            <img src={imgSrc} alt={item.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400">{t.common.noImage}</div>
-          )}
-        </div>
-        
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-slate-800 uppercase mb-1">{item.name}</h1>
-          {confidence && (
-            <p className="text-green-600 font-medium text-sm mb-4">
-              {t.item.confidence}: {confidence}
-            </p>
-          )}
-          
-          {loadingContent ? (
-            <div className="flex flex-col items-center py-4">
-              <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-slate-400 text-sm mt-2">{t.item.composing}</p>
-            </div>
-          ) : (
-            <div>
-              <div className="prose prose-slate text-slate-700 text-sm leading-relaxed mb-4">
-                {content.split('\n').map((p, i) => <p key={i}>{p}</p>)}
-              </div>
-              <button 
-                onClick={handlePlayAudio}
-                disabled={!hasAudio || loadingContent}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 font-medium rounded-full active:scale-95 transition-transform disabled:opacity-50"
-              >
-                {loadingAudio ? (
-                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                ) : isPlaying ? (
-                  <span>⏸ {t.item.pause}</span>
-                ) : (
-                  <span>▶ {t.item.listen}</span>
-                )}
-              </button>
-            </div>
-          )}
+            {t.item.confidence}: {confidence}
+          </span>
+        )}
+        <div className="absolute bottom-3 left-4 right-4 z-10">
+          <p className="artifact-section-label mb-1">{t.item.objectLabel}</p>
+          <h1 className="font-display text-xl" lang={locale}>
+            {item.name}
+          </h1>
         </div>
       </div>
 
-      {/* Chat Section */}
-      <div className="px-4">
-        <div className="flex items-center gap-2 mb-4 px-2">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">🤖</div>
-          <h2 className="font-bold text-slate-700">{t.item.chatTitle}</h2>
+      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-4">
+        <div className="hera-guide-sticky-wrap">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+            <span className="artifact-section-label px-2">{t.item.guideSection}</span>
+            <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+          </div>
+
+          <HeraGuidePanel
+            ref={heraPanelRef}
+            content={content}
+            audioUrl={audioUrl}
+            loading={loadingContent}
+            language={language}
+            overlay={introActive}
+            slideshowImages={
+              slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []
+            }
+            slideshowAlt={item.name}
+            onIntroActiveChange={setIntroActive}
+          />
         </div>
 
-        <div className="space-y-4 mb-24 px-2">
+        <div className="mb-3 flex items-center gap-2">
+          <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+          <span className="artifact-section-label px-2">{t.item.qaSection}</span>
+          <div className="h-px flex-1" style={{ background: "var(--border)" }} />
+        </div>
+
+        <div className="space-y-3">
           {chatHistory.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${msg.role === 'user' ? 'bg-blue-100 text-blue-900 rounded-tr-none' : 'bg-white border text-slate-700 rounded-tl-none shadow-sm'}`}>
-                {msg.content}
-              </div>
+            <div
+              key={idx}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              {msg.role === "user" ? (
+                <div
+                  className="max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                  style={{
+                    background: "var(--primary)",
+                    color: "var(--primary-foreground)",
+                  }}
+                >
+                  {msg.content}
+                </div>
+              ) : (
+                <ChatAssistantBubble
+                  content={msg.content}
+                  language={language}
+                  speakLabel={t.item.speakAnswer}
+                  stopSpeakLabel={t.item.stopSpeak}
+                  onBeforeSpeak={stopGuidePlayback}
+                />
+              )}
             </div>
           ))}
           {isChatting && (
             <div className="flex justify-start">
-              <div className="bg-white border rounded-2xl rounded-tl-none px-4 py-3 text-slate-400 text-sm shadow-sm">
+              <div
+                className="artifact-card px-4 py-3 text-sm"
+                style={{ color: "var(--muted-foreground)" }}
+              >
                 {t.item.answering}
               </div>
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
-      </div>
+      </section>
 
-      {/* Chat Input Pinned Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-20 flex gap-2">
-        <input 
-          type="text" 
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-          placeholder={t.item.chatPlaceholder}
-          className="flex-1 bg-slate-100 rounded-full px-5 py-3 text-sm text-slate-800 placeholder:text-slate-500 outline-none border border-transparent focus:border-red-200"
-        />
-        <button 
-          onClick={handleSendChat}
-          disabled={!chatInput.trim() || isChatting}
-          className="bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white rounded-full px-6 font-medium transition-colors"
-        >
-          {t.item.send}
-        </button>
+      <div
+        className="fixed bottom-0 left-0 right-0 z-20 p-4"
+        style={{ background: "rgba(14,11,7,0.95)", borderTop: "1px solid var(--border)" }}
+      >
+        <div className="mx-auto max-w-phone space-y-2">
+          {inTour && (
+            <button
+              type="button"
+              onClick={() => router.push(`/tour/${tourId}/play`)}
+              className="artifact-btn-primary w-full py-3 text-sm"
+            >
+              {t.item.continueTour} →
+            </button>
+          )}
+          <div className="flex gap-2">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => {
+              setChatInput(e.target.value);
+              if (e.target.value.trim()) stopGuidePlayback();
+            }}
+            onFocus={stopGuidePlayback}
+            onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+            placeholder={t.item.chatPlaceholder}
+            className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
+            style={{
+              background: "var(--secondary)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSendChat}
+            disabled={!chatInput.trim() || isChatting}
+            className="artifact-btn-primary shrink-0 px-5 py-3 text-sm disabled:opacity-50"
+          >
+            {t.item.send}
+          </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -115,9 +115,9 @@ class HybridRetriever:
         if group_id is None:
             return True
         source = document.metadata.get("source")
-        if source == "group_doc":
-            return document.metadata.get("group_id") == group_id
-        return True
+        if source != "group_doc":
+            return False
+        return document.metadata.get("group_id") == group_id
 
     def _filter_group_scope(
         self,

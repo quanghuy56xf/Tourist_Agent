@@ -15,7 +15,8 @@ from app.schemas.object import (
 from app.modules.vision import chroma
 from app.core import storage
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_admin_if_enabled
+from app.modules.auth.dependencies import require_admin_if_enabled, resolve_current_user
+from app.modules.auth.service import ensure_group_access
 from app.modules.objects.groups import get_group_or_404
 from app.modules.objects.item_images import VALID_ANGLES, ingest_image
 from app.modules.objects.items import item_to_response
@@ -45,8 +46,16 @@ def list_ungrouped_items(db: Session = Depends(get_db)):
 
 
 @router.get("/all", response_model=UngroupedItemsResponse)
-def list_all_items(db: Session = Depends(get_db)):
-    items = db.query(Item).order_by(Item.created_at.desc()).all()
+def list_all_items(
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    query = db.query(Item)
+    if user and user.role == "manager":
+        if not user.group_ids:
+            return UngroupedItemsResponse(items=[])
+        query = query.filter(Item.group_id.in_(user.group_ids))
+    items = query.order_by(Item.created_at.desc()).all()
     return UngroupedItemsResponse(items=[item_to_response(item) for item in items])
 
 
@@ -62,14 +71,15 @@ def update_item(
     payload: ItemUpdateRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     item = _get_item_or_404(db, item_id)
+    ensure_group_access(staff, item.group_id)
 
     if payload.name is not None:
         name = payload.name.strip()
         if not name:
-            raise HTTPException(status_code=400, detail="Tên vật thể không được để trống")
+            raise HTTPException(status_code=400, detail="Tên hiện vật không được để trống")
         item.name = name
 
     if payload.description is not None:
@@ -82,6 +92,7 @@ def update_item(
         item.group_id = None
     elif payload.group_id is not None:
         get_group_or_404(db, payload.group_id)
+        ensure_group_access(staff, payload.group_id)
         item.group_id = payload.group_id
 
     db.commit()
@@ -103,9 +114,10 @@ def update_item(
 def delete_item(
     item_id: int,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     item = _get_item_or_404(db, item_id)
+    ensure_group_access(staff, item.group_id)
     db.delete(item)
     db.commit()
 
@@ -135,7 +147,7 @@ async def update_item_image(
     angle: str,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     if angle not in VALID_ANGLES:
         raise HTTPException(status_code=400, detail="Góc ảnh không hợp lệ")
@@ -143,6 +155,7 @@ async def update_item_image(
         raise HTTPException(status_code=400, detail="Ảnh là bắt buộc")
 
     item = _get_item_or_404(db, item_id)
+    ensure_group_access(staff, item.group_id)
     image_url = await ingest_image(item_id, angle, image)
 
     if angle == "front":
@@ -162,7 +175,7 @@ def delete_item_image(
     item_id: int,
     angle: str,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     if angle not in VALID_ANGLES:
         raise HTTPException(status_code=400, detail="Góc ảnh không hợp lệ")
@@ -173,6 +186,7 @@ def delete_item_image(
         )
 
     item = _get_item_or_404(db, item_id)
+    ensure_group_access(staff, item.group_id)
     if not storage.delete_image(item_id, angle):
         raise HTTPException(status_code=404, detail="Ảnh không tồn tại")
 

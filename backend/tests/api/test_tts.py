@@ -1,16 +1,12 @@
 from app.modules.llm import tts_router
 
 
-class FakeTTS:
-    def __init__(self, text, lang, slow):
-        self.text = text
-
-    def write_to_fp(self, fp):
-        fp.write(b"fake-mp3")
-
-
 def test_tts_returns_audio_stream(client, monkeypatch):
-    monkeypatch.setattr(tts_router, "gTTS", FakeTTS)
+    monkeypatch.setattr(
+        tts_router,
+        "synthesize_speech",
+        lambda text, language: (b"fake-mp3", "audio/mpeg"),
+    )
 
     response = client.post(
         "/api/tts",
@@ -32,11 +28,10 @@ def test_tts_rejects_empty_text(client):
 
 
 def test_tts_returns_stable_error_for_provider_failure(client, monkeypatch):
-    class BrokenTTS:
-        def __init__(self, **kwargs):
-            raise RuntimeError("provider details")
+    def broken_speech(text, language):
+        raise RuntimeError("provider details")
 
-    monkeypatch.setattr(tts_router, "gTTS", BrokenTTS)
+    monkeypatch.setattr(tts_router, "synthesize_speech", broken_speech)
 
     response = client.post(
         "/api/tts",

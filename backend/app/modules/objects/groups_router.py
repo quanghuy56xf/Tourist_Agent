@@ -10,7 +10,8 @@ from app.schemas.group import (
     GroupResponse,
 )
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_admin_if_enabled
+from app.modules.auth.dependencies import require_admin_role_if_enabled, resolve_current_user
+from app.modules.auth.service import ensure_group_access
 from app.modules.objects.groups import get_group_or_404
 from app.modules.objects.items import item_to_response
 
@@ -18,8 +19,11 @@ router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 
 @router.get("", response_model=list[GroupResponse])
-def list_groups(db: Session = Depends(get_db)):
-    rows = (
+def list_groups(
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    query = (
         db.query(
             Group.id,
             Group.name,
@@ -28,9 +32,13 @@ def list_groups(db: Session = Depends(get_db)):
         )
         .outerjoin(Item, Item.group_id == Group.id)
         .group_by(Group.id)
-        .order_by(Group.name.asc())
-        .all()
     )
+    if user and user.role == "manager":
+        if not user.group_ids:
+            return []
+        query = query.filter(Group.id.in_(user.group_ids))
+
+    rows = query.order_by(Group.name.asc()).all()
     return [
         GroupResponse(
             id=row.id,
@@ -46,11 +54,11 @@ def list_groups(db: Session = Depends(get_db)):
 def create_group(
     payload: GroupCreate,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    _user=Depends(require_admin_role_if_enabled),
 ):
     name = payload.name.strip()
     if not name:
-        raise HTTPException(status_code=400, detail="Tên nhóm không được để trống")
+        raise HTTPException(status_code=400, detail="Tên khu di tích không được để trống")
 
     existing = db.query(Group).filter(Group.name == name).first()
     if existing:
@@ -75,8 +83,13 @@ def create_group(
 
 
 @router.get("/{group_id}/items", response_model=GroupItemsResponse)
-def list_group_items(group_id: int, db: Session = Depends(get_db)):
+def list_group_items(
+    group_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
     group = get_group_or_404(db, group_id)
+    ensure_group_access(user, group_id)
     items = (
         db.query(Item)
         .filter(Item.group_id == group_id)

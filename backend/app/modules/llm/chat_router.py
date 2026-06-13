@@ -8,8 +8,8 @@ from app.models.item import Item
 from app.modules.content.text_utils import limit_words
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
+from app.modules.rag.service import build_verified_item_context, no_item_knowledge_message
 from app.modules.rag.retriever import try_get_rag_retriever
-from app.modules.rag.service import build_item_context
 from app.schemas.generate import ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
@@ -24,9 +24,9 @@ def chat_with_ai(
 ):
     item = db.query(Item).filter(Item.id == request.item_id).first()
     if item is None:
-        raise HTTPException(status_code=404, detail="Không tìm thấy vật thể.")
+        raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
 
-    docs = build_item_context(
+    docs, has_verified = build_verified_item_context(
         item_id=item.id,
         item_name=item.name,
         item_description=item.description,
@@ -39,6 +39,9 @@ def chat_with_ai(
         {"role": message.role, "content": message.content}
         for message in request.history
     ]
+
+    if not has_verified:
+        return ChatResponse(content=no_item_knowledge_message(request.language))
 
     try:
         content = get_rag_generator().generate_chat(

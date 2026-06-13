@@ -2,121 +2,123 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { searchObject } from "@/lib/api";
-import { compressImage } from "@/lib/imageCompress";
+import BackButton from "@/components/visitor/BackButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ResultModal from "@/components/ResultModal";
+import { SearchResponse, searchObject } from "@/lib/api";
+import { compressImage } from "@/lib/imageCompress";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+
+const methods = [
+  { id: "camera", icon: "📸", titleKey: "cameraTitle" as const, subKey: "cameraSubtitle" as const },
+  { id: "upload", icon: "🖼️", titleKey: "uploadTitle" as const, subKey: "uploadSubtitle" as const },
+  { id: "tour", icon: "🗺️", titleKey: "tourTitle" as const, subKey: "tourSubtitle" as const },
+];
 
 export default function MethodSelectionPage() {
   const router = useRouter();
   const { t } = useVisitorLocale();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    
+    if (!e.target.files?.[0]) return;
     setLoading(true);
     setErrorMsg(null);
-    
+    setSearchResult(null);
     try {
-      const file = e.target.files[0];
-      const compressed = await compressImage(file);
+      const compressed = await compressImage(e.target.files[0]);
       const response = await searchObject(compressed);
-      
       if (response.found && response.results.length > 0) {
-        const bestMatch = response.results[0];
         router.push(
-          `/item/${bestMatch.item_id}?similarity=${bestMatch.similarity}`
+          `/item/${response.results[0].item_id}?similarity=${response.results[0].similarity}`
         );
+      } else if (response.results.length > 0) {
+        setSearchResult(response);
       } else {
-        setErrorMsg(t.method.noMatch);
+        setErrorMsg(response.message || t.method.noMatch);
       }
     } catch {
       setErrorMsg(t.method.uploadError);
     } finally {
       setLoading(false);
-      // Reset input so the same file can be selected again
       e.target.value = "";
     }
   };
 
-  return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex-1 max-w-md mx-auto w-full px-6 py-12 flex flex-col">
-        {/* Header */}
-        <div className="mb-10">
-          <button 
-            onClick={() => router.push("/")}
-            aria-label={t.common.back}
-            className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 shadow-sm mb-6"
-          >
-            &larr;
-          </button>
-          <h1 className="text-3xl font-black text-slate-800 mb-3 leading-tight">
-            {t.method.titleLine1} <br/> {t.method.titleLine2}
-          </h1>
-          <p className="text-slate-500">{t.method.subtitle}</p>
-        </div>
+  const handleClick = (id: string) => {
+    if (id === "camera") router.push("/scan");
+    else if (id === "upload") document.getElementById("file-upload")?.click();
+    else if (id === "tour") router.push("/tour");
+  };
 
-        {/* Error Message */}
+  return (
+    <div className="artifact-shell">
+      <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
+        <BackButton onClick={() => router.push("/")} label={t.common.back} className="mb-6" />
+        <div className="mb-1 flex items-center gap-3">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg"
+            style={{ background: "var(--primary)" }}
+          >
+            <span style={{ color: "var(--primary-foreground)" }}>✦</span>
+          </div>
+          <span className="artifact-section-label">{t.productName}</span>
+        </div>
+        <h1 className="font-display mt-3 text-2xl">
+          {t.method.titleLine1}
+          <br />
+          {t.method.titleLine2}
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          {t.method.subtitle}
+        </p>
+      </header>
+
+      <div className="flex-1 space-y-3 px-6 py-8">
         {errorMsg && (
-          <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm">
+          <div
+            className="rounded-xl px-4 py-3 text-sm"
+            style={{ background: "rgba(212,24,61,0.15)", border: "1px solid rgba(212,24,61,0.3)" }}
+          >
             {errorMsg}
           </div>
         )}
 
-        {/* Options */}
-        <div className="w-full space-y-4">
+        {methods.map((m) => (
           <button
-            onClick={() => router.push("/scan")}
-            className="w-full text-left p-5 rounded-2xl bg-white border-2 border-red-100 hover:border-red-300 hover:bg-red-50 transition-all shadow-sm flex items-center gap-4 active:scale-95"
+            key={m.id}
+            type="button"
+            onClick={() => handleClick(m.id)}
+            className="artifact-card flex w-full items-center gap-4 p-5 text-left transition-transform active:scale-[0.98]"
           >
-            <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-2xl">
-              📸
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl text-xl"
+              style={{ background: "var(--secondary)" }}
+            >
+              {m.icon}
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-800">{t.method.cameraTitle}</h3>
-              <p className="text-sm text-slate-500">{t.method.cameraSubtitle}</p>
+              <h3 className="text-sm font-bold">{t.method[m.titleKey]}</h3>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                {t.method[m.subKey]}
+              </p>
             </div>
           </button>
-
-          <button
-            onClick={() => document.getElementById("file-upload")?.click()}
-            className="w-full text-left p-5 rounded-2xl bg-white border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm flex items-center gap-4 active:scale-95"
-          >
-            <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-2xl">
-              🖼️
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-slate-800">{t.method.uploadTitle}</h3>
-              <p className="text-sm text-slate-500">{t.method.uploadSubtitle}</p>
-            </div>
-          </button>
-          <input 
-            id="file-upload" 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
-            onChange={handleUpload}
-          />
-
-          <button
-            onClick={() => router.push("/manual")}
-            className="w-full text-left p-5 rounded-2xl bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-100 transition-all shadow-sm flex items-center gap-4 active:scale-95"
-          >
-            <div className="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center text-2xl">
-              📋
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-slate-800">{t.method.manualTitle}</h3>
-              <p className="text-sm text-slate-500">{t.method.manualSubtitle}</p>
-            </div>
-          </button>
-        </div>
+        ))}
       </div>
-      
+
+      <input id="file-upload" type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       {loading && <LoadingOverlay />}
+      {searchResult && (
+        <ResultModal
+          found={searchResult.found}
+          results={searchResult.results.slice(0, 3)}
+          message={searchResult.message}
+          onClose={() => setSearchResult(null)}
+        />
+      )}
     </div>
   );
 }

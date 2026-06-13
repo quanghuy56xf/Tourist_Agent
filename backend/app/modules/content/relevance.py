@@ -9,13 +9,11 @@ from app.modules.rag.retriever import try_get_rag_retriever
 logger = logging.getLogger(__name__)
 
 
+from app.modules.rag.service import text_mentions_item
+
+
 def _item_mentions_in_text(item: Item, text: str) -> bool:
-    lowered = text.lower()
-    name = item.name.strip().lower()
-    if name and name in lowered:
-        return True
-    description = (item.description or "").strip().lower()
-    return bool(description and len(description) >= 8 and description in lowered)
+    return text_mentions_item(item.name, item.description or "", text)
 
 
 def _name_in_documents(

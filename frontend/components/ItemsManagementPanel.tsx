@@ -31,6 +31,8 @@ interface ItemsManagementPanelProps {
   refreshToken: number;
   onChanged: () => void;
   onActiveGroupChange?: (groupId: number | null) => void;
+  fixedGroupId?: number | null;
+  hideGroupSelector?: boolean;
 }
 
 export default function ItemsManagementPanel({
@@ -38,6 +40,8 @@ export default function ItemsManagementPanel({
   refreshToken,
   onChanged,
   onActiveGroupChange,
+  fixedGroupId,
+  hideGroupSelector = false,
 }: ItemsManagementPanelProps) {
   const [browseFilter, setBrowseFilter] = useState<BrowseFilter>(null);
   const [items, setItems] = useState<GroupItem[]>([]);
@@ -78,8 +82,12 @@ export default function ItemsManagementPanel({
     }
   }, []);
 
+  const resolvedFilter: BrowseFilter = hideGroupSelector
+    ? fixedGroupId ?? null
+    : browseFilter;
+
   const loadItems = useCallback(async () => {
-    if (browseFilter === null) {
+    if (resolvedFilter === null) {
       setItems([]);
       setBrowseLabel("");
       return;
@@ -88,13 +96,13 @@ export default function ItemsManagementPanel({
     setLoading(true);
     setError(null);
     try {
-      if (browseFilter === "ungrouped") {
+      if (resolvedFilter === "ungrouped") {
         const data = await getUngroupedItems();
         setItems(data.items);
-        setBrowseLabel("Chưa có nhóm");
+        setBrowseLabel("Chưa có khu di tích");
         setUngroupedCount(data.items.length);
       } else {
-        const data = await getGroupItems(browseFilter);
+        const data = await getGroupItems(resolvedFilter);
         setItems(data.items);
         setBrowseLabel(data.group_name);
       }
@@ -104,18 +112,29 @@ export default function ItemsManagementPanel({
     } finally {
       setLoading(false);
     }
-  }, [browseFilter]);
+  }, [resolvedFilter]);
 
   useEffect(() => {
     refreshCounts();
   }, [refreshCounts, refreshToken]);
 
   useEffect(() => {
+    if (hideGroupSelector) return;
     const active = getActiveGroup();
     if (active?.id) {
       setBrowseFilter(active.id);
     }
-  }, []);
+  }, [hideGroupSelector]);
+
+  useEffect(() => {
+    if (hideGroupSelector) return;
+    const onActiveChanged = () => {
+      const active = getActiveGroup();
+      setBrowseFilter(active?.id ?? null);
+    };
+    window.addEventListener("active-group-changed", onActiveChanged);
+    return () => window.removeEventListener("active-group-changed", onActiveChanged);
+  }, [hideGroupSelector]);
 
   const cancelEdit = () => {
     setEditingId(null);
@@ -277,7 +296,7 @@ export default function ItemsManagementPanel({
   };
 
   const handleToggleStoryAudio = () => {
-    if (!hasStoryAudio || !storyAudioUrl) return;
+    if (!storyContent?.trim() || !storyAudioUrl) return;
 
     if (isStoryPlaying && audioRef.current) {
       audioRef.current.pause();
@@ -386,7 +405,7 @@ export default function ItemsManagementPanel({
   };
 
   const handleRemoveFromGroup = async (item: GroupItem) => {
-    if (!confirm(`Gỡ "${item.name}" khỏi nhóm "${browseLabel}"?`)) return;
+    if (!confirm(`Gỡ "${item.name}" khỏi khu di tích "${browseLabel}"?`)) return;
     setBusyId(item.id);
     setError(null);
     try {
@@ -395,7 +414,7 @@ export default function ItemsManagementPanel({
       await refreshCounts();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gỡ nhóm thất bại");
+      setError(err instanceof Error ? err.message : "Gỡ khu di tích thất bại");
     } finally {
       setBusyId(null);
     }
@@ -403,7 +422,7 @@ export default function ItemsManagementPanel({
 
   const handleAssignToGroup = async (item: GroupItem) => {
     if (!assignGroupId) {
-      setError("Chọn nhóm đích trước khi gán");
+      setError("Chọn khu di tích đích trước khi gán");
       return;
     }
     const target = groups.find((g) => g.id === assignGroupId);
@@ -417,14 +436,14 @@ export default function ItemsManagementPanel({
       await refreshCounts();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gán nhóm thất bại");
+      setError(err instanceof Error ? err.message : "Gán khu di tích thất bại");
     } finally {
       setBusyId(null);
     }
   };
 
   const renderGroupActions = (item: GroupItem) => {
-    if (browseFilter === "ungrouped") {
+    if (resolvedFilter === "ungrouped") {
       return (
         <>
           <select
@@ -432,7 +451,7 @@ export default function ItemsManagementPanel({
             onChange={(e) =>
               setAssignGroupId(e.target.value ? Number(e.target.value) : "")
             }
-            className="flex-1 min-w-[140px] px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg"
+            className="admin-select min-w-[140px] flex-1 px-3 py-1.5 text-sm"
           >
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -444,23 +463,23 @@ export default function ItemsManagementPanel({
             type="button"
             disabled={busyId === item.id || groups.length === 0}
             onClick={() => handleAssignToGroup(item)}
-            className="px-4 py-1.5 text-sm rounded-lg bg-emerald-800/50 hover:bg-emerald-800/70 text-emerald-200 disabled:opacity-50"
+            className="admin-btn-secondary px-4 py-1.5 text-sm disabled:opacity-50"
           >
-            Gán vào nhóm
+            Gán vào khu di tích
           </button>
         </>
       );
     }
 
-    if (typeof browseFilter === "number") {
+    if (typeof resolvedFilter === "number") {
       return (
         <button
           type="button"
           disabled={busyId === item.id}
           onClick={() => handleRemoveFromGroup(item)}
-          className="px-4 py-1.5 text-sm rounded-lg bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 disabled:opacity-50"
+          className="admin-btn-secondary px-4 py-1.5 text-sm disabled:opacity-50"
         >
-          Gỡ khỏi nhóm
+          Gỡ khỏi khu di tích
         </button>
       );
     }
@@ -469,18 +488,21 @@ export default function ItemsManagementPanel({
   };
 
   return (
-    <section className="rounded-xl border border-slate-700 bg-slate-900/40 overflow-hidden">
-      <div className="p-4 border-b border-slate-800 space-y-3">
+    <section className="admin-card overflow-hidden">
+      <div className="space-y-3 border-b admin-divider p-4">
         <div>
-          <h2 className="text-lg font-semibold">Quản lý vật thể</h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Chọn nhóm để xem và chỉnh sửa danh sách vật thể
+          <h2 className="admin-card-title">Quản lý hiện vật</h2>
+          <p className="admin-subtitle mt-1">
+            {hideGroupSelector
+              ? "Danh sách hiện vật trong khu di tích đang chọn"
+              : "Chọn khu di tích để xem và chỉnh sửa danh sách hiện vật"}
           </p>
         </div>
 
+        {!hideGroupSelector && (
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
-            Chọn nhóm để xem &amp; đăng ký vật thể
+          <label className="admin-label mb-1.5">
+            Chọn khu di tích để xem &amp; đăng ký hiện vật
           </label>
           <select
             value={browseFilter === null ? "" : String(browseFilter)}
@@ -500,49 +522,51 @@ export default function ItemsManagementPanel({
                 }
               }
             }}
-            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+            className="admin-select w-full text-sm"
           >
-            <option value="">— Chọn nhóm để xem vật thể —</option>
+            <option value="">— Chọn khu di tích để xem hiện vật —</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
-                {group.name} ({group.item_count} vật thể)
+                {group.name} ({group.item_count} hiện vật)
               </option>
             ))}
             <option value="ungrouped">
-              Chưa có nhóm ({ungroupedCount} vật thể)
+              Chưa có khu di tích ({ungroupedCount} hiện vật)
             </option>
           </select>
         </div>
+        )}
       </div>
 
       <div className="p-4 space-y-4 min-h-[80px]">
         {error && (
-          <div className="p-3 rounded-lg text-sm bg-red-900/30 text-red-400 border border-red-800">
+          <div className="admin-alert admin-alert-error text-sm">
             {error}
           </div>
         )}
 
-        {browseFilter === null ? (
-          <p className="text-sm text-slate-500 text-center py-6">
-            Chọn một nhóm hoặc &quot;Chưa có nhóm&quot; ở trên để hiển thị danh
-            sách vật thể.
+        {resolvedFilter === null ? (
+          <p className="admin-muted py-6 text-center text-sm">
+            {hideGroupSelector
+              ? "Chọn khu di tích từ dropdown bên phải menu để xem hiện vật."
+              : 'Chọn một khu di tích hoặc "Chưa có khu di tích" ở trên để hiển thị danh sách hiện vật.'}
           </p>
         ) : loading ? (
-          <p className="text-sm text-slate-400 text-center py-6">
-            Đang tải vật thể...
+          <p className="admin-muted py-6 text-center text-sm">
+            Đang tải hiện vật...
           </p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-6">
-            {browseFilter === "ungrouped"
-              ? "Không có vật thể nào chưa thuộc nhóm."
-              : `Nhóm "${browseLabel}" chưa có vật thể nào.`}
+          <p className="admin-muted py-6 text-center text-sm">
+            {resolvedFilter === "ungrouped"
+              ? "Không có hiện vật nào chưa thuộc khu di tích."
+              : `Khu di tích "${browseLabel}" chưa có hiện vật nào.`}
           </p>
         ) : (
           <>
-            <p className="text-sm text-slate-400">
-              <span className="text-slate-300 font-medium">{browseLabel}</span>
+            <p className="admin-muted text-sm">
+              <span className="font-medium" style={{ color: "var(--foreground)" }}>{browseLabel}</span>
               {" · "}
-              {items.length} vật thể — bấm thẻ để mở rộng
+              {items.length} hiện vật — bấm thẻ để mở rộng
             </p>
             <div className="space-y-3">
               {items.map((item) => (
