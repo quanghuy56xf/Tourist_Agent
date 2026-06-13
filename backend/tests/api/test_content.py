@@ -68,6 +68,40 @@ def test_upsert_variant_persists_audio_blob(db_session):
     assert variant.audio_data == b"fake-mp3"
 
 
+def test_upsert_variant_updates_existing_row(db_session):
+    item = _add_item(db_session)
+    service = ItemContentService()
+    service.upsert_variant(
+        db_session,
+        item=item,
+        persona="Mặc định",
+        language="Tiếng Việt",
+        text_content="First",
+        audio_data=b"a",
+        audio_mime="audio/mpeg",
+        source="generated",
+    )
+    result = service.upsert_variant(
+        db_session,
+        item=item,
+        persona="Mặc định",
+        language="Tiếng Việt",
+        text_content="Second",
+        audio_data=b"b",
+        audio_mime="audio/mpeg",
+        source="manual",
+    )
+
+    assert result.text_content == "Second"
+    assert result.audio_data == b"b"
+    assert (
+        db_session.query(ItemContentVariant)
+        .filter(ItemContentVariant.item_id == item.id)
+        .count()
+        == 1
+    )
+
+
 def test_get_item_content_returns_stored_variant(client, db_session):
     item = _add_item(db_session)
     db_session.add(

@@ -92,8 +92,12 @@ def _section_text(section: StructuredSection) -> str:
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
     if len(text) <= chunk_size:
         return [text]
+
+    overlap = min(max(0, overlap), max(chunk_size - 1, 0))
     chunks: list[str] = []
     start = 0
     while start < len(text):
@@ -101,7 +105,10 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
         chunks.append(text[start:end])
         if end >= len(text):
             break
-        start = max(end - overlap, start + 1)
+        next_start = end - overlap if overlap > 0 else end
+        if next_start <= start:
+            next_start = start + 1
+        start = next_start
     return chunks
 
 

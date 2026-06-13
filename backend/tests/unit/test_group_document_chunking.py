@@ -1,4 +1,4 @@
-from app.modules.rag.chunking import sections_to_chunks
+from app.modules.rag.chunking import _split_text, sections_to_chunks
 from app.modules.rag.document_parser import parse_flat_text_sections, parse_text_sections
 from app.modules.rag.types import StructuredSection
 
@@ -52,3 +52,13 @@ def test_flat_text_sections_skip_heuristic_split():
     flat_chunks = sections_to_chunks(flat_sections)
     heuristic_chunks = sections_to_chunks(heuristic_sections)
     assert len(flat_chunks) < len(heuristic_chunks)
+
+
+def test_split_text_advances_when_overlap_equals_chunk_size():
+    text = "a" * 100
+    chunks = _split_text(text, chunk_size=20, overlap=20)
+
+    assert len(chunks) >= 2
+    assert all(len(chunk) <= 20 for chunk in chunks)
+    assert chunks[0][0] == text[0]
+    assert chunks[-1][-1] == text[-1]
