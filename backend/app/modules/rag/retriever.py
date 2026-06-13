@@ -1,4 +1,5 @@
 import pickle
+import threading
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -45,6 +46,7 @@ class HybridRetriever:
             persist_directory=vector_store_path,
             embedding_function=self.embeddings,
         )
+        self._index_lock = threading.RLock()
 
     def _dense_search(
         self,
@@ -137,20 +139,21 @@ class HybridRetriever:
         fallback_threshold: float = 0.2,
         group_id: int | None = None,
     ) -> List[Document]:
-        search_k = top_k * 3 if group_id is not None else top_k
-        dense_docs, max_dense_score = self._dense_search(
-            query,
-            top_k=search_k,
-        )
-        sparse_docs = self._sparse_search(query, top_k=search_k)
+        with self._index_lock:
+            search_k = top_k * 3 if group_id is not None else top_k
+            dense_docs, max_dense_score = self._dense_search(
+                query,
+                top_k=search_k,
+            )
+            sparse_docs = self._sparse_search(query, top_k=search_k)
 
-        dense_docs = self._filter_group_scope(dense_docs, group_id)
-        sparse_docs = self._filter_group_scope(sparse_docs, group_id)
+            dense_docs = self._filter_group_scope(dense_docs, group_id)
+            sparse_docs = self._filter_group_scope(sparse_docs, group_id)
 
-        if max_dense_score < fallback_threshold:
-            return sparse_docs[:top_k]
+            if max_dense_score < fallback_threshold:
+                return sparse_docs[:top_k]
 
-        return self._rrf(dense_docs, sparse_docs)[:top_k]
+            return self._rrf(dense_docs, sparse_docs)[:top_k]
 
     def _persist_sparse_index(self) -> None:
         with open(RAG_CHUNKS_PATH, "wb") as file:
@@ -193,45 +196,49 @@ class HybridRetriever:
         document_title: str,
         chunk_drafts: List[ChunkDraft],
     ) -> None:
-        self._remove_group_document_chunks(document_id)
+        with self._index_lock:
+            self._remove_group_document_chunks(document_id)
 
-        documents: list[Document] = []
-        ids: list[str] = []
-        for index, draft in enumerate(chunk_drafts):
-            chunk_id = f"group-doc-{document_id}-chunk-{index}"
-            metadata = {
-                "source": "group_doc",
-                "group_id": group_id,
-                "document_id": document_id,
-                "document_title": document_title,
-                "section_title": draft.section_title,
-                "heading_level": draft.heading_level,
-                "chunk_index": index,
-                "chunk_strategy": draft.chunk_strategy,
-                "page": chunk_id,
-            }
-            documents.append(Document(page_content=draft.text, metadata=metadata))
-            ids.append(chunk_id)
+            documents: list[Document] = []
+            ids: list[str] = []
+            for index, draft in enumerate(chunk_drafts):
+                chunk_id = f"group-doc-{document_id}-chunk-{index}"
+                metadata = {
+                    "source": "group_doc",
+                    "group_id": group_id,
+                    "document_id": document_id,
+                    "document_title": document_title,
+                    "section_title": draft.section_title,
+                    "heading_level": draft.heading_level,
+                    "chunk_index": index,
+                    "chunk_strategy": draft.chunk_strategy,
+                    "page": chunk_id,
+                }
+                documents.append(Document(page_content=draft.text, metadata=metadata))
+                ids.append(chunk_id)
 
-        if documents:
-            self.vector_store.add_documents(documents, ids=ids)
-            self.chunks.extend(documents)
-        self._persist_sparse_index()
+            if documents:
+                self.vector_store.add_documents(documents, ids=ids)
+                self.chunks.extend(documents)
+            self._persist_sparse_index()
 
     def delete_group_document(self, document_id: int) -> None:
-        self._remove_group_document_chunks(document_id)
-        self._persist_sparse_index()
+        with self._index_lock:
+            self._remove_group_document_chunks(document_id)
+            self._persist_sparse_index()
 
     def delete_group_documents(self, group_id: int) -> None:
-        document_ids = {
-            chunk.metadata.get("document_id")
-            for chunk in self.chunks
-            if chunk.metadata.get("source") == "group_doc"
-            and chunk.metadata.get("group_id") == group_id
-        }
-        for document_id in document_ids:
-            if document_id is not None:
-                self.delete_group_document(int(document_id))
+        with self._index_lock:
+            document_ids = {
+                chunk.metadata.get("document_id")
+                for chunk in self.chunks
+                if chunk.metadata.get("source") == "group_doc"
+                and chunk.metadata.get("group_id") == group_id
+            }
+            for document_id in document_ids:
+                if document_id is not None:
+                    self._remove_group_document_chunks(int(document_id))
+            self._persist_sparse_index()
 
     def _replace_item_chunk(self, document: Document) -> None:
         item_id = document.metadata["item_id"]
@@ -244,28 +251,30 @@ class HybridRetriever:
         self._persist_sparse_index()
 
     def upsert_item_document(self, item_id: int, content: str) -> None:
-        document_id = f"item-{item_id}"
-        document = Document(
-            page_content=content,
-            metadata={
-                "source": "item",
-                "page": document_id,
-                "item_id": item_id,
-            },
-        )
-        self.vector_store.delete(ids=[document_id])
-        self.vector_store.add_documents([document], ids=[document_id])
-        self._replace_item_chunk(document)
+        with self._index_lock:
+            document_id = f"item-{item_id}"
+            document = Document(
+                page_content=content,
+                metadata={
+                    "source": "item",
+                    "page": document_id,
+                    "item_id": item_id,
+                },
+            )
+            self.vector_store.delete(ids=[document_id])
+            self.vector_store.add_documents([document], ids=[document_id])
+            self._replace_item_chunk(document)
 
     def delete_item_document(self, item_id: int) -> None:
-        document_id = f"item-{item_id}"
-        self.vector_store.delete(ids=[document_id])
-        self.chunks = [
-            chunk
-            for chunk in self.chunks
-            if chunk.metadata.get("item_id") != item_id
-        ]
-        self._persist_sparse_index()
+        with self._index_lock:
+            document_id = f"item-{item_id}"
+            self.vector_store.delete(ids=[document_id])
+            self.chunks = [
+                chunk
+                for chunk in self.chunks
+                if chunk.metadata.get("item_id") != item_id
+            ]
+            self._persist_sparse_index()
 
 
 _retriever_instance = None

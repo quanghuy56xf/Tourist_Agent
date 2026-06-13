@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from urllib.parse import urlencode
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.models.content_variant import ItemContentVariant
 from app.models.item import Item
@@ -86,15 +87,28 @@ class ItemContentService:
         persona = normalize_persona(persona)
         language = normalize_language(language)
         content_hash = compute_content_hash(item.description)
-        variant = (
-            db.query(ItemContentVariant)
-            .filter(
-                ItemContentVariant.item_id == item.id,
-                ItemContentVariant.persona == persona,
-                ItemContentVariant.language == language,
+
+        def _load_variant() -> ItemContentVariant | None:
+            return (
+                db.query(ItemContentVariant)
+                .filter(
+                    ItemContentVariant.item_id == item.id,
+                    ItemContentVariant.persona == persona,
+                    ItemContentVariant.language == language,
+                )
+                .first()
             )
-            .first()
-        )
+
+        def _apply_fields(variant: ItemContentVariant) -> ItemContentVariant:
+            variant.text_content = text_content
+            variant.audio_data = audio_data
+            variant.audio_mime = audio_mime
+            variant.source = source
+            variant.status = status
+            variant.content_hash = content_hash
+            return variant
+
+        variant = _load_variant()
         if variant is None:
             variant = ItemContentVariant(
                 item_id=item.id,
@@ -109,13 +123,18 @@ class ItemContentService:
             )
             db.add(variant)
         else:
-            variant.text_content = text_content
-            variant.audio_data = audio_data
-            variant.audio_mime = audio_mime
-            variant.source = source
-            variant.status = status
-            variant.content_hash = content_hash
-        db.commit()
+            _apply_fields(variant)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            variant = _load_variant()
+            if variant is None:
+                raise
+            _apply_fields(variant)
+            db.commit()
+
         db.refresh(variant)
         return variant
 
