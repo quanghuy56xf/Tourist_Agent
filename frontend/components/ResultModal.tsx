@@ -2,6 +2,7 @@
 
 import { SearchMatch, resolveImageUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface ResultModalProps {
   found: boolean;
@@ -10,7 +11,15 @@ interface ResultModalProps {
   onClose: () => void;
 }
 
-function SimilarityBadge({ value, isBest }: { value: number; isBest: boolean }) {
+function SimilarityBadge({
+  value,
+  isBest,
+  matchLabel,
+}: {
+  value: number;
+  isBest: boolean;
+  matchLabel: string;
+}) {
   const pct = (value * 100).toFixed(1);
   const color = isBest
     ? "bg-green-900/40 text-green-400 border-green-700"
@@ -20,7 +29,7 @@ function SimilarityBadge({ value, isBest }: { value: number; isBest: boolean }) 
 
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border ${color}`}>
-      {pct}% khớp
+      {pct}% {matchLabel}
     </span>
   );
 }
@@ -32,6 +41,7 @@ export default function ResultModal({
   onClose,
 }: ResultModalProps) {
   const router = useRouter();
+  const { t } = useVisitorLocale();
   const hasResults = results.length > 0;
 
   return (
@@ -45,10 +55,10 @@ export default function ResultModal({
             className={`text-xl font-bold ${found ? "text-green-400" : hasResults ? "text-yellow-400" : "text-red-400"}`}
           >
             {found
-              ? "Tìm thấy!"
+              ? t.results.found
               : hasResults
-                ? "Gợi ý vật thể"
-                : "Không tìm thấy"}
+                ? t.results.suggestions
+                : t.results.notFound}
           </h2>
         </div>
 
@@ -59,7 +69,7 @@ export default function ResultModal({
         {hasResults ? (
           <div className="space-y-3 mt-3">
             <p className="text-xs text-slate-500 uppercase tracking-wide">
-              Top {results.length} gần giống nhất
+              Top {results.length} {t.results.topMatches}
             </p>
             {results.map((item, index) => {
               const imgSrc = resolveImageUrl(item.image_url);
@@ -81,7 +91,7 @@ export default function ResultModal({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">
-                        No img
+                        {t.common.noImage}
                       </div>
                     )}
                   </div>
@@ -96,6 +106,7 @@ export default function ResultModal({
                       <SimilarityBadge
                         value={item.similarity}
                         isBest={index === 0 && found}
+                        matchLabel={t.results.match}
                       />
                     </div>
                     <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 mb-2">
@@ -105,7 +116,7 @@ export default function ResultModal({
                       onClick={() => router.push(`/item/${item.item_id}`)}
                       className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md transition-colors font-medium inline-flex items-center gap-1 shadow-lg shadow-blue-900/20"
                     >
-                      <span>✨</span> Khám phá với AI
+                      <span>✨</span> {t.results.explore}
                     </button>
                   </div>
                 </div>
@@ -114,7 +125,7 @@ export default function ResultModal({
           </div>
         ) : (
           <p className="text-slate-300 text-sm mt-2">
-            {message || "Không tìm thấy vật thể gần giống"}
+            {message || t.results.noSimilar}
           </p>
         )}
 
@@ -122,7 +133,7 @@ export default function ResultModal({
           onClick={onClose}
           className="mt-5 w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors"
         >
-          Đóng
+          {t.common.close}
         </button>
       </div>
     </div>

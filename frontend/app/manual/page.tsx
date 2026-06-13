@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchApi, resolveImageUrl } from "@/lib/api";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 type Item = {
   id: number;
@@ -13,6 +14,7 @@ type Item = {
 
 export default function ManualSelectionPage() {
   const router = useRouter();
+  const { t } = useVisitorLocale();
   const [allItems, setAllItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,11 +35,12 @@ export default function ManualSelectionPage() {
       <div className="bg-white p-4 border-b flex items-center gap-4 sticky top-0 z-10 shadow-sm">
         <button 
           onClick={() => router.push("/method")} 
+          aria-label={t.common.back}
           className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold"
         >
           &larr;
         </button>
-        <h1 className="font-bold text-xl text-slate-800">Chọn di tích thủ công</h1>
+        <h1 className="font-bold text-xl text-slate-800">{t.manual.title}</h1>
       </div>
       
       <div className="p-4 flex-1">
@@ -59,7 +62,7 @@ export default function ManualSelectionPage() {
                     {imageUrl ? (
                       <img src={imageUrl} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">No Image</div>
+                      <div className="w-full h-full flex items-center justify-center text-slate-400">{t.common.noImage}</div>
                     )}
                   </div>
                   <h4 className="font-bold text-sm line-clamp-2 text-slate-800">{item.name}</h4>
@@ -67,7 +70,7 @@ export default function ManualSelectionPage() {
               );
             })}
             {allItems.length === 0 && (
-              <p className="col-span-2 text-center text-slate-500 py-10">Không có di tích nào trong hệ thống.</p>
+              <p className="col-span-2 text-center text-slate-500 py-10">{t.manual.empty}</p>
             )}
           </div>
         )}

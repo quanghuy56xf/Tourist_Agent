@@ -10,7 +10,11 @@ class BrokenRetriever:
 
 
 class WorkingRetriever:
+    def __init__(self):
+        self.query = None
+
     def retrieve(self, query: str, top_k: int, group_id: int | None = None):
+        self.query = query
         return [
             Document(
                 page_content="Supplemental fact",
@@ -42,13 +46,16 @@ def test_item_description_is_always_grounding_context():
 
 
 def test_retrieval_documents_are_appended():
+    retriever = WorkingRetriever()
     docs = build_item_context(
         item_id=7,
         item_name="Test item",
         item_description="Primary description",
-        retriever=WorkingRetriever(),
+        retriever=retriever,
+        query="Ai là người xây dựng hiện vật này?",
     )
 
+    assert retriever.query == "Ai là người xây dựng hiện vật này?"
     assert [doc.page_content for doc in docs] == [
         "Primary description",
         "Supplemental fact",

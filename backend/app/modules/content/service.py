@@ -15,7 +15,11 @@ from app.modules.content.personas import (
     normalize_language,
     normalize_persona,
 )
-from app.modules.content.text_utils import strip_citations
+from app.modules.content.text_utils import (
+    GENERATION_RULES_VERSION,
+    limit_words,
+    strip_citations,
+)
 from app.modules.content.tts import synthesize_speech
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
@@ -37,9 +41,20 @@ class ItemContentResult:
     source: str
 
 
-def compute_content_hash(description: str, group_knowledge_version: int = 0) -> str:
-    del group_knowledge_version
-    return hashlib.sha256(description.encode("utf-8")).hexdigest()
+def compute_content_hash(
+    description: str,
+    group_knowledge_version: int | str = 0,
+    source: str = "generated",
+) -> str:
+    if isinstance(group_knowledge_version, str):
+        source = group_knowledge_version
+        group_knowledge_version = 0
+    hash_input = description
+    if source != "manual":
+        hash_input = (
+            f"{GENERATION_RULES_VERSION}:{group_knowledge_version}:{description}"
+        )
+    return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
 
 def build_audio_url(item_id: int, persona: str, language: str) -> str:
@@ -57,18 +72,21 @@ class ItemContentService:
     ) -> ItemContentVariant | None:
         persona = normalize_persona(persona)
         language = normalize_language(language)
-        expected_hash = compute_content_hash(item.description)
         variant = (
             db.query(ItemContentVariant)
             .filter(
                 ItemContentVariant.item_id == item.id,
                 ItemContentVariant.persona == persona,
                 ItemContentVariant.language == language,
-                ItemContentVariant.content_hash == expected_hash,
                 ItemContentVariant.status == "ready",
             )
             .first()
         )
+        if variant is None:
+            return None
+        expected_hash = compute_content_hash(item.description, source=variant.source)
+        if variant.content_hash != expected_hash:
+            return None
         return variant
 
     def upsert_variant(
@@ -86,7 +104,7 @@ class ItemContentService:
     ) -> ItemContentVariant:
         persona = normalize_persona(persona)
         language = normalize_language(language)
-        content_hash = compute_content_hash(item.description)
+        content_hash = compute_content_hash(item.description, source=source)
 
         def _load_variant() -> ItemContentVariant | None:
             return (
@@ -166,7 +184,7 @@ class ItemContentService:
                 persona=persona,
                 language=language,
             )
-            return strip_citations(content), "generated"
+            return limit_words(strip_citations(content)), "generated"
         except LLMServiceUnavailableError:
             raise
         except Exception:
@@ -220,6 +238,19 @@ class ItemContentService:
         language = normalize_language(language)
         variant = self.get_valid_variant(db, item, persona, language)
         if variant is not None:
+            if variant.audio_data is None or variant.audio_mime is None:
+                audio_result = synthesize_speech(variant.text_content, language)
+                if audio_result is not None:
+                    variant = self.upsert_variant(
+                        db,
+                        item=item,
+                        persona=persona,
+                        language=language,
+                        text_content=variant.text_content,
+                        audio_data=audio_result[0],
+                        audio_mime=audio_result[1],
+                        source=variant.source,
+                    )
             return self._variant_to_result(item.id, variant, stored=True)
 
         if persona != DEFAULT_PERSONA or language != DEFAULT_LANGUAGE:
@@ -265,7 +296,7 @@ class ItemContentService:
             persona,
             language,
         )
-        text_content = strip_citations(adapted)
+        text_content = limit_words(strip_citations(adapted))
         audio_result = synthesize_speech(text_content, language)
         audio_data = audio_result[0] if audio_result else None
         audio_mime = audio_result[1] if audio_result else None

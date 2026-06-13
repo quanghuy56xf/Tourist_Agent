@@ -6,9 +6,11 @@ import CameraCapture from "@/components/CameraCapture";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { searchObject } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function SearchPage() {
   const router = useRouter();
+  const { t } = useVisitorLocale();
   const [frozen, setFrozen] = useState(false);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,15 +29,17 @@ export default function SearchPage() {
       const response = await searchObject(compressed);
       
       if (response.found && response.results.length > 0) {
-        // Find best match and navigate
-        router.push(`/item/${response.results[0].item_id}`);
+        const bestMatch = response.results[0];
+        router.push(
+          `/item/${bestMatch.item_id}?similarity=${bestMatch.similarity}`
+        );
       } else {
-        setErrorMsg("Không nhận diện được vật thể này. Hãy thử lại hoặc chọn thủ công.");
+        setErrorMsg(t.scan.noMatch);
         setFrozen(false);
         if (capturedUrl) URL.revokeObjectURL(capturedUrl);
       }
     } catch {
-      setErrorMsg("Lỗi khi tìm kiếm. Vui lòng thử lại.");
+      setErrorMsg(t.scan.searchError);
       setFrozen(false);
       if (capturedUrl) URL.revokeObjectURL(capturedUrl);
     } finally {
@@ -56,6 +60,7 @@ export default function SearchPage() {
       <div className="absolute top-0 left-0 right-0 z-20 flex justify-between p-6">
         <button 
           onClick={() => router.push("/method")}
+          aria-label={t.common.back}
           className="w-10 h-10 rounded-full bg-black/40 flex items-center justify-center text-white backdrop-blur-md"
         >
           &larr;
@@ -78,7 +83,7 @@ export default function SearchPage() {
             {/* Corner markers could go here */}
           </div>
           <p className="text-white text-sm mt-8 font-medium drop-shadow-md">
-            Hãy hướng camera vào hiện vật và bấm nút chụp
+            {t.scan.instruction}
           </p>
         </div>
       )}
@@ -99,7 +104,7 @@ export default function SearchPage() {
               >
                 <div className="w-16 h-16 rounded-full bg-white"></div>
               </button>
-              <span className="text-[12px] font-bold text-white drop-shadow-md">Chụp ảnh</span>
+              <span className="text-[12px] font-bold text-white drop-shadow-md">{t.scan.capture}</span>
             </div>
             
           </div>
@@ -109,7 +114,7 @@ export default function SearchPage() {
       {errorMsg && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 bg-red-600/90 text-white px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap backdrop-blur-md shadow-lg flex items-center gap-3">
           {errorMsg}
-          <button onClick={resetCamera} className="bg-white/20 rounded-full px-2 py-1 text-xs">Thử lại</button>
+          <button onClick={resetCamera} className="bg-white/20 rounded-full px-2 py-1 text-xs">{t.common.retry}</button>
         </div>
       )}
 

@@ -43,7 +43,9 @@ class RAGGenerator:
 1. Trả lời câu hỏi CHỈ dựa trên các thông tin có trong Tài liệu được cung cấp ở trên.
 2. NẾU thông tin không có trong tài liệu, hãy nói "Tôi không tìm thấy thông tin trong tài liệu." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
 3. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
-4. {lang_instruction}"""
+4. {lang_instruction}
+5. Giới hạn độ dài: câu trả lời không quá 300 từ.
+6. Length limit: the response must not exceed 300 words."""
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):
@@ -107,6 +109,8 @@ Viết lại mô tả về vật thể "{item_name}" dựa trên nội dung gố
 Giữ nguyên các thông tin chính xác, không thêm chi tiết không có trong bản gốc.
 {lang_instruction}
 KHÔNG thêm trích dẫn dạng [Trang X] hay [Mục ...] — văn bản sẽ được đọc thành audio.
+Giới hạn độ dài: câu trả lời không quá 300 từ.
+Length limit: the response must not exceed 300 words.
 
 {persona_instructions}
 
@@ -127,7 +131,9 @@ Mô tả đã viết lại:"""
 1. Bạn đang đóng vai trò một trợ lý ảo tư vấn về di tích lịch sử.
 2. Trả lời câu hỏi dựa trên các thông tin có trong Tài liệu được cung cấp (nếu có).
 3. Nếu thông tin không có trong tài liệu, hãy nói "Tôi chưa có đủ thông tin xác thực để trả lời chính xác câu hỏi này." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-4. {lang_instruction}"""
+4. {lang_instruction}
+5. Giới hạn độ dài: câu trả lời không quá 300 từ.
+6. Length limit: the response must not exceed 300 words."""
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):

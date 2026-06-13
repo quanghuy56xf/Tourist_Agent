@@ -34,6 +34,65 @@ def test_chat_uses_item_description_when_rag_is_unavailable(
     assert response.json() == {"content": "Chat answer"}
 
 
+def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
+    captured = {}
+
+    class QueryGenerator:
+        def generate_chat(self, **kwargs):
+            return "Chat answer"
+
+    item = Item(name="Test item", description="Primary description")
+    db_session.add(item)
+    db_session.commit()
+
+    def fake_build_item_context(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(chat_router, "build_item_context", fake_build_item_context)
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(chat_router, "get_rag_generator", lambda: QueryGenerator())
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "item_id": item.id,
+            "message": "Ai là người xây dựng hiện vật này?",
+            "history": [],
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["query"] == "Ai là người xây dựng hiện vật này?"
+
+
+def test_chat_limits_generated_response_to_300_words(
+    client,
+    db_session,
+    monkeypatch,
+):
+    class LongGenerator:
+        def generate_chat(self, **kwargs):
+            return " ".join(f"word{i}" for i in range(301))
+
+    item = Item(name="Test item", description="Primary description")
+    db_session.add(item)
+    db_session.commit()
+
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(chat_router, "get_rag_generator", lambda: LongGenerator())
+
+    response = client.post(
+        "/api/chat",
+        json={"item_id": item.id, "message": "Question", "history": []},
+    )
+
+    assert response.status_code == 200
+    content = response.json()["content"]
+    assert len(content.removesuffix("...").split()) == 300
+    assert content.endswith("...")
+
+
 def test_chat_rejects_empty_message(client):
     response = client.post(
         "/api/chat",
