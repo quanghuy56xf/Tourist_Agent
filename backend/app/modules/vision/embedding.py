@@ -80,6 +80,24 @@ def extract_vector_from_source(source: BinaryIO | bytes | Image.Image) -> list[f
     return extract_vector(image)
 
 
+def extract_vectors_batch(images: list[Image.Image]) -> list[list[float]]:
+    """Trích xuất danh sách vector từ một batch ảnh bằng DINOv2 trong một lần chạy duy nhất."""
+    if not images:
+        return []
+    model, processor = get_model()
+    device = get_device()
+
+    inputs = processor(images=images, return_tensors="pt")
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        features = outputs.last_hidden_state[:, 0]
+        features = torch.nn.functional.normalize(features, p=2, dim=1)
+
+    return features.cpu().tolist()
+
+
 def extract_vectors_augmented(
     source: BinaryIO | bytes | Image.Image,
     augment: bool = True,
@@ -87,4 +105,4 @@ def extract_vectors_augmented(
     """Trích xuất nhiều vector từ ảnh gốc và các biến thể."""
     image = _load_image(source)
     variants = augment_image(image) if augment else [image]
-    return [extract_vector(v) for v in variants]
+    return extract_vectors_batch(variants)

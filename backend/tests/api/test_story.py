@@ -1,19 +1,21 @@
 from app.models.item import Item
 from app.modules.llm import story_router
 from app.modules.llm import client as llm_client
+from app.modules.content.service import ItemContentResult
 
 
-class FakeGenerator:
-    def generate_answer(
-        self,
-        *,
-        query,
-        retrieved_docs,
-        persona,
-        language,
-    ):
-        assert retrieved_docs[0].page_content == "Primary description"
-        return "Generated story [Trang item-1]"
+class FakeContentService:
+    def get_or_generate(self, db, item, persona, language):
+        return ItemContentResult(
+            item_id=item.id,
+            persona=persona,
+            language=language,
+            content="Generated story [Trang item-1]",
+            has_audio=False,
+            audio_url=None,
+            stored=True,
+            source="generated",
+        )
 
 
 def test_generate_uses_item_description_when_rag_is_unavailable(
@@ -25,11 +27,10 @@ def test_generate_uses_item_description_when_rag_is_unavailable(
     db_session.add(item)
     db_session.commit()
 
-    monkeypatch.setattr(story_router, "try_get_rag_retriever", lambda: None)
     monkeypatch.setattr(
         story_router,
-        "get_rag_generator",
-        lambda: FakeGenerator(),
+        "get_item_content_service",
+        lambda: FakeContentService(),
     )
 
     response = client.post(
@@ -56,20 +57,15 @@ def test_generate_returns_stable_error_when_llm_fails(
     db_session,
     monkeypatch,
 ):
-    class BrokenGenerator:
-        def generate_answer(self, **kwargs):
+    class BrokenService:
+        def get_or_generate(self, db, item, persona, language):
             raise RuntimeError("provider details")
 
     item = Item(name="Test item", description="Primary description")
     db_session.add(item)
     db_session.commit()
 
-    monkeypatch.setattr(story_router, "try_get_rag_retriever", lambda: None)
-    monkeypatch.setattr(
-        story_router,
-        "get_rag_generator",
-        lambda: BrokenGenerator(),
-    )
+    monkeypatch.setattr(story_router, "get_item_content_service", lambda: BrokenService())
 
     response = client.post("/api/generate", json={"item_id": item.id})
 
@@ -82,24 +78,18 @@ def test_generate_returns_503_when_llm_provider_is_unavailable(
     db_session,
     monkeypatch,
 ):
-    class UnavailableGenerator:
-        def generate_answer(self, **kwargs):
-            error_type = getattr(
-                llm_client,
-                "LLMServiceUnavailableError",
-                RuntimeError,
-            )
-            raise error_type("provider overloaded")
+    class UnavailableService:
+        def get_or_generate(self, db, item, persona, language):
+            raise llm_client.LLMServiceUnavailableError("provider overloaded")
 
     item = Item(name="Test item", description="Primary description")
     db_session.add(item)
     db_session.commit()
 
-    monkeypatch.setattr(story_router, "try_get_rag_retriever", lambda: None)
     monkeypatch.setattr(
         story_router,
-        "get_rag_generator",
-        lambda: UnavailableGenerator(),
+        "get_item_content_service",
+        lambda: UnavailableService(),
     )
 
     response = client.post("/api/generate", json={"item_id": item.id})

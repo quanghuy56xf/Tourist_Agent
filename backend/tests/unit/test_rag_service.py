@@ -5,12 +5,12 @@ from app.modules.rag.service import build_item_context
 
 
 class BrokenRetriever:
-    def retrieve(self, query: str, top_k: int):
+    def retrieve(self, query: str, top_k: int, group_id: int | None = None):
         raise MemoryError()
 
 
 class WorkingRetriever:
-    def retrieve(self, query: str, top_k: int):
+    def retrieve(self, query: str, top_k: int, group_id: int | None = None):
         return [
             Document(
                 page_content="Supplemental fact",
@@ -20,12 +20,12 @@ class WorkingRetriever:
 
 
 class InvalidRetriever:
-    def retrieve(self, query: str, top_k: int):
+    def retrieve(self, query: str, top_k: int, group_id: int | None = None):
         raise TypeError("broken invariant")
 
 
 class RuntimeFailureRetriever:
-    def retrieve(self, query: str, top_k: int):
+    def retrieve(self, query: str, top_k: int, group_id: int | None = None):
         raise RuntimeError("model out of memory")
 
 

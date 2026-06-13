@@ -1,14 +1,13 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.item import Item
+from app.modules.content.prewarm import invalidate_and_prewarm_item_content, prewarm_item_content
+from app.modules.content.service import get_item_content_service
 from app.modules.llm.client import LLMServiceUnavailableError
-from app.modules.llm.generator import get_rag_generator
-from app.modules.rag.retriever import try_get_rag_retriever
-from app.modules.rag.service import build_item_context
 from app.schemas.generate import GenerateRequest, GenerateResponse
 
 logger = logging.getLogger(__name__)
@@ -28,21 +27,12 @@ def generate_content(
             detail="Không tìm thấy vật thể với ID đã cho.",
         )
 
-    query = f"Giới thiệu chi tiết về {item.name}."
-    docs = build_item_context(
-        item_id=item.id,
-        item_name=item.name,
-        item_description=item.description,
-        retriever=try_get_rag_retriever(),
-        top_k=5,
-    )
-
     try:
-        content = get_rag_generator().generate_answer(
-            query=query,
-            retrieved_docs=docs,
-            persona=request.persona,
-            language=request.language,
+        result = get_item_content_service().get_or_generate(
+            db,
+            item,
+            request.persona,
+            request.language,
         )
     except LLMServiceUnavailableError:
         logger.warning("LLM provider unavailable for story item %s", item.id)
@@ -59,7 +49,7 @@ def generate_content(
 
     return GenerateResponse(
         item_id=item.id,
-        content=content,
-        persona=request.persona,
-        language=request.language,
+        content=result.content,
+        persona=result.persona,
+        language=result.language,
     )

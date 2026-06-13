@@ -5,7 +5,7 @@ import Link from "next/link";
 import ImagePreviewGrid from "@/components/ImagePreviewGrid";
 import ImageUploadField from "@/components/ImageUploadField";
 import { ActiveGroup, getActiveGroup } from "@/lib/activeGroup";
-import { registerObject } from "@/lib/api";
+import { registerObject, listGroupDocuments } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
 
 type Angle = "front" | "side" | "back";
@@ -24,6 +24,7 @@ export default function RegisterPage() {
   const [files, setFiles] = useState<Partial<Record<Angle, File>>>({});
   const [previews, setPreviews] = useState<Partial<Record<Angle, string>>>({});
   const [loading, setLoading] = useState(false);
+  const [docCount, setDocCount] = useState<number | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -43,6 +44,16 @@ export default function RegisterPage() {
       window.removeEventListener("focus", onChange);
     };
   }, [refreshActiveGroup]);
+
+  useEffect(() => {
+    if (!activeGroup) {
+      setDocCount(null);
+      return;
+    }
+    listGroupDocuments(activeGroup.id)
+      .then((docs) => setDocCount(docs.length))
+      .catch(() => setDocCount(null));
+  }, [activeGroup]);
 
   const handleFileSelect = useCallback(async (angle: Angle, file: File) => {
     const compressed = await compressImage(file);
@@ -131,7 +142,20 @@ export default function RegisterPage() {
       <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
         <p className="text-sm text-slate-400 mb-1">Nhóm đăng ký</p>
         {activeGroup ? (
-          <p className="text-lg font-medium text-slate-100">{activeGroup.name}</p>
+          <div className="space-y-2">
+            <p className="text-lg font-medium text-slate-100">{activeGroup.name}</p>
+            <p className="text-sm text-slate-400">
+              {docCount === null
+                ? "Đang tải tài liệu nhóm..."
+                : `${docCount} tài liệu đã index trong RAG`}
+            </p>
+            <Link
+              href="/admin/groups"
+              className="inline-block text-sm text-emerald-400 hover:underline"
+            >
+              Quản lý tài liệu nhóm →
+            </Link>
+          </div>
         ) : (
           <div className="space-y-2">
             <p className="text-amber-300 text-sm">Chưa chọn nhóm</p>

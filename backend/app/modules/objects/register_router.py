@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core import storage
@@ -9,6 +9,7 @@ from app.modules.auth.dependencies import require_admin_if_enabled
 from app.models.group import Group
 from app.models.item import Item
 from app.modules.objects.item_images import ingest_image
+from app.modules.content.prewarm import prewarm_item_content
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.modules.vision import chroma
 from app.schemas.register import RegisterResponse
@@ -42,6 +43,7 @@ def _resolve_group_id(
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_object(
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     description: str = Form(...),
     main_image: UploadFile = File(...),
@@ -109,5 +111,7 @@ async def register_object(
             retriever.upsert_item_document(item.id, item.description)
     except Exception as exc:
         logger.warning("Failed to sync registered item to RAG: %s", exc)
+
+    background_tasks.add_task(prewarm_item_content, item.id)
 
     return RegisterResponse(item_id=item.id, message="success")

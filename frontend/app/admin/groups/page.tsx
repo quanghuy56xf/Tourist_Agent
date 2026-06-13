@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ItemsManagementPanel from "@/components/ItemsManagementPanel";
+import GroupDocumentsPanel from "@/components/GroupDocumentsPanel";
 import {
   ActiveGroup,
   getActiveGroup,
@@ -145,6 +146,11 @@ export default function GroupsPage() {
           </div>
         )}
       </section>
+
+      <GroupDocumentsPanel
+        groupId={activeGroup?.id ?? null}
+        groupName={activeGroup?.name ?? null}
+      />
 
       <ItemsManagementPanel
         groups={groups}

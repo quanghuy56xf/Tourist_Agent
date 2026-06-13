@@ -1,6 +1,12 @@
 // De trong = dung Next.js rewrite (hoat dong qua ngrok frontend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+// File lon (vd PDF scan) upload thang vao backend de tranh gioi han proxy Next.js.
+// De trong = dung proxy nhu cu (hop ngrok).
+const UPLOAD_BASE = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || API_URL;
+// Sinh/tai noi dung persona co the mat 30s+ — goi thang backend neu co.
+const CONTENT_API_BASE = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || API_URL;
+
 const NGROK_HEADERS: HeadersInit = API_URL.includes("ngrok")
   ? { "ngrok-skip-browser-warning": "true" }
   : {};
@@ -221,6 +227,230 @@ export async function deleteItemImage(
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Xóa ảnh thất bại"));
   }
+}
+
+export interface GroupDocumentSummary {
+  id: number;
+  group_id: number;
+  title: string;
+  source_type: string;
+  original_filename: string | null;
+  chunk_count: number;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupDocumentDetail extends GroupDocumentSummary {
+  extracted_text: string;
+}
+
+export async function getGroupDocument(
+  groupId: number,
+  documentId: number
+): Promise<GroupDocumentDetail> {
+  const res = await fetch(
+    `${API_URL}/api/groups/${groupId}/documents/${documentId}`,
+    { headers: NGROK_HEADERS }
+  );
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được nội dung tài liệu"));
+  }
+  return res.json();
+}
+
+export async function listGroupDocuments(
+  groupId: number
+): Promise<GroupDocumentSummary[]> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/documents`, {
+    headers: NGROK_HEADERS,
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được tài liệu nhóm"));
+  }
+  return res.json();
+}
+
+export type GroupDocumentUploadPhase = "uploading" | "encoding" | "complete";
+
+export function createGroupDocument(
+  groupId: number,
+  formData: FormData,
+  onPhaseChange?: (phase: GroupDocumentUploadPhase) => void
+): Promise<GroupDocumentSummary> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const url = `${UPLOAD_BASE}/api/groups/${groupId}/documents`;
+
+    onPhaseChange?.("uploading");
+
+    xhr.upload.addEventListener("load", () => {
+      onPhaseChange?.("encoding");
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onPhaseChange?.("complete");
+        try {
+          resolve(JSON.parse(xhr.responseText) as GroupDocumentSummary);
+        } catch {
+          reject(new Error("Thêm tài liệu thất bại"));
+        }
+        return;
+      }
+
+      const fallback = "Thêm tài liệu thất bại";
+      try {
+        const err = JSON.parse(xhr.responseText) as { detail?: unknown };
+        const detail = err.detail;
+        reject(
+          new Error(
+            typeof detail === "string"
+              ? detail
+              : detail
+                ? JSON.stringify(detail)
+                : fallback
+          )
+        );
+      } catch {
+        reject(new Error(fallback));
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("Thêm tài liệu thất bại"));
+    });
+
+    xhr.addEventListener("abort", () => {
+      reject(new Error("Upload bị hủy"));
+    });
+
+    xhr.open("POST", url);
+    if (UPLOAD_BASE.includes("ngrok")) {
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
+    }
+    xhr.send(formData);
+  });
+}
+
+export async function deleteGroupDocument(
+  groupId: number,
+  documentId: number
+): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/groups/${groupId}/documents/${documentId}`,
+    {
+      method: "DELETE",
+      headers: NGROK_HEADERS,
+    }
+  );
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Xóa tài liệu thất bại"));
+  }
+}
+
+export interface ItemContentResponse {
+  item_id: number;
+  persona: string;
+  language: string;
+  content: string;
+  has_audio: boolean;
+  audio_url: string | null;
+  stored: boolean;
+  source: string;
+}
+
+export const CONTENT_PERSONAS = [
+  "Mặc định",
+  "Gen Z Explorer",
+  "Family Visitor",
+] as const;
+
+export const CONTENT_LANGUAGES = ["Tiếng Việt", "Tiếng Anh"] as const;
+
+export const EDITABLE_CONTENT_PERSONA = "Mặc định";
+export const EDITABLE_CONTENT_LANGUAGE = "Tiếng Việt";
+
+export function isEditableContentVariant(persona: string, language: string): boolean {
+  return persona === EDITABLE_CONTENT_PERSONA && language === EDITABLE_CONTENT_LANGUAGE;
+}
+
+export async function getItemContent(
+  itemId: number,
+  persona: string = "Mặc định",
+  language: string = "Tiếng Việt"
+): Promise<ItemContentResponse> {
+  const params = new URLSearchParams({ persona, language });
+  const res = await fetch(`${CONTENT_API_BASE}/api/objects/${itemId}/content?${params}`, {
+    headers: NGROK_HEADERS,
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được nội dung vật thể"));
+  }
+  return res.json();
+}
+
+export async function updateItemContent(
+  itemId: number,
+  content: string,
+  persona: string = "Mặc định",
+  language: string = "Tiếng Việt"
+): Promise<ItemContentResponse> {
+  const res = await fetch(`${API_URL}/api/objects/${itemId}/content`, {
+    method: "PUT",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ content, persona, language }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Cập nhật mô tả thất bại"));
+  }
+  return res.json();
+}
+
+export interface ItemContentDraftResponse {
+  item_id: number;
+  persona: string;
+  language: string;
+  content: string;
+}
+
+export async function generateItemContentDraft(
+  itemId: number,
+  persona: string = EDITABLE_CONTENT_PERSONA,
+  language: string = EDITABLE_CONTENT_LANGUAGE
+): Promise<ItemContentDraftResponse> {
+  const res = await fetch(`${API_URL}/api/objects/${itemId}/content/draft`, {
+    method: "POST",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ persona, language }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "AI không thể tạo nội dung lúc này"));
+  }
+  return res.json();
+}
+
+export interface BulkRegenerateContentResponse {
+  updated_count: number;
+  skipped_count: number;
+  updated_item_ids: number[];
+  skipped_item_ids: number[];
+}
+
+export async function bulkRegenerateGroupContent(
+  groupId: number,
+  documentIds?: number[]
+): Promise<BulkRegenerateContentResponse> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/content/bulk-regenerate`, {
+    method: "POST",
+    headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ document_ids: documentIds ?? null }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Cập nhật mô tả hàng loạt thất bại"));
+  }
+  return res.json();
 }
 
 export interface GenerateResponse {

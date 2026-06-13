@@ -27,8 +27,8 @@ class RAGGenerator:
     def _format_context(self, docs: List[Document]) -> str:
         formatted_docs = []
         for doc in docs:
-            page = doc.metadata.get('page', 'Unknown')
-            formatted_docs.append(f"[Trang {page}]: {doc.page_content}")
+            label = doc.metadata.get("section_title") or doc.metadata.get("page", "Unknown")
+            formatted_docs.append(f"[Mục {label}]: {doc.page_content}")
         return "\n\n".join(formatted_docs)
 
     def generate_answer(self, query: str, retrieved_docs: List[Document], persona: str = "Mặc định", language: str = "Tiếng Việt") -> str:
@@ -42,7 +42,7 @@ class RAGGenerator:
         base_instructions = f"""Nhiệm vụ của bạn:
 1. Trả lời câu hỏi CHỈ dựa trên các thông tin có trong Tài liệu được cung cấp ở trên.
 2. NẾU thông tin không có trong tài liệu, hãy nói "Tôi không tìm thấy thông tin trong tài liệu." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-3. BẮT BUỘC phải trích dẫn nguồn cho mỗi thông tin bạn đưa ra bằng cách thêm thẻ [Trang X] vào cuối câu trả lời hoặc cuối mỗi ý tương ứng.
+3. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
 4. {lang_instruction}"""
 
         if persona == "Gen Z Explorer":
@@ -71,6 +71,49 @@ Câu hỏi về vật thể cần tìm hiểu:
 {persona_instructions}
 
 Câu trả lời:"""
+
+        response = invoke_llm(self.llm, prompt)
+        return extract_text_content(response.content)
+
+    def adapt_content(
+        self,
+        base_content: str,
+        item_name: str,
+        persona: str = "Mặc định",
+        language: str = "Tiếng Việt",
+    ) -> str:
+        lang_instruction = (
+            "BẮT BUỘC viết bằng Tiếng Việt."
+            if language == "Tiếng Việt"
+            else "BẮT BUỘC viết bằng Tiếng Anh (MUST WRITE IN ENGLISH)."
+        )
+
+        if persona == "Gen Z Explorer":
+            persona_instructions = """Phong cách (Gen Z Explorer):
+- Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
+- Đưa các sự thật bất ngờ lên đầu nếu phù hợp.
+- Có thể dùng emoji hợp lý."""
+        elif persona == "Family Visitor":
+            persona_instructions = """Phong cách (Family Visitor):
+- Dành cho phụ huynh đi cùng con nhỏ.
+- Kể chuyện, ví von đơn giản.
+- Tránh thuật ngữ hàn lâm."""
+        else:
+            persona_instructions = """Phong cách: Mặc định, rõ ràng, lịch sự và chính xác."""
+
+        prompt = f"""Bạn là biên tập viên nội dung thuyết minh di tích.
+
+Viết lại mô tả về vật thể "{item_name}" dựa trên nội dung gốc bên dưới.
+Giữ nguyên các thông tin chính xác, không thêm chi tiết không có trong bản gốc.
+{lang_instruction}
+KHÔNG thêm trích dẫn dạng [Trang X] hay [Mục ...] — văn bản sẽ được đọc thành audio.
+
+{persona_instructions}
+
+Nội dung gốc:
+{base_content}
+
+Mô tả đã viết lại:"""
 
         response = invoke_llm(self.llm, prompt)
         return extract_text_content(response.content)
