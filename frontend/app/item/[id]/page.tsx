@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getItem, getItemContent, GroupItem, resolveImageUrl, chatWithAI, ChatMessage } from "@/lib/api";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { language, t, ready: localeReady } = useVisitorLocale();
   const itemId = Number(params.id);
+  const similarityParam = searchParams.get("similarity");
+  const similarity = Number(similarityParam);
+  const confidence =
+    similarityParam !== null &&
+    Number.isFinite(similarity) &&
+    similarity >= 0 &&
+    similarity <= 1
+      ? `${(similarity * 100).toFixed(1)}%`
+      : null;
 
   const [item, setItem] = useState<GroupItem | null>(null);
   const [content, setContent] = useState<string>("");
@@ -31,18 +43,16 @@ export default function ItemDetailPage() {
 
   // Persona
   const [persona, setPersona] = useState("Mặc định");
-  const [language, setLanguage] = useState("Tiếng Việt");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setPersona(localStorage.getItem("user_persona") || "Mặc định");
-      setLanguage(localStorage.getItem("user_language") || "Tiếng Việt");
     }
     setPreferencesLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (!itemId || !preferencesLoaded) return;
+    if (!itemId || !preferencesLoaded || !localeReady) return;
     let cancelled = false;
 
     async function loadItemAndStory() {
@@ -65,20 +75,14 @@ export default function ItemDetailPage() {
               itemContent.audio_url ? resolveImageUrl(itemContent.audio_url) : null
             );
           }
-        } catch (storyError) {
+        } catch {
           if (!cancelled) {
-            setContent(
-              storyError instanceof Error
-                ? storyError.message
-                : "Không thể sinh nội dung lúc này"
-            );
+            setContent(t.item.contentError);
           }
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Không thể tải nội dung"
-          );
+          setError(t.item.loadError);
         }
       } finally {
         if (!cancelled) {
@@ -92,7 +96,17 @@ export default function ItemDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [itemId, persona, language, preferencesLoaded]);
+  }, [itemId, persona, language, localeReady, preferencesLoaded, t.item.contentError, t.item.loadError]);
+
+  useEffect(() => {
+    setChatHistory([]);
+    setChatInput("");
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setIsPlaying(false);
+    setAudioUrl(null);
+    setHasAudio(false);
+  }, [language]);
 
   useEffect(() => {
     // Auto-scroll chat
@@ -103,7 +117,7 @@ export default function ItemDetailPage() {
 
   const handlePlayAudio = async () => {
     if (!hasAudio || !audioUrl) {
-      alert("Không có âm thanh cho nội dung này");
+      alert(t.item.noAudio);
       return;
     }
 
@@ -124,7 +138,7 @@ export default function ItemDetailPage() {
       await audioRef.current.play();
       setIsPlaying(true);
     } catch {
-      alert("Không thể phát âm thanh");
+      alert(t.item.audioError);
     } finally {
       setLoadingAudio(false);
     }
@@ -143,8 +157,8 @@ export default function ItemDetailPage() {
     try {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language);
       setChatHistory([...updatedHistory, { role: "assistant", content: res.content }]);
-    } catch (err) {
-      setChatHistory([...updatedHistory, { role: "assistant", content: "Lỗi kết nối. Vui lòng thử lại sau." }]);
+    } catch {
+      setChatHistory([...updatedHistory, { role: "assistant", content: t.item.chatConnectionError }]);
     } finally {
       setIsChatting(false);
     }
@@ -161,8 +175,8 @@ export default function ItemDetailPage() {
   if (error || !item) {
     return (
       <div className="min-h-screen p-6 bg-slate-50 flex flex-col items-center justify-center">
-        <p className="text-red-500 mb-4">{error || "Không tìm thấy vật thể"}</p>
-        <button onClick={() => router.push('/scan')} className="px-4 py-2 bg-slate-200 rounded-lg">Quay lại</button>
+        <p className="text-red-500 mb-4">{error || t.item.notFound}</p>
+        <button onClick={() => router.push('/scan')} className="px-4 py-2 bg-slate-200 rounded-lg">{t.common.back}</button>
       </div>
     );
   }
@@ -176,6 +190,7 @@ export default function ItemDetailPage() {
         <div className="relative w-full h-64 bg-slate-200">
           <button 
             onClick={() => router.push('/scan')}
+            aria-label={t.common.back}
             className="absolute top-4 left-4 z-10 w-10 h-10 bg-black/40 rounded-full flex items-center justify-center text-white backdrop-blur-md"
           >
             &larr;
@@ -186,18 +201,22 @@ export default function ItemDetailPage() {
           {imgSrc ? (
             <img src={imgSrc} alt={item.name} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400">No Image</div>
+            <div className="w-full h-full flex items-center justify-center text-slate-400">{t.common.noImage}</div>
           )}
         </div>
         
         <div className="p-6">
           <h1 className="text-2xl font-bold text-slate-800 uppercase mb-1">{item.name}</h1>
-          <p className="text-green-600 font-medium text-sm mb-4">Độ chính xác: 96%</p>
+          {confidence && (
+            <p className="text-green-600 font-medium text-sm mb-4">
+              {t.item.confidence}: {confidence}
+            </p>
+          )}
           
           {loadingContent ? (
             <div className="flex flex-col items-center py-4">
               <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-slate-400 text-sm mt-2">AI đang soạn nội dung...</p>
+              <p className="text-slate-400 text-sm mt-2">{t.item.composing}</p>
             </div>
           ) : (
             <div>
@@ -212,9 +231,9 @@ export default function ItemDetailPage() {
                 {loadingAudio ? (
                   <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
                 ) : isPlaying ? (
-                  <span>⏸ Tạm dừng</span>
+                  <span>⏸ {t.item.pause}</span>
                 ) : (
-                  <span>▶ Nghe đoạn văn</span>
+                  <span>▶ {t.item.listen}</span>
                 )}
               </button>
             </div>
@@ -226,7 +245,7 @@ export default function ItemDetailPage() {
       <div className="px-4">
         <div className="flex items-center gap-2 mb-4 px-2">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">🤖</div>
-          <h2 className="font-bold text-slate-700">Hỏi đáp thêm với Trợ lý AI về hiện vật này</h2>
+          <h2 className="font-bold text-slate-700">{t.item.chatTitle}</h2>
         </div>
 
         <div className="space-y-4 mb-24 px-2">
@@ -240,7 +259,7 @@ export default function ItemDetailPage() {
           {isChatting && (
             <div className="flex justify-start">
               <div className="bg-white border rounded-2xl rounded-tl-none px-4 py-3 text-slate-400 text-sm shadow-sm">
-                Đang trả lời...
+                {t.item.answering}
               </div>
             </div>
           )}
@@ -255,7 +274,7 @@ export default function ItemDetailPage() {
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-          placeholder="Nhập câu hỏi của bạn tại đây..." 
+          placeholder={t.item.chatPlaceholder}
           className="flex-1 bg-slate-100 rounded-full px-5 py-3 text-sm text-slate-800 placeholder:text-slate-500 outline-none border border-transparent focus:border-red-200"
         />
         <button 
@@ -263,7 +282,7 @@ export default function ItemDetailPage() {
           disabled={!chatInput.trim() || isChatting}
           className="bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white rounded-full px-6 font-medium transition-colors"
         >
-          Gửi
+          {t.item.send}
         </button>
       </div>
     </div>

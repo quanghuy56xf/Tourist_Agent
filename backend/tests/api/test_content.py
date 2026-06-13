@@ -1,3 +1,4 @@
+import hashlib
 from unittest.mock import Mock
 
 import pytest
@@ -25,6 +26,57 @@ def _add_item(db_session, **overrides) -> Item:
 
 def test_compute_content_hash_changes_when_description_changes():
     assert compute_content_hash("a") != compute_content_hash("b")
+
+
+def test_generation_rules_change_generated_hash_but_preserve_manual_hash():
+    generated = compute_content_hash("Description", source="generated")
+    manual = compute_content_hash("Description", source="manual")
+
+    assert generated != manual
+    assert manual == hashlib.sha256(b"Description").hexdigest()
+
+
+def test_generated_item_content_is_limited_before_persistence(
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    long_text = " ".join(f"word{i}" for i in range(301))
+    monkeypatch.setattr(
+        "app.modules.content.service.get_rag_generator",
+        lambda: Mock(generate_answer=Mock(return_value=long_text)),
+    )
+    monkeypatch.setattr(
+        "app.modules.content.service.try_get_rag_retriever",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "app.modules.content.service.synthesize_speech",
+        lambda text, language: None,
+    )
+
+    result = ItemContentService().generate_and_persist(
+        db_session, item, "Mặc định", "Tiếng Việt"
+    )
+
+    assert len(result.content.removesuffix("...").split()) == 300
+    stored = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
+    assert stored.text_content == result.content
+
+
+def test_manual_content_is_not_truncated(db_session, monkeypatch):
+    item = _add_item(db_session)
+    long_text = " ".join(f"word{i}" for i in range(350))
+    monkeypatch.setattr(
+        "app.modules.content.service.synthesize_speech",
+        lambda text, language: None,
+    )
+
+    result = ItemContentService().update_content(
+        db_session, item, "Mặc định", "Tiếng Việt", long_text
+    )
+
+    assert len(result.content.split()) == 350
 
 
 def test_get_valid_variant_requires_matching_hash(db_session):
@@ -130,6 +182,44 @@ def test_get_item_content_returns_stored_variant(client, db_session):
     assert payload["stored"] is True
     assert payload["has_audio"] is True
     assert payload["audio_url"].startswith(f"/api/objects/{item.id}/content/audio")
+
+
+def test_get_or_generate_repairs_stored_variant_without_audio(
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    db_session.add(
+        ItemContentVariant(
+            item_id=item.id,
+            persona="Mặc định",
+            language="Tiếng Việt",
+            text_content="Stored LLM story",
+            audio_data=None,
+            audio_mime=None,
+            content_hash=compute_content_hash(item.description),
+            status="ready",
+            source="generated",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        "app.modules.content.service.synthesize_speech",
+        lambda text, language: (b"repaired-audio", "audio/mpeg"),
+    )
+
+    result = ItemContentService().get_or_generate(
+        db_session,
+        item,
+        "Mặc định",
+        "Tiếng Việt",
+    )
+
+    assert result.stored is True
+    assert result.has_audio is True
+    variant = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
+    assert variant.audio_data == b"repaired-audio"
+    assert variant.audio_mime == "audio/mpeg"
 
 
 def test_get_item_content_generates_when_missing(client, db_session, monkeypatch):
@@ -273,6 +363,10 @@ def test_update_item_content_regenerates_other_variants(
 def test_generate_item_content_draft(client, db_session, monkeypatch):
     item = _add_item(db_session)
 
+    monkeypatch.setattr(
+        "app.modules.content.service.try_get_rag_retriever",
+        lambda: None,
+    )
     monkeypatch.setattr(
         "app.modules.content.service.get_rag_generator",
         lambda: Mock(

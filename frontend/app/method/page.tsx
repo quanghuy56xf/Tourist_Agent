@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { searchObject } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function MethodSelectionPage() {
   const router = useRouter();
+  const { t } = useVisitorLocale();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -23,12 +25,15 @@ export default function MethodSelectionPage() {
       const response = await searchObject(compressed);
       
       if (response.found && response.results.length > 0) {
-        router.push(`/item/${response.results[0].item_id}`);
+        const bestMatch = response.results[0];
+        router.push(
+          `/item/${bestMatch.item_id}?similarity=${bestMatch.similarity}`
+        );
       } else {
-        setErrorMsg("Không nhận diện được vật thể này trong ảnh. Vui lòng thử ảnh khác.");
+        setErrorMsg(t.method.noMatch);
       }
     } catch {
-      setErrorMsg("Lỗi khi tải ảnh lên. Vui lòng thử lại.");
+      setErrorMsg(t.method.uploadError);
     } finally {
       setLoading(false);
       // Reset input so the same file can be selected again
@@ -43,14 +48,15 @@ export default function MethodSelectionPage() {
         <div className="mb-10">
           <button 
             onClick={() => router.push("/")}
+            aria-label={t.common.back}
             className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 shadow-sm mb-6"
           >
             &larr;
           </button>
           <h1 className="text-3xl font-black text-slate-800 mb-3 leading-tight">
-            Bạn muốn tìm hiểu <br/> bằng cách nào?
+            {t.method.titleLine1} <br/> {t.method.titleLine2}
           </h1>
-          <p className="text-slate-500">Hãy chọn một phương thức bên dưới để bắt đầu nhận diện di tích.</p>
+          <p className="text-slate-500">{t.method.subtitle}</p>
         </div>
 
         {/* Error Message */}
@@ -70,8 +76,8 @@ export default function MethodSelectionPage() {
               📸
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-800">Chụp ảnh trực tiếp</h3>
-              <p className="text-sm text-slate-500">Sử dụng camera để quét di tích</p>
+              <h3 className="font-bold text-lg text-slate-800">{t.method.cameraTitle}</h3>
+              <p className="text-sm text-slate-500">{t.method.cameraSubtitle}</p>
             </div>
           </button>
 
@@ -83,8 +89,8 @@ export default function MethodSelectionPage() {
               🖼️
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-800">Tải ảnh lên</h3>
-              <p className="text-sm text-slate-500">Chọn ảnh có sẵn từ điện thoại</p>
+              <h3 className="font-bold text-lg text-slate-800">{t.method.uploadTitle}</h3>
+              <p className="text-sm text-slate-500">{t.method.uploadSubtitle}</p>
             </div>
           </button>
           <input 
@@ -103,8 +109,8 @@ export default function MethodSelectionPage() {
               📋
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-800">Chọn thủ công</h3>
-              <p className="text-sm text-slate-500">Xem danh sách toàn bộ di tích</p>
+              <h3 className="font-bold text-lg text-slate-800">{t.method.manualTitle}</h3>
+              <p className="text-sm text-slate-500">{t.method.manualSubtitle}</p>
             </div>
           </button>
         </div>

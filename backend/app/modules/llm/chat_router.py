@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.item import Item
+from app.modules.content.text_utils import limit_words
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.retriever import try_get_rag_retriever
@@ -32,6 +33,7 @@ def chat_with_ai(
         group_id=item.group_id,
         retriever=try_get_rag_retriever(),
         top_k=3,
+        query=request.message,
     )
     history = [
         {"role": message.role, "content": message.content}
@@ -59,4 +61,4 @@ def chat_with_ai(
             detail="Không thể sinh nội dung lúc này",
         )
 
-    return ChatResponse(content=content)
+    return ChatResponse(content=limit_words(content))

@@ -23,6 +23,7 @@ def build_item_context(
     retriever: Retriever | None,
     top_k: int = 5,
     group_id: int | None = None,
+    query: str | None = None,
 ) -> list[Document]:
     docs = [
         Document(
@@ -35,7 +36,7 @@ def build_item_context(
 
     try:
         retrieved = retriever.retrieve(
-            f"Giới thiệu chi tiết về {item_name}.",
+            query or f"Giới thiệu chi tiết về {item_name}.",
             top_k=top_k,
             group_id=group_id,
         )

@@ -7,6 +7,7 @@ import {
   getPreviewRotationDeg,
   isMobileDevice,
 } from "@/lib/cameraOrientation";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface CameraCaptureProps {
   onCapture: (blob: Blob) => void;
@@ -19,6 +20,7 @@ export default function CameraCapture({
   frozen,
   capturedUrl,
 }: CameraCaptureProps) {
+  const { t } = useVisitorLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function CameraCapture({
           };
         }
       } catch {
-        setError("Không thể truy cập camera. Vui lòng cấp quyền.");
+        setError(t.scan.cameraPermission);
       }
     }
 
@@ -85,7 +87,7 @@ export default function CameraCapture({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [frozen, mobile, updateVideoRotation]);
+  }, [frozen, mobile, t.scan.cameraPermission, updateVideoRotation]);
 
   const handleCapture = () => {
     const video = videoRef.current;
@@ -131,7 +133,7 @@ export default function CameraCapture({
   return (
     <div className={stageClass}>
       {frozen && capturedUrl ? (
-        <img src={capturedUrl} alt="Captured" className={previewClass} />
+        <img src={capturedUrl} alt={t.scan.capturedAlt} className={previewClass} />
       ) : (
         <video
           ref={videoRef}
@@ -149,7 +151,7 @@ export default function CameraCapture({
           onClick={handleCapture}
           className="hidden" // Hiding this because we built a custom overlay UI in page.tsx
         >
-          Quét vật thể
+          {t.scan.hiddenCapture}
         </button>
       )}
     </div>

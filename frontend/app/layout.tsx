@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { VisitorLocaleProvider } from "@/components/VisitorLocaleProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DINOv2 Object Search",
-  description: "Tra cứu vật thể từ nhiều góc nhìn bằng AI",
+  title: "HERA",
+  description: "Trợ lý khám phá di tích bằng AI",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className="bg-slate-950 text-slate-200">
-        {children}
+        <VisitorLocaleProvider>{children}</VisitorLocaleProvider>
       </body>
     </html>
   );

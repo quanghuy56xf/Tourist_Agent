@@ -1,6 +1,9 @@
 "use client";
 
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+
 export default function LoadingOverlay() {
+  const { t } = useVisitorLocale();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
       <div className="relative flex flex-col items-center gap-4">
@@ -20,7 +23,7 @@ export default function LoadingOverlay() {
             <div className="w-3 h-3 bg-blue-500 rounded-full" />
           </div>
         </div>
-        <p className="text-sm text-slate-300 animate-pulse">Đang quét vật thể...</p>
+        <p className="text-sm text-slate-300 animate-pulse">{t.scan.scanning}</p>
       </div>
     </div>
   );

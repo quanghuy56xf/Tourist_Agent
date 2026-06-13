@@ -32,7 +32,10 @@ frontend/.env.local
 # IDE
 .vscode/
 .idea/
+.worktrees/
 
 # Cloudflare tunnel credentials
 cloudflared/config.yml
 cloudflared/*.json
+
+data/
