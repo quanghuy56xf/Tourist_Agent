@@ -1,0 +1,13 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["app/**", "components/**", "lib/**", "public/**", "package.json", "package-lock.json", "next.config.mjs", "Dockerfile"]
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Build-time vars (Railway > Variables > gan vao Build):
+#   NEXT_PUBLIC_API_URL=https://<backend>.up.railway.app
+#   NEXT_PUBLIC_BACKEND_DIRECT_URL=https://<backend>.up.railway.app
+#   BACKEND_INTERNAL_URL=https://<backend>.up.railway.app
