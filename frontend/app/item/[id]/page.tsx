@@ -7,6 +7,7 @@ import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
+import { buildItemAudioPath } from "@/lib/contentAudio";
 import {
   getItem,
   getItemContent,
@@ -28,9 +29,9 @@ export default function ItemDetailPage() {
   const similarity = Number(similarityParam);
   const confidence =
     similarityParam !== null &&
-    Number.isFinite(similarity) &&
-    similarity >= 0 &&
-    similarity <= 1
+      Number.isFinite(similarity) &&
+      similarity >= 0 &&
+      similarity <= 1
       ? `${(similarity * 100).toFixed(1)}%`
       : null;
   const tourId = searchParams.get("tour");
@@ -72,6 +73,8 @@ export default function ItemDetailPage() {
         setError("");
         setLoadingItem(true);
         setLoadingContent(true);
+        setContent("");
+        setAudioUrl(null);
         const data = await getItem(itemId);
         if (cancelled) return;
         setItem(data);
@@ -81,9 +84,7 @@ export default function ItemDetailPage() {
           if (!cancelled) {
             setContent(itemContent.content);
             setAudioUrl(
-              itemContent.has_audio && itemContent.audio_url
-                ? resolveImageUrl(itemContent.audio_url)
-                : null
+              resolveImageUrl(buildItemAudioPath(itemId, persona, language))
             );
           }
         } catch {
@@ -279,31 +280,31 @@ export default function ItemDetailPage() {
             </button>
           )}
           <div className="flex gap-2">
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => {
-              setChatInput(e.target.value);
-              if (e.target.value.trim()) stopGuidePlayback();
-            }}
-            onFocus={stopGuidePlayback}
-            onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
-            placeholder={t.item.chatPlaceholder}
-            className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
-            style={{
-              background: "var(--secondary)",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-            }}
-          />
-          <button
-            type="button"
-            onClick={handleSendChat}
-            disabled={!chatInput.trim() || isChatting}
-            className="artifact-btn-primary shrink-0 px-5 py-3 text-sm disabled:opacity-50"
-          >
-            {t.item.send}
-          </button>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => {
+                setChatInput(e.target.value);
+                if (e.target.value.trim()) stopGuidePlayback();
+              }}
+              onFocus={stopGuidePlayback}
+              onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+              placeholder={t.item.chatPlaceholder}
+              className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
+              style={{
+                background: "var(--secondary)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSendChat}
+              disabled={!chatInput.trim() || isChatting}
+              className="artifact-btn-primary shrink-0 px-5 py-3 text-sm disabled:opacity-50"
+            >
+              {t.item.send}
+            </button>
           </div>
         </div>
       </div>

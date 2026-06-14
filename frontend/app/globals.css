@@ -94,7 +94,7 @@ html[lang="en"] .font-display {
   }
 
   .admin-header-controls {
-    @apply grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end;
+    @apply grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] md:items-end;
   }
 
   .admin-header-field {
@@ -403,6 +403,7 @@ html[lang="en"] .font-display {
 }
 
 @media (orientation: landscape) and (max-width: 767px) {
+
   .camera-fullscreen-video--rotated,
   .camera-fullscreen-video--normal {
     width: 100%;
@@ -420,10 +421,12 @@ html[lang="en"] .font-display {
 }
 
 @keyframes scan-line {
+
   0%,
   100% {
     top: 10%;
   }
+
   50% {
     top: 90%;
   }
@@ -482,12 +485,10 @@ html[lang="en"] .font-display {
 }
 
 .hera-guide-slide-scrim {
-  background: linear-gradient(
-    to bottom,
-    rgba(14, 11, 7, 0.18) 0%,
-    rgba(14, 11, 7, 0.42) 50%,
-    rgba(14, 11, 7, 0.72) 100%
-  );
+  background: linear-gradient(to bottom,
+      rgba(14, 11, 7, 0.18) 0%,
+      rgba(14, 11, 7, 0.42) 50%,
+      rgba(14, 11, 7, 0.72) 100%);
 }
 
 .hera-guide-spacer {

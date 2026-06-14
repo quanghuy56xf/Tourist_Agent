@@ -8,7 +8,7 @@ from app.modules.content.service import compute_content_hash
 from app.modules.rag import group_documents_router
 
 
-def test_content_hash_ignores_group_knowledge_version(db_session):
+def test_generated_content_hash_changes_with_group_knowledge_version(db_session):
     group = Group(name="Hash group", knowledge_version=1)
     db_session.add(group)
     db_session.flush()
@@ -20,6 +20,13 @@ def test_content_hash_ignores_group_knowledge_version(db_session):
     group.knowledge_version = 2
     db_session.commit()
     second = compute_content_hash(item.description, 2)
+
+    assert first != second
+
+
+def test_manual_content_hash_ignores_group_knowledge_version():
+    first = compute_content_hash("Manual content", 1, source="manual")
+    second = compute_content_hash("Manual content", 2, source="manual")
 
     assert first == second
 

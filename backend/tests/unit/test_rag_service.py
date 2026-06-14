@@ -2,6 +2,7 @@ import pytest
 from langchain_core.documents import Document
 
 from app.modules.rag.service import (
+    build_chat_context,
     build_item_context,
     build_verified_item_context,
     filter_group_docs_for_item,
@@ -160,3 +161,53 @@ def test_verified_context_keeps_group_docs_that_mention_item():
     )
 
     assert len(filtered) == 1
+
+
+def test_chat_context_keeps_query_relevant_group_docs_without_item_mention():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Văn Miếu được xây dựng năm 1070.",
+            metadata={"source": "group_doc", "page": "kb-history"},
+        )
+    ]
+
+    docs, has_verified = build_chat_context(
+        item_id=9,
+        item_name="Cổng Đại Trung",
+        item_description="Cổng Đại Trung là cổng thuộc khu Văn Miếu.",
+        retriever=retriever,
+        group_id=1,
+        query="Văn Miếu xây năm nào?",
+        top_k=6,
+    )
+
+    assert has_verified is True
+    assert docs[-1].page_content == "Văn Miếu được xây dựng năm 1070."
+
+
+def test_chat_context_prioritizes_docs_that_mention_item():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Văn Miếu được xây dựng năm 1070.",
+            metadata={"source": "group_doc", "page": "kb-history"},
+        ),
+        Document(
+            page_content="Cổng Đại Trung nằm trên trục chính của Văn Miếu.",
+            metadata={"source": "group_doc", "page": "kb-gate"},
+        ),
+    ]
+
+    docs, _ = build_chat_context(
+        item_id=9,
+        item_name="Cổng Đại Trung",
+        item_description="Cổng Đại Trung",
+        retriever=retriever,
+        group_id=1,
+        query="Văn Miếu xây năm nào?",
+        top_k=6,
+    )
+
+    assert [doc.metadata["page"] for doc in docs] == ["kb-gate", "kb-history"]
+

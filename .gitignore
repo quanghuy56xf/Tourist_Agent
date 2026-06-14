@@ -27,6 +27,7 @@ backend/uploads/
 # Node
 frontend/node_modules/
 frontend/.next/
+frontend/.test-dist/
 frontend/.env.local
 
 # IDE
