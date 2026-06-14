@@ -8,15 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  canUseBrowserSpeech,
+  speakWithBrowser,
+  stopBrowserSpeech,
+} from "@/lib/browserSpeech";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
-import {
-  AudioPreparationState,
-  getAudioControlState,
-  shouldRetryAudioPlay,
-  shouldRestartAudio,
-  syncAudioSource,
-} from "@/lib/audioPlayback";
 
 interface HeraGuidePanelProps {
   content: string;
@@ -62,11 +60,14 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [revealedLength, setRevealedLength] = useState(0);
   const [textComplete, setTextComplete] = useState(false);
+  const [browserSpeechReady, setBrowserSpeechReady] = useState(false);
+  const [voicesChecked, setVoicesChecked] = useState(false);
   const [speechBlocked, setSpeechBlocked] = useState(false);
-  const [audioState, setAudioState] = useState<AudioPreparationState>("idle");
 
   const plainContent = content.trim();
   const canSpeak = Boolean(plainContent);
+  const hasServerAudio = Boolean(audioUrl);
+  const wantsSpeech = hasServerAudio || browserSpeechReady;
   contentRef.current = plainContent;
 
   const visibleText = plainContent.slice(0, revealedLength);
@@ -86,24 +87,33 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
     }
   };
 
-  const pauseAudio = useCallback((reset = false) => {
+  const stopAllSpeech = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
-      if (reset) audio.currentTime = 0;
+      audio.currentTime = 0;
     }
+    stopBrowserSpeech();
     setIsSpeaking(false);
   }, []);
 
   const markFinished = useCallback(() => {
     clearTextTimer();
-    pauseAudio();
+    stopAllSpeech();
     setRevealedLength(contentRef.current.length);
     setTextComplete(true);
     setSessionState("finished");
     setSpeechBlocked(false);
     notifyIntroActive(false);
-  }, [notifyIntroActive, pauseAudio]);
+  }, [notifyIntroActive, stopAllSpeech]);
+
+  const pauseForSpeechBlock = useCallback(() => {
+    clearTextTimer();
+    stopAllSpeech();
+    setSessionState("paused");
+    setSpeechBlocked(true);
+    notifyIntroActive(false);
+  }, [notifyIntroActive, stopAllSpeech]);
 
   const startTextReveal = useCallback((fromStart: boolean) => {
     clearTextTimer();
@@ -129,11 +139,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
       if (isRunActive(runId)) setIsSpeaking(false);
     };
     audio.onerror = () => {
-      if (isRunActive(runId)) {
-        setAudioState("error");
-        setIsSpeaking(false);
-        setSpeechBlocked(false);
-      }
+      if (isRunActive(runId)) setIsSpeaking(false);
     };
   }, []);
 
@@ -141,19 +147,52 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
     if (!audioUrl) return null;
     let audio = audioRef.current;
     if (!audio) {
-      audio = new Audio();
-      audio.preload = "auto";
-      audio.src = audioUrl;
+      audio = new Audio(audioUrl);
       audioRef.current = audio;
       return audio;
     }
-    syncAudioSource(audio, audioUrl);
+    if (audio.src !== audioUrl) {
+      audio.pause();
+      audio.src = audioUrl;
+      audio.load();
+    }
     return audio;
   }, [audioUrl]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setVoicesChecked(false);
+    void canUseBrowserSpeech(language).then((ok) => {
+      if (!cancelled) {
+        setBrowserSpeechReady(ok);
+        setVoicesChecked(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const startBrowserSpeech = useCallback(
+    async (text: string, runId: number): Promise<boolean> => {
+      if (!text.trim() || !browserSpeechReady || !isRunActive(runId)) return false;
+      try {
+        setIsSpeaking(true);
+        await speakWithBrowser(text, language, { strictVoice: true });
+        return isRunActive(runId);
+      } catch {
+        return false;
+      } finally {
+        if (isRunActive(runId)) setIsSpeaking(false);
+      }
+    },
+    [browserSpeechReady, language]
+  );
+
   const playServerAudio = useCallback(
     async (restart: boolean, runId: number): Promise<boolean> => {
-      if (!audioUrl || !isRunActive(runId)) return false;
+      if (!hasServerAudio || !isRunActive(runId)) return false;
+      stopBrowserSpeech();
       const audio = ensureAudio();
       if (!audio) return false;
       attachAudioHandlers(audio, runId);
@@ -166,137 +205,142 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
         }
         setIsSpeaking(true);
         setSpeechBlocked(false);
-        setAudioState("ready");
         return true;
       } catch {
-        if (isRunActive(runId)) {
-          setIsSpeaking(false);
-          if (shouldRetryAudioPlay(audio.readyState, Boolean(audio.error))) {
-            setAudioState("loading");
-            setSpeechBlocked(false);
-          } else if (audio.error) {
-            setAudioState("error");
-            setSpeechBlocked(false);
-          } else {
-            setAudioState("ready");
-            setSpeechBlocked(true);
-          }
-        }
+        if (isRunActive(runId)) setIsSpeaking(false);
         return false;
       }
     },
-    [attachAudioHandlers, audioUrl, ensureAudio]
+    [attachAudioHandlers, ensureAudio, hasServerAudio]
   );
 
-  const prepareAndPlayAudio = useCallback(
-    (runId: number) => {
-      const audio = ensureAudio();
-      if (!audio || !isRunActive(runId)) {
-        setAudioState("error");
-        return;
+  const startSpeech = useCallback(
+    async (restart: boolean, offset: number, runId: number): Promise<boolean> => {
+      if (!plainContent || !isRunActive(runId)) return false;
+      if (!hasServerAudio && !browserSpeechReady) return true;
+
+      stopAllSpeech();
+      if (!isRunActive(runId)) return false;
+
+      if (hasServerAudio) {
+        const fullRestart = restart || offset === 0 || !plainContent.slice(restart ? 0 : offset).trim();
+        return playServerAudio(fullRestart, runId);
       }
 
-      setAudioState("loading");
-      setSpeechBlocked(false);
-      attachAudioHandlers(audio, runId);
-      audio.oncanplay = () => {
-        if (!isRunActive(runId)) return;
-        audio.oncanplay = null;
-        void playServerAudio(shouldRestartAudio("autoplay"), runId);
-      };
-      audio.load();
-      void playServerAudio(shouldRestartAudio("autoplay"), runId);
+      const spokenText = plainContent.slice(restart ? 0 : offset);
+      const textToSpeak = spokenText.trim() ? spokenText : plainContent;
+      return startBrowserSpeech(textToSpeak, runId);
     },
-    [attachAudioHandlers, ensureAudio, playServerAudio]
+    [
+      browserSpeechReady,
+      hasServerAudio,
+      plainContent,
+      playServerAudio,
+      startBrowserSpeech,
+      stopAllSpeech,
+    ]
   );
 
   const startIntro = useCallback(
-    (restart: boolean) => {
+    async (restart: boolean) => {
       if (!plainContent) return;
       const runId = introRunRef.current;
       setSpeechBlocked(false);
       setSessionState("running");
       notifyIntroActive(true);
       startTextReveal(restart);
-      prepareAndPlayAudio(runId);
+
+      if (!wantsSpeech) return;
+
+      const speechStarted = await startSpeech(
+        restart,
+        restart ? 0 : revealedLength,
+        runId
+      );
+      if (!isRunActive(runId)) return;
+      if (!speechStarted) {
+        pauseForSpeechBlock();
+      }
     },
     [
       notifyIntroActive,
+      pauseForSpeechBlock,
       plainContent,
-      prepareAndPlayAudio,
+      revealedLength,
+      startSpeech,
       startTextReveal,
+      wantsSpeech,
     ]
   );
 
   const stopIntro = useCallback(() => {
+    introRunRef.current += 1;
     clearTextTimer();
-    pauseAudio();
+    stopAllSpeech();
     setSessionState("paused");
     setSpeechBlocked(false);
     notifyIntroActive(false);
-  }, [notifyIntroActive, pauseAudio]);
+  }, [notifyIntroActive, stopAllSpeech]);
 
   useImperativeHandle(ref, () => ({ stopPlayback: stopIntro }), [stopIntro]);
 
   const resumeIntro = async () => {
     if (!plainContent) return;
     const runId = introRunRef.current;
-    const trigger = sessionState === "finished" ? "replay" : "resume";
+    const speakFromStart = revealedLength >= plainContent.length;
     setSpeechBlocked(false);
     setSessionState("running");
     notifyIntroActive(true);
     if (revealedLength < plainContent.length) {
       startTextReveal(false);
     }
-    await playServerAudio(shouldRestartAudio(trigger), runId);
+
+    if (!wantsSpeech) return;
+
+    const speechStarted = await startSpeech(
+      speakFromStart,
+      speakFromStart ? 0 : revealedLength,
+      runId
+    );
+    if (!isRunActive(runId)) return;
+    if (!speechStarted) {
+      pauseForSpeechBlock();
+    }
   };
 
   useEffect(() => {
     if (sessionState !== "running") return;
-    if (
-      textComplete &&
-      !isSpeaking &&
-      !speechBlocked &&
-      audioState !== "loading"
-    ) {
+    if (textComplete && !isSpeaking && !speechBlocked) {
       markFinished();
     }
-  }, [
-    audioState,
-    isSpeaking,
-    markFinished,
-    sessionState,
-    speechBlocked,
-    textComplete,
-  ]);
+  }, [isSpeaking, markFinished, sessionState, speechBlocked, textComplete]);
 
   useEffect(() => {
     introRunRef.current += 1;
     const runId = introRunRef.current;
     clearTextTimer();
-    pauseAudio(true);
+    stopAllSpeech();
     audioRef.current = null;
-    setAudioState("idle");
     setSessionState("idle");
     setRevealedLength(0);
     setTextComplete(false);
     setSpeechBlocked(false);
     notifyIntroActive(false);
 
-    if (loading || !plainContent) return;
+    if (loading || !plainContent || !voicesChecked) return;
 
-    startIntro(true);
+    void startIntro(true);
     return () => {
       if (runId === introRunRef.current) {
         introRunRef.current += 1;
       }
       clearTextTimer();
-      pauseAudio(true);
+      stopAllSpeech();
       audioRef.current = null;
       notifyIntroActive(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, audioUrl, loading, language]);
+  }, [content, audioUrl, loading, language, voicesChecked]);
 
   useEffect(() => {
     const el = textRef.current;
@@ -306,34 +350,26 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
 
   const replayIntro = () => {
     introRunRef.current += 1;
-    startIntro(true);
+    void startIntro(true);
   };
 
   const showControls = canSpeak && !loading;
-  const controlState = getAudioControlState(
-    audioState,
-    sessionState,
-    isSpeaking
-  );
+  const isRunning = sessionState === "running";
+  const isFinished = sessionState === "finished";
 
   const handlePlay = () => {
-    if (sessionState === "finished") {
+    if (speechBlocked || isFinished) {
       replayIntro();
       return;
     }
     void resumeIntro();
   };
 
-  const controlLabel =
-    controlState.label === "preparing"
-      ? t.item.preparingAudio
-      : controlState.label === "error"
-        ? t.item.audioError
-        : controlState.label === "stop"
-          ? t.item.stop
-          : controlState.label === "replay"
-            ? t.item.replay
-            : t.item.resume;
+  const playLabel = speechBlocked
+    ? t.item.tapToListen
+    : isFinished
+      ? t.item.replay
+      : t.item.resume;
 
   return (
     <>
@@ -366,10 +402,6 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
             <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
               {loading
                 ? t.item.composing
-                : audioState === "loading"
-                  ? t.item.preparingAudio
-                  : audioState === "error"
-                    ? t.item.audioError
                 : speechBlocked
                   ? t.item.tapToListen
                   : t.item.chatTitle}
@@ -377,7 +409,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
           </div>
           {showControls && (
             <div className="flex shrink-0 items-center gap-2">
-              {controlState.action === "stop" ? (
+              {isRunning ? (
                 <button
                   type="button"
                   onClick={stopIntro}
@@ -388,21 +420,19 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
                     color: "#f0e8d5",
                   }}
                 >
-                  ⏹ {controlLabel}
+                  ⏹ {t.item.stop}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handlePlay}
-                  disabled={controlState.disabled}
                   className="rounded-full px-3 py-1.5 text-xs font-medium"
                   style={{
                     background: "var(--primary)",
                     color: "var(--primary-foreground)",
-                    opacity: controlState.disabled ? 0.65 : 1,
                   }}
                 >
-                  {audioState === "loading" ? "…" : "▶"} {controlLabel}
+                  ▶ {playLabel}
                 </button>
               )}
             </div>
@@ -427,7 +457,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
                 style={{ lineHeight: 1.8 }}
               >
                 {visibleText}
-                {sessionState === "running" && revealedLength < plainContent.length && (
+                {isRunning && revealedLength < plainContent.length && (
                   <span
                     className="ml-0.5 inline-block h-4 w-0.5 animate-pulse align-middle"
                     style={{ background: "var(--primary)" }}

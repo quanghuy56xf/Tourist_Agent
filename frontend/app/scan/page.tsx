@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CameraCapture from "@/components/CameraCapture";
 import ResultModal from "@/components/ResultModal";
@@ -18,62 +18,45 @@ export default function SearchPage() {
   const { t } = useVisitorLocale();
   const [frozen, setFrozen] = useState(false);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
-  const capturedUrlRef = useRef<string | null>(null);
   const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
   const [scanProgress, setScanProgress] = useState(0);
-  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const revokeCapturedUrl = useCallback(() => {
-    if (capturedUrlRef.current) {
-      URL.revokeObjectURL(capturedUrlRef.current);
-      capturedUrlRef.current = null;
-    }
-  }, []);
-
-  const clearCapturedUrl = useCallback(() => {
-    revokeCapturedUrl();
-    setCapturedUrl(null);
-  }, [revokeCapturedUrl]);
-
-  const stopProgress = useCallback(() => {
+  const stopProgress = () => {
     if (progressTimer.current) {
       clearInterval(progressTimer.current);
       progressTimer.current = null;
     }
-  }, []);
+  };
 
-  const startProgress = useCallback(() => {
+  const startProgress = () => {
     stopProgress();
     setScanProgress(0);
     progressTimer.current = setInterval(() => {
-      setScanProgress((previous) =>
-        previous >= 95 ? previous : previous + Math.random() * 8 + 4
-      );
+      setScanProgress((prev) => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 8 + 4;
+      });
     }, 80);
-  }, [stopProgress]);
+  };
 
-  useEffect(
-    () => () => {
-      stopProgress();
-      revokeCapturedUrl();
-    },
-    [revokeCapturedUrl, stopProgress]
-  );
+  useEffect(() => () => stopProgress(), []);
 
-  const resetScan = useCallback(() => {
+  const resetScan = () => {
     stopProgress();
+    setErrorMsg(null);
+    setSearchResult(null);
     setScanPhase("idle");
     setScanProgress(0);
     setFrozen(false);
-    clearCapturedUrl();
-  }, [clearCapturedUrl, stopProgress]);
+    if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+    setCapturedUrl(null);
+  };
 
   const handleCapture = async (blob: Blob) => {
-    clearCapturedUrl();
     const url = URL.createObjectURL(blob);
-    capturedUrlRef.current = url;
     setCapturedUrl(url);
     setFrozen(true);
     setScanPhase("scanning");
@@ -102,21 +85,29 @@ export default function SearchPage() {
 
       if (response.results.length > 0) {
         setSearchResult(response);
-        resetScan();
-      } else {
-        setErrorMsg(response.message || t.scan.noMatch);
-        resetScan();
+        setScanPhase("idle");
+        setFrozen(false);
+        URL.revokeObjectURL(url);
+        setCapturedUrl(null);
+        return;
       }
+
+      setErrorMsg(response.message || t.scan.noMatch);
+      URL.revokeObjectURL(url);
+      setCapturedUrl(null);
+      setFrozen(false);
+      setScanPhase("idle");
+      stopProgress();
+      setScanProgress(0);
     } catch {
       setErrorMsg(t.scan.searchError);
-      resetScan();
+      URL.revokeObjectURL(url);
+      setCapturedUrl(null);
+      setFrozen(false);
+      setScanPhase("idle");
+      stopProgress();
+      setScanProgress(0);
     }
-  };
-
-  const resetCamera = () => {
-    setErrorMsg(null);
-    setSearchResult(null);
-    resetScan();
   };
 
   const closeResults = () => {

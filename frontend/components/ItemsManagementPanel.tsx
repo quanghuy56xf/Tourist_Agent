@@ -136,21 +136,21 @@ export default function ItemsManagementPanel({
     return () => window.removeEventListener("active-group-changed", onActiveChanged);
   }, [hideGroupSelector]);
 
-  const cancelEdit = useCallback(() => {
+  const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
     setEditDescription("");
-  }, []);
+  };
 
-  const stopStoryAudio = useCallback(() => {
+  const stopStoryAudio = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
     setIsStoryPlaying(false);
-  }, []);
+  };
 
-  const clearStoryContent = useCallback(() => {
+  const clearStoryContent = () => {
     setStoryContent(null);
     setStoryLoading(false);
     setStorySaving(false);
@@ -162,20 +162,20 @@ export default function ItemsManagementPanel({
     setEditStoryContent("");
     setRegenNotice(null);
     stopStoryAudio();
-  }, [stopStoryAudio]);
+  };
 
-  const resetStoryState = useCallback(() => {
+  const resetStoryState = () => {
     clearStoryContent();
     setSelectedPersona(EDITABLE_CONTENT_PERSONA);
     setSelectedLanguage(EDITABLE_CONTENT_LANGUAGE);
-  }, [clearStoryContent]);
+  };
 
   useEffect(() => {
     setExpandedId(null);
     cancelEdit();
     resetStoryState();
     loadItems();
-  }, [cancelEdit, loadItems, refreshToken, resetStoryState]);
+  }, [loadItems, refreshToken]);
 
   useEffect(() => {
     if (expandedId === null) {
@@ -209,13 +209,7 @@ export default function ItemsManagementPanel({
     return () => {
       cancelled = true;
     };
-  }, [
-    clearStoryContent,
-    expandedId,
-    resetStoryState,
-    selectedLanguage,
-    selectedPersona,
-  ]);
+  }, [expandedId, selectedPersona, selectedLanguage]);
 
   useEffect(() => {
     if (isEditingStory && !canEditStory) {
