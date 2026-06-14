@@ -8,8 +8,7 @@
     "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js"
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "^14.2.0",

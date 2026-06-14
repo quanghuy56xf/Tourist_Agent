@@ -1,4 +1,3 @@
-import threading
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -64,7 +63,6 @@ def test_upsert_item_document_replaces_existing_item_chunk(
     instance = retriever_module.HybridRetriever.__new__(
         retriever_module.HybridRetriever
     )
-    instance._index_lock = threading.RLock()
     instance.vector_store = FakeVectorStore()
     instance.chunks = [
         Document(

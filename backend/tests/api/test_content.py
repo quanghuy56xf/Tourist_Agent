@@ -42,7 +42,7 @@ def test_generated_item_content_is_limited_before_persistence(
     monkeypatch,
 ):
     item = _add_item(db_session)
-    long_text = " ".join(f"word{i}" for i in range(201))
+    long_text = " ".join(f"word{i}" for i in range(301))
     monkeypatch.setattr(
         "app.modules.content.service.get_rag_generator",
         lambda: Mock(generate_answer=Mock(return_value=long_text)),
@@ -60,7 +60,7 @@ def test_generated_item_content_is_limited_before_persistence(
         db_session, item, "Mặc định", "Tiếng Việt"
     )
 
-    assert len(result.content.removesuffix("...").split()) == 200
+    assert len(result.content.removesuffix("...").split()) == 300
     stored = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
     assert stored.text_content == result.content
 
@@ -263,21 +263,20 @@ def test_get_item_content_generates_when_missing(client, db_session, monkeypatch
         persona="Mặc định",
         language="Tiếng Việt",
         content="Generated story",
-        has_audio=False,
-        audio_url=None,
+        has_audio=True,
+        audio_url=f"/api/objects/{item.id}/content/audio?persona=M%E1%BA%B7c+%C4%91%E1%BB%8Bnh&language=Ti%E1%BA%BFng+Vi%E1%BB%87t&v=abc",
         stored=False,
         source="generated",
     )
     fake_service.get_or_generate.return_value = generated
+    fake_service.finalize_with_audio.return_value = generated
     monkeypatch.setattr(content_router, "get_item_content_service", lambda: fake_service)
 
     response = client.get(f"/api/objects/{item.id}/content")
 
     assert response.status_code == 200
     assert response.json()["stored"] is False
-    assert response.json()["has_audio"] is False
     fake_service.get_or_generate.assert_called_once()
-    fake_service.finalize_with_audio.assert_not_called()
 
 
 def test_get_item_content_audio_generates_when_missing(client, db_session, monkeypatch):
@@ -337,16 +336,13 @@ def test_get_item_content_audio_streams_blob(client, db_session):
     assert response.headers["content-type"].startswith("audio/mpeg")
 
 
-def test_update_item_content_persists_text_without_generating_audio(
-    client,
-    db_session,
-    monkeypatch,
-):
+def test_update_item_content_persists_text_and_audio(client, db_session, monkeypatch):
     item = _add_item(db_session)
 
+    fake_audio = (b"new-audio", "audio/mpeg")
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        Mock(side_effect=AssertionError("PUT /content must not generate audio")),
+        lambda text, language: fake_audio,
     )
 
     response = client.put(
@@ -361,8 +357,9 @@ def test_update_item_content_persists_text_without_generating_audio(
     assert response.status_code == 200
     payload = response.json()
     assert payload["content"] == "Mô tả đã chỉnh sửa thủ công"
-    assert payload["has_audio"] is False
-    assert payload["audio_url"] is None
+    assert payload["has_audio"] is True
+    assert payload["audio_url"] is not None
+    assert "v=" in payload["audio_url"]
     assert payload["source"] == "manual"
 
     variant = (

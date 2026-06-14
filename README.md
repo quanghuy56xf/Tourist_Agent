@@ -105,6 +105,6 @@ Script chỉ tự repair khi mọi chunk đều đã có vector. Trước khi s�
 
 ## Tài Liệu
 
-- [Kiến trúc](docs/architecture/architecture_v2.md)
-- [API](docs/specs/api.md)
+- [Kiến trúc](docs/architecture_and_tech_stack.md)
+- [API](docs/api.md)
 - [Implementation plan](docs/superpowers/plans/2026-06-12-stabilize-api-rag-llm.md)

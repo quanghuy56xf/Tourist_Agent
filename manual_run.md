@@ -13,7 +13,6 @@ Backend cung cấp API, giao tiếp với Database, tìm kiếm ảnh và RAG. B
 cd backend
 
 # 2. Tạo môi trường và cài đặt thư viện tự động siêu tốc
-uv pip install -r requirements.txt
 uv sync
 
 # 3. Kích hoạt môi trường ảo
