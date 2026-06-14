@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": ".test-dist"
+  },
+  "include": [
+    "lib/cameraOrientation.ts",
+    "lib/audioPlayback.ts",
+    "lib/i18n.ts",
+    "lib/similarity.ts",
+    "tests/**/*.test.ts"
+  ]
+}

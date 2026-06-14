@@ -43,23 +43,22 @@ export default function OnboardingPage() {
       </div>
 
       <header className="mb-8 text-center">
-        <div className="mb-4 flex items-center justify-center gap-3">
+        <div className="mb-4 flex items-center justify-center gap-4">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg"
+            className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl"
             style={{ background: "var(--primary)" }}
           >
             <span style={{ color: "var(--primary-foreground)" }}>✦</span>
           </div>
-          <span className="artifact-section-label">{t.home.siteName}</span>
+          <span className="text-4xl font-black tracking-widest uppercase" style={{ color: "var(--primary)" }}>{t.home.siteName}</span>
         </div>
         <Image
           src="/hera-app-icon.png"
           alt="HERA"
-          width={96}
-          height={96}
+          width={256}
+          height={256}
           priority
-          className="mx-auto mb-4 h-24 w-24 rounded-2xl border object-cover"
-          style={{ borderColor: "var(--border)" }}
+          className="mx-auto mb-4 h-64 w-64 object-contain drop-shadow-[0_12px_20px_rgba(127,29,29,0.28)]"
         />
         <h1 className="font-display text-3xl" style={{ color: "var(--foreground)" }}>
           {t.home.headline}
