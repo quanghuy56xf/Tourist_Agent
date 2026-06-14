@@ -9,25 +9,12 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 type PersonaType = {
   id: "family" | "genz" | "international";
   personaStr: "Family Visitor" | "Gen Z Explorer" | "Mặc định";
-  color: string;
 };
 
 const personas: PersonaType[] = [
-  {
-    id: "family",
-    personaStr: "Family Visitor",
-    color: "bg-amber-100 border-amber-200 text-amber-900",
-  },
-  {
-    id: "genz",
-    personaStr: "Gen Z Explorer",
-    color: "bg-green-100 border-green-200 text-green-900",
-  },
-  {
-    id: "international",
-    personaStr: "Mặc định",
-    color: "bg-blue-100 border-blue-200 text-blue-900",
-  },
+  { id: "family", personaStr: "Family Visitor" },
+  { id: "genz", personaStr: "Gen Z Explorer" },
+  { id: "international", personaStr: "Mặc định" },
 ];
 
 export default function OnboardingPage() {
@@ -37,10 +24,7 @@ export default function OnboardingPage() {
   const personaCopy = {
     family: [t.home.familyTitle, t.home.familySubtitle],
     genz: [t.home.genZTitle, t.home.genZSubtitle],
-    international: [
-      t.home.internationalTitle,
-      t.home.internationalSubtitle,
-    ],
+    international: [t.home.internationalTitle, t.home.internationalSubtitle],
   };
 
   const handleStart = () => {
@@ -53,67 +37,85 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex-1 max-w-md mx-auto w-full px-6 py-12 flex flex-col items-center">
-        <div className="mb-4 flex w-full justify-end">
-          <LanguageSelector />
-        </div>
-        {/* Header */}
-        <div className="text-center mb-10">
-          <Image
-            src="/hera-app-icon.png"
-            alt="HERA"
-            width={128}
-            height={128}
-            priority
-            className="mx-auto mb-4 h-28 w-28 rounded-3xl object-cover shadow-lg"
-          />
-          <h2 className="mb-5 bg-gradient-to-r from-red-800 via-red-600 to-amber-500 bg-clip-text text-5xl font-black uppercase tracking-[0.16em] text-transparent drop-shadow-sm">
-            {t.home.siteName}
-          </h2>
-          <p className="text-slate-500">{t.home.subtitle}</p>
-        </div>
+    <div className="artifact-shell px-6 py-8">
+      <div className="mb-6 flex justify-end">
+        <LanguageSelector />
+      </div>
 
-        {/* Personas */}
-        <div className="w-full space-y-4 mb-8">
-          <h3 className="text-center font-bold text-lg mb-4">
-            {t.home.audiencePrompt}
-          </h3>
+      <header className="mb-8 text-center">
+        <div className="mb-4 flex items-center justify-center gap-3">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg"
+            style={{ background: "var(--primary)" }}
+          >
+            <span style={{ color: "var(--primary-foreground)" }}>✦</span>
+          </div>
+          <span className="artifact-section-label">{t.home.siteName}</span>
+        </div>
+        <Image
+          src="/hera-app-icon.png"
+          alt="HERA"
+          width={96}
+          height={96}
+          priority
+          className="mx-auto mb-4 h-24 w-24 rounded-2xl border object-cover"
+          style={{ borderColor: "var(--border)" }}
+        />
+        <h1 className="font-display text-3xl" style={{ color: "var(--foreground)" }}>
+          {t.home.headline}
+        </h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          {t.home.subtitle}
+        </p>
+      </header>
+
+      <section className="mb-8">
+        <h2 className="mb-4 text-center text-sm font-medium" style={{ color: "var(--foreground)" }}>
+          {t.home.audiencePrompt}
+        </h2>
+        <div className="space-y-2">
           {personas.map((p) => (
             <button
               key={p.id}
+              type="button"
               onClick={() => setSelected(p.id)}
-              className={`w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 ${
-                p.color
-              } ${
-                selected === p.id
-                  ? "ring-4 ring-red-500/30 border-red-500 scale-[1.02]"
-                  : "hover:scale-[1.01]"
-              }`}
+              className="w-full rounded-xl p-4 text-left transition-all active:scale-[0.98]"
+              style={{
+                background:
+                  selected === p.id ? "var(--primary)" : "var(--secondary)",
+                color:
+                  selected === p.id ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                border:
+                  selected === p.id
+                    ? "1px solid var(--primary)"
+                    : "1px solid var(--border)",
+              }}
             >
-              <h4 className="font-bold text-lg mb-1">{personaCopy[p.id][0]}</h4>
-              <p className="text-sm opacity-80">{personaCopy[p.id][1]}</p>
+              <h3 className="text-sm font-bold">{personaCopy[p.id][0]}</h3>
+              <p className="mt-1 text-xs opacity-90">{personaCopy[p.id][1]}</p>
             </button>
           ))}
         </div>
+      </section>
 
-        {/* CTA */}
-        <div className="mt-auto w-full pt-6">
+      <div className="mt-auto space-y-4">
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={!selected}
+          className="artifact-btn-primary w-full"
+        >
+          {t.home.start}
+        </button>
+        <div className="text-center">
           <button
-            onClick={handleStart}
-            disabled={!selected}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-full text-lg shadow-lg shadow-red-500/30 transition-all active:scale-95 mb-4"
+            type="button"
+            onClick={() => router.push("/admin/login")}
+            className="text-xs underline-offset-4 hover:underline"
+            style={{ color: "var(--muted-foreground)" }}
           >
-            {t.home.start}
+            {t.home.management}
           </button>
-          <div className="text-center pb-2">
-            <button 
-              onClick={() => router.push('/admin/groups')}
-              className="text-slate-400 text-sm hover:text-slate-600 underline underline-offset-2"
-            >
-              {t.home.management}
-            </button>
-          </div>
         </div>
       </div>
     </div>

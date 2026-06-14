@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  bulkRegenerateGroupContent,
   createGroupDocument,
   deleteGroupDocument,
   getGroupDocument,
@@ -51,8 +50,6 @@ export default function GroupDocumentsPanel({
   const [viewingDocId, setViewingDocId] = useState<number | null>(null);
   const [viewingText, setViewingText] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
-  const [lastUploadedDocumentIds, setLastUploadedDocumentIds] = useState<number[]>([]);
-  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const loadDocuments = useCallback(async () => {
     if (!groupId) {
@@ -65,7 +62,7 @@ export default function GroupDocumentsPanel({
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Không tải được tài liệu nhóm",
+        text: err instanceof Error ? err.message : "Không tải được tài liệu khu di tích",
       });
     }
   }, [groupId]);
@@ -97,15 +94,12 @@ export default function GroupDocumentsPanel({
     setLoading(true);
     setUploadPhase("uploading");
     setMessage(null);
-    const uploadedDocumentIds: number[] = [];
-
     try {
       if (hasText && !hasFiles) {
         const formData = new FormData();
         formData.append("title", title.trim());
         formData.append("text", text.trim());
-        const created = await createGroupDocument(groupId, formData, setUploadPhase);
-        uploadedDocumentIds.push(created.id);
+        await createGroupDocument(groupId, formData, setUploadPhase);
       } else {
         for (const file of files) {
           const formData = new FormData();
@@ -117,12 +111,9 @@ export default function GroupDocumentsPanel({
                 : titleFromFilename(file.name);
           formData.append("title", docTitle);
           formData.append("file", file);
-          const created = await createGroupDocument(groupId, formData, setUploadPhase);
-          uploadedDocumentIds.push(created.id);
+          await createGroupDocument(groupId, formData, setUploadPhase);
         }
       }
-
-      setLastUploadedDocumentIds(uploadedDocumentIds);
 
       setTitle("");
       setText("");
@@ -132,8 +123,8 @@ export default function GroupDocumentsPanel({
         type: "success",
         text:
           files.length > 1
-            ? `Đã thêm ${files.length} tài liệu vào nhóm. Mô tả vật thể liên quan đang được cập nhật tự động.`
-            : "Đã thêm tài liệu vào nhóm. Mô tả vật thể liên quan đang được cập nhật tự động.",
+            ? `Đã thêm ${files.length} tài liệu vào khu di tích.`
+            : "Đã thêm tài liệu vào khu di tích.",
       });
       await loadDocuments();
       setTimeout(() => setUploadPhase(null), 2500);
@@ -150,7 +141,7 @@ export default function GroupDocumentsPanel({
 
   const handleDelete = async (documentId: number) => {
     if (!groupId) return;
-    if (!confirm("Xóa tài liệu này khỏi nhóm?")) return;
+    if (!confirm("Xóa tài liệu này khỏi khu di tích?")) return;
     try {
       await deleteGroupDocument(groupId, documentId);
       if (viewingDocId === documentId) {
@@ -191,47 +182,21 @@ export default function GroupDocumentsPanel({
     }
   };
 
-  const handleBulkUpdateDescriptions = async () => {
-    if (!groupId) return;
-    setBulkUpdating(true);
-    setMessage(null);
-    try {
-      const result = await bulkRegenerateGroupContent(
-        groupId,
-        lastUploadedDocumentIds.length > 0 ? lastUploadedDocumentIds : undefined
-      );
-      setMessage({
-        type: "success",
-        text: `Đã cập nhật ${result.updated_count} vật thể, bỏ qua ${result.skipped_count} vật thể không liên quan.`,
-      });
-    } catch (err) {
-      setMessage({
-        type: "error",
-        text:
-          err instanceof Error
-            ? err.message
-            : "Cập nhật mô tả hàng loạt thất bại",
-      });
-    } finally {
-      setBulkUpdating(false);
-    }
-  };
-
   if (!groupId) {
     return (
-      <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-        <h2 className="text-lg font-semibold mb-2">Tài liệu tri thức nhóm</h2>
-        <p className="text-sm text-slate-400">Chọn nhóm để quản lý tài liệu.</p>
+      <section className="admin-card-padded">
+        <h2 className="admin-card-title mb-2">Tài liệu tri thức khu di tích</h2>
+        <p className="admin-muted text-sm">Chọn khu di tích để quản lý tài liệu.</p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+    <section className="admin-card-padded space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Tài liệu tri thức nhóm</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Tài liệu cho nhóm <span className="text-slate-200">{groupName}</span> — hỗ trợ .txt, .docx, .pdf và văn bản trực tiếp. Có thể thêm nhiều tài liệu vào cùng một nhóm.
+        <h2 className="admin-card-title">Tài liệu tri thức khu di tích</h2>
+        <p className="admin-subtitle mt-1">
+          Tài liệu cho khu di tích <span className="text-[var(--foreground)]">{groupName}</span> — hỗ trợ .txt, .docx, .pdf và văn bản trực tiếp. Có thể thêm nhiều tài liệu vào cùng một khu di tích.
         </p>
       </div>
 
@@ -241,24 +206,24 @@ export default function GroupDocumentsPanel({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Tiêu đề tài liệu (tùy chọn nếu upload file)"
-          className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500"
+          className="admin-input"
         />
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={5}
           placeholder={"Văn bản trực tiếp hoặc Markdown (# Tiêu đề)\n\nNội dung..."}
-          className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+          className="admin-textarea"
         />
         <input
           type="file"
           multiple
           accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-          className="block w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-100"
+          className="admin-muted block w-full text-sm file:mr-3 file:rounded-lg file:border file:px-4 file:py-2"
         />
         {files.length > 0 && (
-          <p className="text-xs text-slate-400">
+          <p className="admin-muted text-xs">
             Đã chọn {files.length} file: {files.map((f) => f.name).join(", ")}
           </p>
         )}
@@ -266,7 +231,7 @@ export default function GroupDocumentsPanel({
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-sm font-medium"
+            className="admin-btn-primary"
           >
             Thêm tài liệu
           </button>
@@ -274,8 +239,8 @@ export default function GroupDocumentsPanel({
             <span
               className={`text-sm ${
                 uploadPhase === "complete"
-                  ? "text-green-400"
-                  : "text-slate-300 animate-pulse"
+                  ? "text-green-300"
+                  : "animate-pulse"
               }`}
             >
               {uploadPhaseLabel(uploadPhase)}
@@ -284,44 +249,26 @@ export default function GroupDocumentsPanel({
         </div>
       </form>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          disabled={bulkUpdating || documents.length === 0}
-          onClick={handleBulkUpdateDescriptions}
-          className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-sm font-medium"
-        >
-          {bulkUpdating ? "Đang cập nhật thông tin..." : "Cập nhật thông tin"}
-        </button>
-        {lastUploadedDocumentIds.length > 0 && (
-          <span className="text-xs text-slate-400">
-            Ưu tiên {lastUploadedDocumentIds.length} tài liệu vừa thêm
-          </span>
-        )}
-      </div>
-
       {message && (
         <div
-          className={`p-3 rounded-lg text-sm ${
-            message.type === "success"
-              ? "bg-green-900/30 text-green-400 border border-green-800"
-              : "bg-red-900/30 text-red-400 border border-red-800"
+          className={`admin-alert ${
+            message.type === "success" ? "admin-alert-success" : "admin-alert-error"
           }`}
         >
           {message.text}
         </div>
       )}
 
-      <ul className="divide-y divide-slate-800 border border-slate-800 rounded-lg overflow-hidden">
+      <ul className="admin-list">
         {documents.length === 0 ? (
-          <li className="p-4 text-sm text-slate-500">Chưa có tài liệu nào.</li>
+          <li className="admin-list-item admin-muted text-sm">Chưa có tài liệu nào.</li>
         ) : (
           documents.map((doc) => (
-            <li key={doc.id} className="p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <li key={doc.id} className="admin-list-item !flex-col !items-stretch space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-medium text-slate-100">{doc.title}</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="font-medium">{doc.title}</p>
+                  <p className="admin-muted mt-1 text-xs">
                     {doc.source_type.toUpperCase()}
                     {doc.original_filename ? ` · ${doc.original_filename}` : ""}
                     {" · "}
@@ -334,7 +281,7 @@ export default function GroupDocumentsPanel({
                     type="button"
                     onClick={() => handleViewText(doc.id)}
                     disabled={viewLoading && viewingDocId === doc.id}
-                    className="text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                    className="admin-link disabled:opacity-50"
                   >
                     {viewLoading && viewingDocId === doc.id
                       ? "Đang tải..."
@@ -345,18 +292,18 @@ export default function GroupDocumentsPanel({
                   <button
                     type="button"
                     onClick={() => handleDelete(doc.id)}
-                    className="text-sm text-red-400 hover:text-red-300"
+                    className="text-sm text-red-300 hover:text-red-200"
                   >
                     Xóa
                   </button>
                 </div>
               </div>
               {viewingDocId === doc.id && viewingText !== null && (
-                <div className="rounded-lg border border-slate-700 bg-slate-950/60 p-3">
-                  <p className="text-xs text-slate-500 mb-2">
+                <div className="admin-stop-card">
+                  <p className="admin-muted mb-2 text-xs">
                     Bản text đã trích xuất và lưu (dùng cho chunk/RAG)
                   </p>
-                  <pre className="max-h-80 overflow-y-auto text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+                  <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed">
                     {viewingText}
                   </pre>
                 </div>

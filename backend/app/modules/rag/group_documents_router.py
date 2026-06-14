@@ -4,7 +4,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_admin_if_enabled
+from app.modules.auth.dependencies import require_admin_if_enabled, resolve_current_user
+from app.modules.auth.service import ensure_group_access
 from app.modules.content.bulk_update import (
     regenerate_related_items_for_group,
     regenerate_related_items_task,
@@ -71,16 +72,22 @@ def bulk_regenerate_group_content(
     group_id: int,
     payload: BulkRegenerateContentRequest,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    _staff=Depends(require_admin_if_enabled),
 ):
     get_group_or_404(db, group_id)
+    ensure_group_access(_staff, group_id)
     result = regenerate_related_items_for_group(db, group_id, payload.document_ids)
     return BulkRegenerateContentResponse(**result)
 
 
 @router.get("/{group_id}/documents", response_model=list[GroupDocumentSummary])
-def list_group_documents(group_id: int, db: Session = Depends(get_db)):
+def list_group_documents(
+    group_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
     get_group_or_404(db, group_id)
+    ensure_group_access(user, group_id)
     documents = get_group_document_service().list_documents(db, group_id)
     return [_to_summary(document) for document in documents]
 
@@ -93,9 +100,10 @@ async def create_group_document(
     text: str | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     get_group_or_404(db, group_id)
+    ensure_group_access(staff, group_id)
     try:
         document = await get_group_document_service().create_document(
             db,
@@ -122,7 +130,9 @@ def get_group_document(
     group_id: int,
     document_id: int,
     db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
 ):
+    ensure_group_access(user, group_id)
     try:
         document = get_group_document_service().get_document(db, group_id, document_id)
     except ValueError as exc:
@@ -139,8 +149,9 @@ async def update_group_document(
     text: str | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
+    ensure_group_access(staff, group_id)
     try:
         document = await get_group_document_service().update_document(
             db,
@@ -172,8 +183,9 @@ def delete_group_document(
     document_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
+    ensure_group_access(staff, group_id)
     try:
         get_group_document_service().delete_document(db, group_id, document_id)
     except ValueError as exc:

@@ -24,7 +24,7 @@ def generate_content(
     if item is None:
         raise HTTPException(
             status_code=404,
-            detail="Không tìm thấy vật thể với ID đã cho.",
+            detail="Không tìm thấy hiện vật với ID đã cho.",
         )
 
     try:

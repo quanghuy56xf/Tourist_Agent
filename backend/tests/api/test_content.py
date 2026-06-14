@@ -11,6 +11,7 @@ from app.modules.content.service import (
     ItemContentService,
     compute_content_hash,
 )
+from app.modules.content.tts import build_audio_mime
 
 
 def _add_item(db_session, **overrides) -> Item:
@@ -79,6 +80,28 @@ def test_manual_content_is_not_truncated(db_session, monkeypatch):
     assert len(result.content.split()) == 350
 
 
+def test_generate_text_skips_llm_without_verified_knowledge(db_session, monkeypatch):
+    item = Item(name="Chuông văn miếu", description="Chuông văn miếu", group_id=1)
+    db_session.add(item)
+    db_session.commit()
+
+    generator = Mock()
+    monkeypatch.setattr(
+        "app.modules.content.service.get_rag_generator",
+        lambda: generator,
+    )
+    monkeypatch.setattr(
+        "app.modules.content.service.build_verified_item_context",
+        lambda **kwargs: ([], False),
+    )
+
+    text, source = ItemContentService().generate_text(item, "Mặc định", "Tiếng Việt")
+
+    assert "chưa có đủ thông tin xác thực" in text.lower()
+    assert source == "no_knowledge"
+    generator.generate_answer.assert_not_called()
+
+
 def test_get_valid_variant_requires_matching_hash(db_session):
     item = _add_item(db_session, description="Old")
     variant = ItemContentVariant(
@@ -110,7 +133,7 @@ def test_upsert_variant_persists_audio_blob(db_session):
         language="Tiếng Việt",
         text_content="Hello",
         audio_data=b"fake-mp3",
-        audio_mime="audio/mpeg",
+        audio_mime=build_audio_mime(),
         source="generated",
     )
 
@@ -130,7 +153,7 @@ def test_upsert_variant_updates_existing_row(db_session):
         language="Tiếng Việt",
         text_content="First",
         audio_data=b"a",
-        audio_mime="audio/mpeg",
+        audio_mime=build_audio_mime(),
         source="generated",
     )
     result = service.upsert_variant(
@@ -140,7 +163,7 @@ def test_upsert_variant_updates_existing_row(db_session):
         language="Tiếng Việt",
         text_content="Second",
         audio_data=b"b",
-        audio_mime="audio/mpeg",
+        audio_mime=build_audio_mime(),
         source="manual",
     )
 
@@ -163,7 +186,7 @@ def test_get_item_content_returns_stored_variant(client, db_session):
             language="Tiếng Việt",
             text_content="Stored story",
             audio_data=b"audio-bytes",
-            audio_mime="audio/mpeg",
+            audio_mime=build_audio_mime(),
             content_hash=compute_content_hash(item.description),
             status="ready",
             source="pregenerated",
@@ -207,8 +230,9 @@ def test_get_or_generate_repairs_stored_variant_without_audio(
         "app.modules.content.service.synthesize_speech",
         lambda text, language: (b"repaired-audio", "audio/mpeg"),
     )
+    service = ItemContentService()
 
-    result = ItemContentService().get_or_generate(
+    result = service.get_or_generate(
         db_session,
         item,
         "Mặc định",
@@ -216,26 +240,36 @@ def test_get_or_generate_repairs_stored_variant_without_audio(
     )
 
     assert result.stored is True
-    assert result.has_audio is True
-    variant = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
+    assert result.has_audio is False
+    assert result.audio_url is None
+
+    variant = service.ensure_audio(
+        db_session,
+        item,
+        "Mặc định",
+        "Tiếng Việt",
+    )
+    assert variant is not None
     assert variant.audio_data == b"repaired-audio"
-    assert variant.audio_mime == "audio/mpeg"
+    assert variant.audio_mime == build_audio_mime()
 
 
 def test_get_item_content_generates_when_missing(client, db_session, monkeypatch):
     item = _add_item(db_session)
 
     fake_service = Mock()
-    fake_service.get_or_generate.return_value = ItemContentResult(
+    generated = ItemContentResult(
         item_id=item.id,
         persona="Mặc định",
         language="Tiếng Việt",
         content="Generated story",
         has_audio=True,
-        audio_url=f"/api/objects/{item.id}/content/audio?persona=M%E1%BA%B7c+%C4%91%E1%BB%8Bnh&language=Ti%E1%BA%BFng+Vi%E1%BB%87t",
+        audio_url=f"/api/objects/{item.id}/content/audio?persona=M%E1%BA%B7c+%C4%91%E1%BB%8Bnh&language=Ti%E1%BA%BFng+Vi%E1%BB%87t&v=abc",
         stored=False,
         source="generated",
     )
+    fake_service.get_or_generate.return_value = generated
+    fake_service.finalize_with_audio.return_value = generated
     monkeypatch.setattr(content_router, "get_item_content_service", lambda: fake_service)
 
     response = client.get(f"/api/objects/{item.id}/content")
@@ -243,6 +277,36 @@ def test_get_item_content_generates_when_missing(client, db_session, monkeypatch
     assert response.status_code == 200
     assert response.json()["stored"] is False
     fake_service.get_or_generate.assert_called_once()
+
+
+def test_get_item_content_audio_generates_when_missing(client, db_session, monkeypatch):
+    item = _add_item(db_session)
+    db_session.add(
+        ItemContentVariant(
+            item_id=item.id,
+            persona="Mặc định",
+            language="Tiếng Việt",
+            text_content="Stored story",
+            audio_data=None,
+            audio_mime=None,
+            content_hash=compute_content_hash(item.description),
+            status="ready",
+            source="generated",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        "app.modules.content.service.synthesize_speech",
+        lambda text, language: (b"generated-audio", "audio/mpeg"),
+    )
+
+    response = client.get(
+        f"/api/objects/{item.id}/content/audio",
+        params={"persona": "Mặc định", "language": "Tiếng Việt"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"generated-audio"
 
 
 def test_get_item_content_audio_streams_blob(client, db_session):
@@ -254,7 +318,7 @@ def test_get_item_content_audio_streams_blob(client, db_session):
             language="Tiếng Việt",
             text_content="Stored story",
             audio_data=b"audio-bytes",
-            audio_mime="audio/mpeg",
+            audio_mime=build_audio_mime(),
             content_hash=compute_content_hash(item.description),
             status="ready",
             source="pregenerated",
@@ -294,6 +358,8 @@ def test_update_item_content_persists_text_and_audio(client, db_session, monkeyp
     payload = response.json()
     assert payload["content"] == "Mô tả đã chỉnh sửa thủ công"
     assert payload["has_audio"] is True
+    assert payload["audio_url"] is not None
+    assert "v=" in payload["audio_url"]
     assert payload["source"] == "manual"
 
     variant = (
@@ -302,7 +368,6 @@ def test_update_item_content_persists_text_and_audio(client, db_session, monkeyp
         .one()
     )
     assert variant.text_content == "Mô tả đã chỉnh sửa thủ công"
-    assert variant.audio_data == b"new-audio"
     assert variant.source == "manual"
 
 

@@ -20,11 +20,14 @@ from app.modules.content.text_utils import (
     limit_words,
     strip_citations,
 )
-from app.modules.content.tts import synthesize_speech
+from app.modules.content.tts import build_audio_mime, is_current_audio_mime, synthesize_speech
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.retriever import try_get_rag_retriever
-from app.modules.rag.service import build_item_context
+from app.modules.rag.service import (
+    build_verified_item_context,
+    no_item_knowledge_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +60,23 @@ def compute_content_hash(
     return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
 
-def build_audio_url(item_id: int, persona: str, language: str) -> str:
-    query = urlencode({"persona": persona, "language": language})
+def compute_text_version(text_content: str) -> str:
+    return hashlib.sha256(text_content.encode("utf-8")).hexdigest()[:16]
+
+
+def build_audio_url(
+    item_id: int,
+    persona: str,
+    language: str,
+    text_content: str,
+) -> str:
+    query = urlencode(
+        {
+            "persona": persona,
+            "language": language,
+            "v": compute_text_version(text_content),
+        }
+    )
     return f"/api/objects/{item_id}/content/audio?{query}"
 
 
@@ -168,7 +186,7 @@ class ItemContentService:
         persona: str,
         language: str,
     ) -> tuple[str, str]:
-        docs = build_item_context(
+        docs, has_verified = build_verified_item_context(
             item_id=item.id,
             item_name=item.name,
             item_description=item.description,
@@ -176,6 +194,9 @@ class ItemContentService:
             retriever=try_get_rag_retriever(),
             top_k=5,
         )
+        if not has_verified:
+            return no_item_knowledge_message(language), "no_knowledge"
+
         query = f"Giới thiệu chi tiết về {item.name}."
         try:
             content = get_rag_generator().generate_answer(
@@ -210,22 +231,18 @@ class ItemContentService:
         except LLMServiceUnavailableError:
             raise
 
-        audio_result = synthesize_speech(strip_citations(text_content), language)
-        audio_data = audio_result[0] if audio_result else None
-        audio_mime = audio_result[1] if audio_result else None
-
-        self.upsert_variant(
+        variant = self.upsert_variant(
             db,
             item=item,
             persona=persona,
             language=language,
             text_content=text_content,
-            audio_data=audio_data,
-            audio_mime=audio_mime,
+            audio_data=None,
+            audio_mime=None,
             source=resolved_source,
         )
 
-        return self._to_result(item.id, persona, language, text_content, audio_data, False, resolved_source)
+        return self._variant_to_result(item.id, variant, stored=False)
 
     def get_or_generate(
         self,
@@ -238,19 +255,6 @@ class ItemContentService:
         language = normalize_language(language)
         variant = self.get_valid_variant(db, item, persona, language)
         if variant is not None:
-            if variant.audio_data is None or variant.audio_mime is None:
-                audio_result = synthesize_speech(variant.text_content, language)
-                if audio_result is not None:
-                    variant = self.upsert_variant(
-                        db,
-                        item=item,
-                        persona=persona,
-                        language=language,
-                        text_content=variant.text_content,
-                        audio_data=audio_result[0],
-                        audio_mime=audio_result[1],
-                        source=variant.source,
-                    )
             return self._variant_to_result(item.id, variant, stored=True)
 
         if persona != DEFAULT_PERSONA or language != DEFAULT_LANGUAGE:
@@ -280,6 +284,28 @@ class ItemContentService:
             source="generated",
         )
 
+    def finalize_with_audio(
+        self,
+        db: Session,
+        item: Item,
+        result: ItemContentResult,
+    ) -> ItemContentResult:
+        if not result.content.strip():
+            return result
+        variant = self.ensure_audio(db, item, result.persona, result.language)
+        if variant is None:
+            return ItemContentResult(
+                item_id=result.item_id,
+                persona=result.persona,
+                language=result.language,
+                content=result.content,
+                has_audio=False,
+                audio_url=None,
+                stored=result.stored,
+                source=result.source,
+            )
+        return self._variant_to_result(item.id, variant, stored=result.stored)
+
     def generate_adapted_variant(
         self,
         db: Session,
@@ -297,27 +323,50 @@ class ItemContentService:
             language,
         )
         text_content = limit_words(strip_citations(adapted))
-        audio_result = synthesize_speech(text_content, language)
-        audio_data = audio_result[0] if audio_result else None
-        audio_mime = audio_result[1] if audio_result else None
-        self.upsert_variant(
+        variant = self.upsert_variant(
             db,
             item=item,
             persona=persona,
             language=language,
             text_content=text_content,
-            audio_data=audio_data,
-            audio_mime=audio_mime,
+            audio_data=None,
+            audio_mime=None,
             source="generated",
         )
-        return self._to_result(
-            item.id,
-            persona,
-            language,
-            text_content,
-            audio_data,
-            False,
-            "generated",
+        return self._variant_to_result(item.id, variant, stored=False)
+
+    def ensure_audio(
+        self,
+        db: Session,
+        item: Item,
+        persona: str,
+        language: str,
+    ) -> ItemContentVariant | None:
+        persona = normalize_persona(persona)
+        language = normalize_language(language)
+        variant = self.get_valid_variant(db, item, persona, language)
+        if variant is None or not variant.text_content.strip():
+            return None
+        if (
+            variant.audio_data is not None
+            and variant.audio_mime is not None
+            and is_current_audio_mime(variant.audio_mime)
+        ):
+            return variant
+
+        audio_result = synthesize_speech(variant.text_content, language)
+        if audio_result is None:
+            return variant
+
+        return self.upsert_variant(
+            db,
+            item=item,
+            persona=persona,
+            language=language,
+            text_content=variant.text_content,
+            audio_data=audio_result[0],
+            audio_mime=build_audio_mime(),
+            source=variant.source,
         )
 
     def generate_draft_content(
@@ -361,30 +410,18 @@ class ItemContentService:
         if not normalized:
             raise ValueError("empty_content")
 
-        audio_result = synthesize_speech(normalized, language)
-        audio_data = audio_result[0] if audio_result else None
-        audio_mime = audio_result[1] if audio_result else None
-
-        self.upsert_variant(
+        variant = self.upsert_variant(
             db,
             item=item,
             persona=persona,
             language=language,
             text_content=normalized,
-            audio_data=audio_data,
-            audio_mime=audio_mime,
+            audio_data=None,
+            audio_mime=None,
             source="manual",
         )
 
-        return self._to_result(
-            item.id,
-            persona,
-            language,
-            normalized,
-            audio_data,
-            True,
-            "manual",
-        )
+        return self._variant_to_result(item.id, variant, stored=True)
 
     def regenerate_other_variants(
         self,
@@ -450,7 +487,11 @@ class ItemContentService:
             language=language,
             content=text_content,
             has_audio=has_audio,
-            audio_url=build_audio_url(item_id, persona, language) if has_audio else None,
+            audio_url=(
+                build_audio_url(item_id, persona, language, text_content)
+                if has_audio and text_content.strip()
+                else None
+            ),
             stored=stored,
             source=source,
         )

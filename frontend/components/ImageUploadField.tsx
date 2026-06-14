@@ -19,14 +19,12 @@ export default function ImageUploadField({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-slate-300">
-        {label}
-      </label>
+      <label className="admin-label">{label}</label>
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex-1 px-4 py-3 border border-dashed border-slate-600 rounded-lg hover:border-blue-500 hover:bg-slate-800/50 transition-colors text-sm text-slate-400"
+          className="admin-upload-zone flex-1 py-4"
         >
           {previewUrl ? "Đổi ảnh" : "Chọn file / Camera"}
         </button>
@@ -47,7 +45,8 @@ export default function ImageUploadField({
         <img
           src={previewUrl}
           alt={label}
-          className="w-full h-32 object-cover rounded-lg border border-slate-700"
+          className="h-32 w-full rounded-xl border object-cover"
+          style={{ borderColor: "var(--border)" }}
         />
       )}
     </div>

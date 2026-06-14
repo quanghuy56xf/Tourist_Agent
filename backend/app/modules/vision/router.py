@@ -26,7 +26,7 @@ async def search_object(
     if not matches:
         return SearchResponse(
             found=False,
-            message="Không tìm thấy vật thể gần giống",
+            message="Không tìm thấy hiện vật gần giống",
         )
 
     results: list[SearchMatch] = []
@@ -53,7 +53,7 @@ async def search_object(
     if not results:
         return SearchResponse(
             found=False,
-            message="Không tìm thấy vật thể gần giống",
+            message="Không tìm thấy hiện vật gần giống",
         )
 
     best_similarity = results[0].similarity
@@ -62,5 +62,5 @@ async def search_object(
     return SearchResponse(
         found=found,
         results=results,
-        message=None if found else "Không có vật thể khớp đủ tin cậy — xem gợi ý bên dưới",
+        message=None if found else "Không có hiện vật khớp đủ tin cậy — xem gợi ý bên dưới",
     )

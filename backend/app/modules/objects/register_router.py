@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.core.database import get_db
 from app.modules.auth.dependencies import require_admin_if_enabled
+from app.modules.auth.service import ensure_group_access
 from app.models.group import Group
 from app.models.item import Item
 from app.modules.objects.item_images import ingest_image
@@ -52,12 +53,12 @@ async def register_object(
     group_id: int | None = Form(None),
     new_group_name: str | None = Form(None),
     db: Session = Depends(get_db),
-    _admin: str | None = Depends(require_admin_if_enabled),
+    staff=Depends(require_admin_if_enabled),
 ):
     if not name.strip():
         raise HTTPException(
             status_code=400,
-            detail="Tên vật thể không được để trống",
+            detail="Tên hiện vật không được để trống",
         )
     if not description.strip():
         raise HTTPException(
@@ -70,7 +71,14 @@ async def register_object(
             detail="Ảnh mặt trước là bắt buộc",
         )
 
+    if new_group_name and new_group_name.strip() and staff and staff.role == "manager":
+        raise HTTPException(
+            status_code=403,
+            detail="Chỉ admin mới được tạo khu di tích mới",
+        )
+
     resolved_group_id = _resolve_group_id(db, group_id, new_group_name)
+    ensure_group_access(staff, resolved_group_id)
     item = Item(
         name=name.strip(),
         description=description.strip(),
