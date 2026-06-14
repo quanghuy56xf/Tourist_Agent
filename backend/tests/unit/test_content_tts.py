@@ -19,6 +19,14 @@ def test_short_vi_code_maps_to_hoai_my():
     assert language_to_edge_voice("vi") == "vi-VN-HoaiMyNeural"
 
 
+def test_english_voice_is_jenny():
+    assert language_to_edge_voice("Tiếng Anh") == "en-US-JennyNeural"
+
+
+def test_short_en_code_maps_to_jenny():
+    assert language_to_edge_voice("en") == "en-US-JennyNeural"
+
+
 def test_stale_audio_mime_is_not_current():
     assert not is_current_audio_mime("audio/mpeg")
     assert is_current_audio_mime(build_audio_mime())

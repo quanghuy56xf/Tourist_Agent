@@ -7,7 +7,7 @@ import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
-import { buildItemAudioPath } from "@/lib/contentAudio";
+import { playChatTts, stopChatTts } from "@/lib/chatTts";
 import {
   getItem,
   getItemContent,
@@ -29,9 +29,9 @@ export default function ItemDetailPage() {
   const similarity = Number(similarityParam);
   const confidence =
     similarityParam !== null &&
-      Number.isFinite(similarity) &&
-      similarity >= 0 &&
-      similarity <= 1
+    Number.isFinite(similarity) &&
+    similarity >= 0 &&
+    similarity <= 1
       ? `${(similarity * 100).toFixed(1)}%`
       : null;
   const tourId = searchParams.get("tour");
@@ -51,17 +51,26 @@ export default function ItemDetailPage() {
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [persona, setPersona] = useState("Mặc định");
   const [introActive, setIntroActive] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
 
   const stopGuidePlayback = () => {
     heraPanelRef.current?.stopPlayback();
     stopBrowserSpeech();
+    stopChatTts();
   };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setPersona(localStorage.getItem("user_persona") || "Mặc định");
+      setAutoSpeak(localStorage.getItem("chat_auto_speak") === "true");
     }
     setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopChatTts();
+    };
   }, []);
 
   useEffect(() => {
@@ -73,8 +82,6 @@ export default function ItemDetailPage() {
         setError("");
         setLoadingItem(true);
         setLoadingContent(true);
-        setContent("");
-        setAudioUrl(null);
         const data = await getItem(itemId);
         if (cancelled) return;
         setItem(data);
@@ -84,7 +91,9 @@ export default function ItemDetailPage() {
           if (!cancelled) {
             setContent(itemContent.content);
             setAudioUrl(
-              resolveImageUrl(buildItemAudioPath(itemId, persona, language))
+              itemContent.has_audio && itemContent.audio_url
+                ? resolveImageUrl(itemContent.audio_url)
+                : null
             );
           }
         } catch {
@@ -125,7 +134,13 @@ export default function ItemDetailPage() {
     setIsChatting(true);
     try {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language);
-      setChatHistory([...updatedHistory, { role: "assistant", content: res.content }]);
+      const assistantContent = res.content;
+      setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
+      if (autoSpeak && assistantContent.trim()) {
+        void playChatTts(assistantContent, language).catch(() => {
+          /* ignore playback errors */
+        });
+      }
     } catch {
       setChatHistory([
         ...updatedHistory,
@@ -245,7 +260,6 @@ export default function ItemDetailPage() {
                   content={msg.content}
                   language={language}
                   speakLabel={t.item.speakAnswer}
-                  stopSpeakLabel={t.item.stopSpeak}
                   onBeforeSpeak={stopGuidePlayback}
                 />
               )}
@@ -280,31 +294,54 @@ export default function ItemDetailPage() {
             </button>
           )}
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => {
-                setChatInput(e.target.value);
-                if (e.target.value.trim()) stopGuidePlayback();
-              }}
-              onFocus={stopGuidePlayback}
-              onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
-              placeholder={t.item.chatPlaceholder}
-              className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
-              style={{
-                background: "var(--secondary)",
-                border: "1px solid var(--border)",
-                color: "var(--foreground)",
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleSendChat}
-              disabled={!chatInput.trim() || isChatting}
-              className="artifact-btn-primary shrink-0 px-5 py-3 text-sm disabled:opacity-50"
-            >
-              {t.item.send}
-            </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !autoSpeak;
+              setAutoSpeak(next);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("chat_auto_speak", String(next));
+              }
+              if (!next) {
+                stopChatTts();
+              }
+            }}
+            aria-label={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
+            title={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg"
+            style={{
+              background: "var(--secondary)",
+              border: `1px solid ${autoSpeak ? "var(--primary)" : "var(--border)"}`,
+              color: autoSpeak ? "var(--primary)" : "var(--muted-foreground)",
+            }}
+          >
+            {autoSpeak ? "🔊" : "🔇"}
+          </button>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => {
+              setChatInput(e.target.value);
+              if (e.target.value.trim()) stopGuidePlayback();
+            }}
+            onFocus={stopGuidePlayback}
+            onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+            placeholder={t.item.chatPlaceholder}
+            className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
+            style={{
+              background: "var(--secondary)",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSendChat}
+            disabled={!chatInput.trim() || isChatting}
+            className="artifact-btn-primary shrink-0 px-5 py-3 text-sm disabled:opacity-50"
+          >
+            {t.item.send}
+          </button>
           </div>
         </div>
       </div>

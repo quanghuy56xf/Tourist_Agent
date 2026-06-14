@@ -2,7 +2,7 @@ import pytest
 from langchain_core.documents import Document
 
 from app.modules.rag.service import (
-    build_chat_context,
+    build_chat_item_context,
     build_item_context,
     build_verified_item_context,
     filter_group_docs_for_item,
@@ -163,51 +163,50 @@ def test_verified_context_keeps_group_docs_that_mention_item():
     assert len(filtered) == 1
 
 
-def test_chat_context_keeps_query_relevant_group_docs_without_item_mention():
+def test_chat_context_includes_query_aligned_docs_without_item_name():
     retriever = WorkingRetriever()
     retriever.retrieve = lambda query, top_k, group_id=None: [
         Document(
-            page_content="Văn Miếu được xây dựng năm 1070.",
-            metadata={"source": "group_doc", "page": "kb-history"},
-        )
+            page_content="Văn Miếu được xây dựng năm 1070 dưới triều Lý Thánh Tông.",
+            metadata={"source": "group_doc", "page": "kb-1"},
+        ),
+        Document(
+            page_content="Quốc Tử Giám từng là trường đại học đầu tiên của Việt Nam.",
+            metadata={"source": "group_doc", "page": "kb-2"},
+        ),
     ]
-
-    docs, has_verified = build_chat_context(
-        item_id=9,
-        item_name="Cổng Đại Trung",
-        item_description="Cổng Đại Trung là cổng thuộc khu Văn Miếu.",
+    chat_docs, has_verified = build_chat_item_context(
+        item_id=3,
+        item_name="Văn Miếu",
+        item_description=(
+            "Văn Miếu – Quốc Tử Giám Thăng Long tọa lạc tại 58 Quốc Tử Giám, "
+            "Đống Đa, Hà Nội, là nơi thờ Khổng Tử và các bậc hiền triết Việt Nam."
+        ),
         retriever=retriever,
         group_id=1,
-        query="Văn Miếu xây năm nào?",
-        top_k=6,
+        query="còn thông tin nào thú vị nữa",
+        top_k=8,
     )
 
     assert has_verified is True
-    assert docs[-1].page_content == "Văn Miếu được xây dựng năm 1070."
+    assert chat_docs[0].metadata["source"] == "item"
+    assert len(chat_docs) == 3
+    assert "Quốc Tử Giám từng là trường đại học" in chat_docs[2].page_content
 
-
-def test_chat_context_prioritizes_docs_that_mention_item():
-    retriever = WorkingRetriever()
-    retriever.retrieve = lambda query, top_k, group_id=None: [
-        Document(
-            page_content="Văn Miếu được xây dựng năm 1070.",
-            metadata={"source": "group_doc", "page": "kb-history"},
+    verified_docs, _ = build_verified_item_context(
+        item_id=3,
+        item_name="Văn Miếu",
+        item_description=(
+            "Văn Miếu – Quốc Tử Giám Thăng Long tọa lạc tại 58 Quốc Tử Giám, "
+            "Đống Đa, Hà Nội, là nơi thờ Khổng Tử và các bậc hiền triết Việt Nam."
         ),
-        Document(
-            page_content="Cổng Đại Trung nằm trên trục chính của Văn Miếu.",
-            metadata={"source": "group_doc", "page": "kb-gate"},
-        ),
-    ]
-
-    docs, _ = build_chat_context(
-        item_id=9,
-        item_name="Cổng Đại Trung",
-        item_description="Cổng Đại Trung",
         retriever=retriever,
         group_id=1,
-        query="Văn Miếu xây năm nào?",
-        top_k=6,
+        query="còn thông tin nào thú vị nữa",
+        top_k=8,
     )
-
-    assert [doc.metadata["page"] for doc in docs] == ["kb-gate", "kb-history"]
-
+    assert len(verified_docs) == 2
+    assert all(
+        "Quốc Tử Giám từng là trường đại học" not in doc.page_content
+        for doc in verified_docs
+    )

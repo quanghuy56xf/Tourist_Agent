@@ -149,16 +149,23 @@ def build_verified_item_context(
     return verified_docs, has_verified_knowledge
 
 
-def build_chat_context(
+def build_chat_item_context(
     *,
     item_id: int,
     item_name: str,
     item_description: str,
     retriever: Retriever | None,
-    top_k: int = 6,
+    top_k: int = 8,
     group_id: int | None = None,
     query: str | None = None,
 ) -> tuple[list[Document], bool]:
+    """Wider retrieval for chat: pass query-aligned group docs to the LLM.
+
+    ``has_verified`` still requires a substantive item description or at least
+    one group document that mentions the item. Once verified, the LLM receives
+    all retrieved group chunks (including lower-ranked matches), not only those
+    that explicitly name the artifact.
+    """
     all_docs = build_item_context(
         item_id=item_id,
         item_name=item_name,
@@ -168,34 +175,16 @@ def build_chat_context(
         group_id=group_id,
         query=query,
     )
-    group_docs = [
-        document
-        for document in all_docs
-        if document.metadata.get("source") == "group_doc"
-    ]
-    item_related_docs = filter_group_docs_for_item(
+    relevant_group_docs = filter_group_docs_for_item(
         item_name,
         item_description,
-        group_docs,
+        all_docs,
     )
-    item_related_contents = {
-        document.page_content
-        for document in item_related_docs
-    }
-    expanded_docs = [
-        document
-        for document in group_docs
-        if document.page_content not in item_related_contents
-    ]
-
-    chat_docs: list[Document] = []
     has_substantive_description = is_substantive_item_description(
         item_description,
         item_name,
     )
-    if has_substantive_description and all_docs:
-        chat_docs.append(all_docs[0])
-    chat_docs.extend(item_related_docs)
-    chat_docs.extend(expanded_docs)
+    has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
 
-    return chat_docs, bool(chat_docs)
+    chat_docs: list[Document] = list(all_docs)
+    return chat_docs, has_verified_knowledge

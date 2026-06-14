@@ -10,11 +10,21 @@ from google.api_core.exceptions import (
 )
 from google.genai.errors import APIError
 
+try:
+    from openai import APIStatusError, RateLimitError
+except ImportError:  # pragma: no cover - optional until langchain-openai installed
+    APIStatusError = RateLimitError = ()
+
 
 _LEGACY_TEMPORARY_ERRORS = (
     DeadlineExceeded,
     ServiceUnavailable,
     TooManyRequests,
+)
+_OPENAI_TEMPORARY_ERRORS = tuple(
+    error_type
+    for error_type in (RateLimitError, APIStatusError)
+    if isinstance(error_type, type)
 )
 _TIMEOUT_ERRORS = (httpx.TimeoutException, requests.exceptions.Timeout)
 _TEMPORARY_STATUS_CODES = {429, 503, 504}
@@ -27,7 +37,12 @@ class LLMServiceUnavailableError(RuntimeError):
 def _is_temporary_provider_error(exc: Exception) -> bool:
     current: BaseException | None = exc
     while current is not None:
-        if isinstance(current, _LEGACY_TEMPORARY_ERRORS + _TIMEOUT_ERRORS):
+        if isinstance(current, _LEGACY_TEMPORARY_ERRORS + _TIMEOUT_ERRORS + _OPENAI_TEMPORARY_ERRORS):
+            return True
+        if (
+            isinstance(current, APIStatusError)
+            and current.status_code in _TEMPORARY_STATUS_CODES
+        ):
             return True
         if (
             isinstance(current, APIError)
