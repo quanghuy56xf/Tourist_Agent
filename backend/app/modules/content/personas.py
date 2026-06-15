@@ -33,11 +33,13 @@ EDGE_TTS_VOICES: dict[str, str] = {
 
 
 def language_to_edge_voice(language: str) -> str:
-    if language in EDGE_TTS_VOICES:
-        return EDGE_TTS_VOICES[language]
-    normalized = normalize_language(language)
-    if normalized in EDGE_TTS_VOICES:
-        return EDGE_TTS_VOICES[normalized]
-    if language in ("vi", "vi-VN"):
+    raw = (language or "").strip()
+    lowered = raw.lower()
+    if raw in EDGE_TTS_VOICES:
+        return EDGE_TTS_VOICES[raw]
+    if lowered in ("vi", "vi-vn") or raw == "Tiếng Việt":
         return EDGE_TTS_VOICES["Tiếng Việt"]
-    return EDGE_TTS_VOICES["Tiếng Anh"]
+    if lowered in ("en", "en-us", "en-gb") or raw == "Tiếng Anh":
+        return EDGE_TTS_VOICES["Tiếng Anh"]
+    normalized = normalize_language(raw)
+    return EDGE_TTS_VOICES[normalized]

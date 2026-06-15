@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  isBrowserSpeechSupported,
-  isSpeechCancelled,
-  speakWithBrowser,
-  stopBrowserSpeech,
-} from "@/lib/browserSpeech";
+import { useState } from "react";
+import { playChatTts } from "@/lib/chatTts";
 
 interface ChatAssistantBubbleProps {
   content: string;
   language: string;
   speakLabel: string;
-  stopSpeakLabel: string;
   onBeforeSpeak?: () => void;
 }
 
@@ -20,41 +14,20 @@ export default function ChatAssistantBubble({
   content,
   language,
   speakLabel,
-  stopSpeakLabel,
   onBeforeSpeak,
 }: ChatAssistantBubbleProps) {
-  const [speechReady, setSpeechReady] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setSpeechReady(isBrowserSpeechSupported());
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      stopBrowserSpeech();
-    };
-  }, []);
-
-  const handleToggleSpeak = async () => {
-    if (!speechReady) return;
-
-    if (speaking) {
-      stopBrowserSpeech();
-      setSpeaking(false);
-      return;
-    }
-
+  const handleSpeak = async () => {
+    if (loading || !content.trim()) return;
     onBeforeSpeak?.();
-    setSpeaking(true);
+    setLoading(true);
     try {
-      await speakWithBrowser(content, language);
-    } catch (error) {
-      if (!isSpeechCancelled(error)) {
-        /* ignore other playback errors */
-      }
+      await playChatTts(content, language);
+    } catch {
+      /* ignore playback errors */
     } finally {
-      setSpeaking(false);
+      setLoading(false);
     }
   };
 
@@ -67,22 +40,21 @@ export default function ChatAssistantBubble({
         border: "1px solid var(--border)",
       }}
     >
-      {speechReady && (
+      {content.trim() && (
         <button
           type="button"
-          onClick={() => void handleToggleSpeak()}
-          aria-label={speaking ? stopSpeakLabel : speakLabel}
-          title={speaking ? stopSpeakLabel : speakLabel}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-xs"
+          onClick={() => void handleSpeak()}
+          disabled={loading}
+          aria-label={speakLabel}
+          title={speakLabel}
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-xs disabled:opacity-70"
           style={{
-            background: speaking ? "rgba(212,24,61,0.85)" : "rgba(14, 11, 7, 0.55)",
-            color: speaking ? "#f0e8d5" : "var(--primary)",
-            border: speaking
-              ? "1px solid rgba(212,24,61,0.55)"
-              : "1px solid var(--border)",
+            background: "rgba(14, 11, 7, 0.55)",
+            color: "var(--primary)",
+            border: "1px solid var(--border)",
           }}
         >
-          {speaking ? "⏹" : "🔊"}
+          {loading ? "…" : "🔊"}
         </button>
       )}
       {content}

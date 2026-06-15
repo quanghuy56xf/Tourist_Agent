@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import (
     ADMIN_AUTH_ENABLED,
+    CONTENT_AUDIO_SWEEP_ENABLED,
+    CONTENT_AUDIO_SWEEP_INTERVAL_SECONDS,
     CORS_ALLOW_ALL,
     CORS_ORIGINS,
     LOG_LEVEL,
@@ -32,6 +35,19 @@ from app.modules.vision import embedding
 from app.core.database import init_db
 
 
+async def _audio_sweep_loop(interval_seconds: int):
+    from app.modules.content.audio_jobs import sweep_missing_audio
+
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            await asyncio.to_thread(sweep_missing_audio)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Periodic audio sweep failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting HERA backend (admin_auth_enabled=%s)", ADMIN_AUTH_ENABLED)
@@ -39,8 +55,26 @@ async def lifespan(app: FastAPI):
     Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     if MODEL_WARMUP_ENABLED:
         embedding.warmup()
+
+    audio_sweep_task: asyncio.Task | None = None
+    if CONTENT_AUDIO_SWEEP_ENABLED and CONTENT_AUDIO_SWEEP_INTERVAL_SECONDS > 0:
+        audio_sweep_task = asyncio.create_task(
+            _audio_sweep_loop(CONTENT_AUDIO_SWEEP_INTERVAL_SECONDS)
+        )
+        logger.info(
+            "Audio sweep scheduled every %ss", CONTENT_AUDIO_SWEEP_INTERVAL_SECONDS
+        )
+
     logger.info("HERA backend startup complete")
-    yield
+    try:
+        yield
+    finally:
+        if audio_sweep_task is not None:
+            audio_sweep_task.cancel()
+            try:
+                await audio_sweep_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(title="DINOv2 Object Search API", lifespan=lifespan)

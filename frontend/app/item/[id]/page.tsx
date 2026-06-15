@@ -50,17 +50,26 @@ export default function ItemDetailPage() {
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [persona, setPersona] = useState("Mặc định");
   const [introActive, setIntroActive] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
 
   const stopGuidePlayback = () => {
     heraPanelRef.current?.stopPlayback();
     stopBrowserSpeech();
+    stopChatTts();
   };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setPersona(localStorage.getItem("user_persona") || "Mặc định");
+      setAutoSpeak(localStorage.getItem("chat_auto_speak") === "true");
     }
     setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopChatTts();
+    };
   }, []);
 
   useEffect(() => {
@@ -124,7 +133,13 @@ export default function ItemDetailPage() {
     setIsChatting(true);
     try {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language);
-      setChatHistory([...updatedHistory, { role: "assistant", content: res.content }]);
+      const assistantContent = res.content;
+      setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
+      if (autoSpeak && assistantContent.trim()) {
+        void playChatTts(assistantContent, language).catch(() => {
+          /* ignore playback errors */
+        });
+      }
     } catch {
       setChatHistory([
         ...updatedHistory,
@@ -244,7 +259,6 @@ export default function ItemDetailPage() {
                   content={msg.content}
                   language={language}
                   speakLabel={t.item.speakAnswer}
-                  stopSpeakLabel={t.item.stopSpeak}
                   onBeforeSpeak={stopGuidePlayback}
                 />
               )}

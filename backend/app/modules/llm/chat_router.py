@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import RAG_CHAT_TOP_K
 from app.core.database import get_db
 from app.models.item import Item
 from app.modules.content.text_utils import limit_words

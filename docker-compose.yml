@@ -7,11 +7,11 @@ services:
       - "8000:8000"
     volumes:
       - backend_data:/app/data
-      - backend_uploads:/app/uploads
     environment:
+      - PORT=8000
       - DATABASE_URL=sqlite:///./data/app.db
       - CHROMA_PATH=./data/chroma
-      - UPLOAD_DIR=./uploads
+      - UPLOAD_DIR=./data/uploads
       - SIMILARITY_THRESHOLD=0.75
       - SEARCH_TOP_K=20
       - SEARCH_TOP_N=3
@@ -24,13 +24,20 @@ services:
       - RAG_CHROMA_PATH=./data/rag_chroma
       - RAG_BM25_PATH=./data/rag/bm25_index.pkl
       - RAG_CHUNKS_PATH=./data/rag/chunks.pkl
+      - GROUP_DOCS_DIR=./data/group_docs
+      - HF_HOME=./data/huggingface
       - MODEL_WARMUP_ENABLED=false
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - ADMIN_AUTH_ENABLED=${ADMIN_AUTH_ENABLED:-false}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        BACKEND_INTERNAL_URL: http://backend:8000
     container_name: dinov2-frontend
     restart: unless-stopped
     ports:
@@ -56,4 +63,3 @@ services:
 
 volumes:
   backend_data:
-  backend_uploads:

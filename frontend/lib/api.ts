@@ -582,11 +582,24 @@ export async function chatWithAI(
   return res.json();
 }
 
-export async function fetchTTSAudio(text: string, language: string = "vi"): Promise<string> {
+export function toTtsLanguageCode(language: string): "vi" | "en" {
+  const normalized = language.trim().toLowerCase();
+  if (normalized === "tiếng việt" || normalized === "tieng viet" || normalized.startsWith("vi")) {
+    return "vi";
+  }
+  return "en";
+}
+
+export async function fetchTTSAudio(
+  text: string,
+  language: string = "vi",
+  signal?: AbortSignal
+): Promise<string> {
   const res = await fetch(`${API_URL}/api/tts`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, language: language === "Tiếng Việt" ? "vi" : "en" }),
+    body: JSON.stringify({ text, language: toTtsLanguageCode(language) }),
+    signal,
   });
   if (!res.ok) {
     throw new Error("Lỗi tải âm thanh");

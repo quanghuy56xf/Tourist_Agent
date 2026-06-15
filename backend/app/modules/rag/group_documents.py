@@ -153,15 +153,18 @@ class GroupDocumentService:
         invalidate_item_content_for_group(db, group.id, document_ids=[document.id])
         return document
 
-    def delete_document(self, db: Session, group_id: int, document_id: int) -> None:
+    def delete_document(self, db: Session, group_id: int, document_id: int) -> list[int]:
         document = self.get_document(db, group_id, document_id)
         group = get_group_or_404(db, group_id)
-        invalidate_item_content_for_group(db, group.id, document_ids=[document_id])
+        affected_ids = invalidate_item_content_for_group(
+            db, group.id, document_ids=[document_id]
+        )
         self._remove_vectors(document.id)
         delete_group_document_file(document.storage_path)
         db.delete(document)
         group.knowledge_version += 1
         db.commit()
+        return affected_ids
 
     def _prepare_storage_content(
         self,

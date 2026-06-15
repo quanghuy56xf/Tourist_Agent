@@ -1,27 +1,34 @@
 from typing import List
+
 from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
     GOOGLE_API_KEY,
     LLM_MAX_RETRIES,
     LLM_MODEL,
+    LLM_PROVIDER,
     LLM_TIMEOUT_SECONDS,
 )
 from app.modules.llm.client import extract_text_content, invoke_llm
 
 
-class RAGGenerator:
-    def __init__(self, model_name: str | None = None, temperature: float = 0.2):
-        if not GOOGLE_API_KEY:
-            raise ValueError("GOOGLE_API_KEY is not set.")
+def _build_llm(model_name: str | None, temperature: float):
+    model = model_name or LLM_MODEL
+    if LLM_PROVIDER == "deepseek":
+        if not DEEPSEEK_API_KEY:
+            raise ValueError("DEEPSEEK_API_KEY is not set.")
+        from langchain_openai import ChatOpenAI
 
-        self.llm = ChatGoogleGenerativeAI(
-            model=model_name or LLM_MODEL,
+        return ChatOpenAI(
+            model=model,
             temperature=temperature,
-            api_key=GOOGLE_API_KEY,
-            request_timeout=LLM_TIMEOUT_SECONDS,
-            retries=LLM_MAX_RETRIES,
+            api_key=DEEPSEEK_API_KEY,
+            base_url=DEEPSEEK_BASE_URL,
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
         )
 
     def _format_context(self, docs: List[Document]) -> str:

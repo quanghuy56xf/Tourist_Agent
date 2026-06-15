@@ -1,15 +1,18 @@
+import logging
 import pickle
 import threading
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
 from app.core.config import RAG_BM25_PATH, RAG_CHROMA_PATH, RAG_CHUNKS_PATH
 from app.modules.rag.types import ChunkDraft
+
+logger = logging.getLogger(__name__)
+
+EMBEDDING_MODEL = "bkai-foundation-models/vietnamese-bi-encoder"
 
 
 def ensure_rag_index() -> None:
@@ -37,24 +40,49 @@ class HybridRetriever:
         with open(bm25_path, "rb") as file:
             self.bm25 = pickle.load(file)
 
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="bkai-foundation-models/vietnamese-bi-encoder",
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
-        )
-        self.vector_store = Chroma(
-            persist_directory=vector_store_path,
-            embedding_function=self.embeddings,
-        )
+        self._vector_store_path = vector_store_path
+        self._embeddings = None
+        self._vector_store = None
+        self._dense_available: bool | None = None
         self._index_lock = threading.RLock()
+
+    def _ensure_dense(self) -> bool:
+        if self._dense_available is not None:
+            return self._dense_available
+
+        try:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            from langchain_community.vectorstores import Chroma
+
+            self._embeddings = HuggingFaceEmbeddings(
+                model_name=EMBEDDING_MODEL,
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+            self._vector_store = Chroma(
+                persist_directory=self._vector_store_path,
+                embedding_function=self._embeddings,
+            )
+            self._dense_available = True
+        except (MemoryError, OSError, RuntimeError, ImportError) as exc:
+            logger.warning(
+                "Dense RAG unavailable; continuing with BM25-only retrieval: %s",
+                exc,
+            )
+            self._dense_available = False
+
+        return self._dense_available
 
     def _dense_search(
         self,
         query: str,
         top_k: int = 5,
     ) -> Tuple[List[Document], float]:
+        if not self._ensure_dense() or self._vector_store is None:
+            return [], 0.0
+
         results_with_scores = (
-            self.vector_store.similarity_search_with_relevance_scores(
+            self._vector_store.similarity_search_with_relevance_scores(
                 query,
                 k=top_k,
             )
@@ -150,7 +178,7 @@ class HybridRetriever:
             dense_docs = self._filter_group_scope(dense_docs, group_id)
             sparse_docs = self._filter_group_scope(sparse_docs, group_id)
 
-            if max_dense_score < fallback_threshold:
+            if not dense_docs or max_dense_score < fallback_threshold:
                 return sparse_docs[:top_k]
 
             return self._rrf(dense_docs, sparse_docs)[:top_k]
@@ -181,8 +209,8 @@ class HybridRetriever:
 
     def _remove_group_document_chunks(self, document_id: int) -> None:
         ids = self._group_doc_chunk_ids(document_id)
-        if ids:
-            self.vector_store.delete(ids=ids)
+        if ids and self._ensure_dense() and self._vector_store is not None:
+            self._vector_store.delete(ids=ids)
         self.chunks = [
             chunk
             for chunk in self.chunks
@@ -218,7 +246,13 @@ class HybridRetriever:
                 ids.append(chunk_id)
 
             if documents:
-                self.vector_store.add_documents(documents, ids=ids)
+                if self._ensure_dense() and self._vector_store is not None:
+                    self._vector_store.add_documents(documents, ids=ids)
+                else:
+                    logger.warning(
+                        "Skipping Chroma upsert for group document %s; BM25 index updated only",
+                        document_id,
+                    )
                 self.chunks.extend(documents)
             self._persist_sparse_index()
 
@@ -261,14 +295,16 @@ class HybridRetriever:
                     "item_id": item_id,
                 },
             )
-            self.vector_store.delete(ids=[document_id])
-            self.vector_store.add_documents([document], ids=[document_id])
+            if self._ensure_dense() and self._vector_store is not None:
+                self._vector_store.delete(ids=[document_id])
+                self._vector_store.add_documents([document], ids=[document_id])
             self._replace_item_chunk(document)
 
     def delete_item_document(self, item_id: int) -> None:
         with self._index_lock:
             document_id = f"item-{item_id}"
-            self.vector_store.delete(ids=[document_id])
+            if self._ensure_dense() and self._vector_store is not None:
+                self._vector_store.delete(ids=[document_id])
             self.chunks = [
                 chunk
                 for chunk in self.chunks
@@ -297,3 +333,8 @@ def try_get_rag_retriever() -> HybridRetriever | None:
         return get_rag_retriever()
     except (MemoryError, OSError, RuntimeError, FileNotFoundError):
         return None
+
+
+def reset_rag_retriever_for_tests() -> None:
+    global _retriever_instance
+    _retriever_instance = None

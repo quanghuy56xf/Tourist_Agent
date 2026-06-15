@@ -1,0 +1,15 @@
+__pycache__
+*.py[cod]
+.venv
+.env
+.env.*
+data/
+uploads/
+*.db
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests/
+benchmark_search.py
+big.txt
+persona_compare.txt

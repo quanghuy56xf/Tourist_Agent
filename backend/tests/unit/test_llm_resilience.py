@@ -14,6 +14,7 @@ def test_generator_uses_configured_model_timeout_and_retries(monkeypatch):
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
+    monkeypatch.setattr(generator, "LLM_PROVIDER", "gemini", raising=False)
     monkeypatch.setattr(generator, "GOOGLE_API_KEY", "test-key")
     monkeypatch.setattr(generator, "LLM_MODEL", "configured-model", raising=False)
     monkeypatch.setattr(generator, "LLM_TIMEOUT_SECONDS", 12.5, raising=False)
