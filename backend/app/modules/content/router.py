@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, get_db
 from app.models.item import Item
 from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA, LANGUAGES, PERSONAS
-from app.modules.content.service import get_item_content_service
+from app.modules.content.service import build_audio_url, get_item_content_service
 from app.modules.content.tts import is_current_audio_mime, response_audio_mime
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.auth.dependencies import require_admin_if_enabled
@@ -79,8 +79,6 @@ def get_item_content(
 
     try:
         result = service.get_or_generate(db, item, persona, language)
-        if result.content.strip():
-            result = service.finalize_with_audio(db, item, result)
     except LLMServiceUnavailableError:
         logger.warning("LLM provider unavailable for item content %s", item.id)
         raise HTTPException(
@@ -94,13 +92,28 @@ def get_item_content(
             detail="Không thể sinh nội dung lúc này",
         )
 
+    audio_url = result.audio_url
+    if result.content.strip() and not result.has_audio:
+        audio_url = build_audio_url(
+            item.id,
+            result.persona,
+            result.language,
+            result.content,
+        )
+        background_tasks.add_task(
+            _ensure_audio_task,
+            item.id,
+            result.persona,
+            result.language,
+        )
+
     return ItemContentResponse(
         item_id=result.item_id,
         persona=result.persona,
         language=result.language,
         content=result.content,
         has_audio=result.has_audio,
-        audio_url=result.audio_url,
+        audio_url=audio_url,
         stored=result.stored,
         source=result.source,
     )
@@ -125,8 +138,6 @@ def update_item_content(
             payload.language,
             payload.content,
         )
-        if result.content.strip():
-            result = service.finalize_with_audio(db, item, result)
     except ValueError as exc:
         if str(exc) == "empty_content":
             raise HTTPException(status_code=400, detail="Nội dung mô tả không được để trống")
@@ -142,13 +153,28 @@ def update_item_content(
 
     background_tasks.add_task(_regenerate_other_variants_task, item.id, result.content)
 
+    audio_url = None
+    if result.content.strip():
+        audio_url = build_audio_url(
+            item.id,
+            result.persona,
+            result.language,
+            result.content,
+        )
+        background_tasks.add_task(
+            _ensure_audio_task,
+            item.id,
+            result.persona,
+            result.language,
+        )
+
     return ItemContentResponse(
         item_id=result.item_id,
         persona=result.persona,
         language=result.language,
         content=result.content,
-        has_audio=result.has_audio,
-        audio_url=result.audio_url,
+        has_audio=bool(audio_url),
+        audio_url=audio_url,
         stored=result.stored,
         source=result.source,
     )

@@ -39,6 +39,7 @@ class FakeGroupDocumentService:
             for doc in self.documents
             if not (doc["group_id"] == group_id and doc["id"] == document_id)
         ]
+        return []
 
 
 @pytest.fixture

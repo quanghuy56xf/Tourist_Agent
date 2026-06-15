@@ -187,7 +187,9 @@ def delete_group_document(
 ):
     ensure_group_access(staff, group_id)
     try:
-        get_group_document_service().delete_document(db, group_id, document_id)
+        affected_ids = get_group_document_service().delete_document(
+            db, group_id, document_id
+        )
     except ValueError as exc:
         raise _map_error(exc) from exc
     except Exception:
@@ -196,6 +198,7 @@ def delete_group_document(
     background_tasks.add_task(
         regenerate_related_items_task,
         group_id,
-        [document_id],
+        None,
+        affected_ids,
     )
     return GroupDocumentDeleteResponse()
