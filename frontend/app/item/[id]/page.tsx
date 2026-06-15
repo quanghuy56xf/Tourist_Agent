@@ -7,7 +7,6 @@ import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
-import { playChatTts, stopChatTts } from "@/lib/chatTts";
 import {
   getItem,
   getItemContent,
@@ -294,29 +293,6 @@ export default function ItemDetailPage() {
             </button>
           )}
           <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              const next = !autoSpeak;
-              setAutoSpeak(next);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("chat_auto_speak", String(next));
-              }
-              if (!next) {
-                stopChatTts();
-              }
-            }}
-            aria-label={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
-            title={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg"
-            style={{
-              background: "var(--secondary)",
-              border: `1px solid ${autoSpeak ? "var(--primary)" : "var(--border)"}`,
-              color: autoSpeak ? "var(--primary)" : "var(--muted-foreground)",
-            }}
-          >
-            {autoSpeak ? "🔊" : "🔇"}
-          </button>
           <input
             type="text"
             value={chatInput}

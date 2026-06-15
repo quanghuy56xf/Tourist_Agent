@@ -79,6 +79,8 @@ def get_item_content(
 
     try:
         result = service.get_or_generate(db, item, persona, language)
+        if result.content.strip():
+            result = service.finalize_with_audio(db, item, result)
     except LLMServiceUnavailableError:
         logger.warning("LLM provider unavailable for item content %s", item.id)
         raise HTTPException(
@@ -138,6 +140,8 @@ def update_item_content(
             payload.language,
             payload.content,
         )
+        if result.content.strip():
+            result = service.finalize_with_audio(db, item, result)
     except ValueError as exc:
         if str(exc) == "empty_content":
             raise HTTPException(status_code=400, detail="Nội dung mô tả không được để trống")

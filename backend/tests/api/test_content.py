@@ -269,6 +269,7 @@ def test_get_item_content_generates_when_missing(client, db_session, monkeypatch
         source="generated",
     )
     fake_service.get_or_generate.return_value = generated
+    fake_service.finalize_with_audio.return_value = generated
     monkeypatch.setattr(content_router, "get_item_content_service", lambda: fake_service)
 
     response = client.get(f"/api/objects/{item.id}/content")
@@ -276,7 +277,6 @@ def test_get_item_content_generates_when_missing(client, db_session, monkeypatch
     assert response.status_code == 200
     assert response.json()["stored"] is False
     fake_service.get_or_generate.assert_called_once()
-    fake_service.finalize_with_audio.assert_not_called()
 
 
 def test_get_item_content_audio_generates_when_missing(client, db_session, monkeypatch):
