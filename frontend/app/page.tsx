@@ -1,39 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import LanguageSelector from "@/components/LanguageSelector";
+import { GroupSummary, listPublicGroups } from "@/lib/api";
+import { rememberVisitorGroup } from "@/lib/groupSlug";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
-type PersonaType = {
-  id: "family" | "genz" | "international";
-  personaStr: "Family Visitor" | "Gen Z Explorer" | "Mặc định";
-};
-
-const personas: PersonaType[] = [
-  { id: "family", personaStr: "Family Visitor" },
-  { id: "genz", personaStr: "Gen Z Explorer" },
-  { id: "international", personaStr: "Mặc định" },
-];
-
-export default function OnboardingPage() {
+export default function GroupSelectionPage() {
   const router = useRouter();
   const { t } = useVisitorLocale();
-  const [selected, setSelected] = useState<string | null>(null);
-  const personaCopy = {
-    family: [t.home.familyTitle, t.home.familySubtitle],
-    genz: [t.home.genZTitle, t.home.genZSubtitle],
-    international: [t.home.internationalTitle, t.home.internationalSubtitle],
-  };
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleStart = () => {
-    if (!selected) return;
-    const persona = personas.find((p) => p.id === selected);
-    if (persona) {
-      localStorage.setItem("user_persona", persona.personaStr);
-      router.push("/method");
-    }
+  useEffect(() => {
+    listPublicGroups()
+      .then(setGroups)
+      .catch(() => setError(t.groups.loadError))
+      .finally(() => setLoading(false));
+  }, [t.groups.loadError]);
+
+  const handleSelect = (group: GroupSummary) => {
+    const slug = rememberVisitorGroup(group);
+    router.push(`/${slug}`);
   };
 
   return (
@@ -50,73 +40,59 @@ export default function OnboardingPage() {
           >
             <span style={{ color: "var(--primary-foreground)" }}>✦</span>
           </div>
-          <span className="artifact-section-label">{t.home.siteName}</span>
+          <span className="artifact-section-label">{t.productName}</span>
         </div>
-        <Image
-          src="/hera-app-icon.png"
-          alt="HERA"
-          width={96}
-          height={96}
-          priority
-          className="mx-auto mb-4 h-24 w-24 rounded-2xl border object-cover"
-          style={{ borderColor: "var(--border)" }}
-        />
         <h1 className="font-display text-3xl" style={{ color: "var(--foreground)" }}>
-          {t.home.headline}
+          {t.groups.headline}
         </h1>
         <p className="mt-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
-          {t.home.subtitle}
+          {t.groups.subtitle}
         </p>
       </header>
 
-      <section className="mb-8">
-        <h2 className="mb-4 text-center text-sm font-medium" style={{ color: "var(--foreground)" }}>
-          {t.home.audiencePrompt}
-        </h2>
-        <div className="space-y-2">
-          {personas.map((p) => (
+      <section className="mb-8 space-y-3">
+        {loading ? (
+          <div className="flex h-40 items-center justify-center">
+            <div
+              className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+              style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
+            />
+          </div>
+        ) : error ? (
+          <p className="rounded-xl px-4 py-3 text-center text-sm text-red-400">{error}</p>
+        ) : groups.length === 0 ? (
+          <p className="py-12 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+            {t.groups.empty}
+          </p>
+        ) : (
+          groups.map((group) => (
             <button
-              key={p.id}
+              key={group.id}
               type="button"
-              onClick={() => setSelected(p.id)}
-              className="w-full rounded-xl p-4 text-left transition-all active:scale-[0.98]"
-              style={{
-                background:
-                  selected === p.id ? "var(--primary)" : "var(--secondary)",
-                color:
-                  selected === p.id ? "var(--primary-foreground)" : "var(--muted-foreground)",
-                border:
-                  selected === p.id
-                    ? "1px solid var(--primary)"
-                    : "1px solid var(--border)",
-              }}
+              onClick={() => handleSelect(group)}
+              className="artifact-card flex w-full items-center justify-between gap-4 p-5 text-left transition-transform active:scale-[0.98]"
             >
-              <h3 className="text-sm font-bold">{personaCopy[p.id][0]}</h3>
-              <p className="mt-1 text-xs opacity-90">{personaCopy[p.id][1]}</p>
+              <div>
+                <h2 className="text-base font-bold">{group.name}</h2>
+                <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  {group.item_count} {t.groups.itemCount}
+                </p>
+              </div>
+              <span style={{ color: "var(--primary)" }}>→</span>
             </button>
-          ))}
-        </div>
+          ))
+        )}
       </section>
 
-      <div className="mt-auto space-y-4">
+      <div className="mt-auto text-center">
         <button
           type="button"
-          onClick={handleStart}
-          disabled={!selected}
-          className="artifact-btn-primary w-full"
+          onClick={() => router.push("/admin/login")}
+          className="text-xs underline-offset-4 hover:underline"
+          style={{ color: "var(--muted-foreground)" }}
         >
-          {t.home.start}
+          {t.home.management}
         </button>
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => router.push("/admin/login")}
-            className="text-xs underline-offset-4 hover:underline"
-            style={{ color: "var(--muted-foreground)" }}
-          >
-            {t.home.management}
-          </button>
-        </div>
       </div>
     </div>
   );

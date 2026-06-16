@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: "/admin/groups", label: "Quản lý khu di tích", adminOnly: false },
   { href: "/admin/register", label: "Đăng ký hiện vật", adminOnly: false },
   { href: "/admin/tours", label: "Đăng ký tour khám phá", adminOnly: false },
+  { href: "/admin/analytics", label: "Thống kê", adminOnly: false },
   { href: "/admin/product", label: "Thông tin sản phẩm", adminOnly: false },
 ] as const;
 

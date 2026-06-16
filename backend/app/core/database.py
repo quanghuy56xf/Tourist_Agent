@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import ADMIN_PASSWORD, ADMIN_USERNAME, BASE_DIR, DATABASE_URL
+from app.models.analytics_event import AnalyticsEvent  # noqa: F401
 from app.models.group import Group  # noqa: F401
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
@@ -40,6 +41,13 @@ def _migrate_schema() -> None:
                 conn.execute(
                     text(
                         "ALTER TABLE groups ADD COLUMN knowledge_version INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
+        if "is_public" not in columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE groups ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 1"
                     )
                 )
 

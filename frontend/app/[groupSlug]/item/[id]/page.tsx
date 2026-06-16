@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
+import HomeButton from "@/components/visitor/HomeButton";
 import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
@@ -16,12 +17,22 @@ import {
   ChatMessage,
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
+import { groupPath } from "@/lib/groupSlug";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
+import {
+  getActiveSearchSessionId,
+  getVisitorSessionId,
+  readStoredGroupId,
+  trackVisitorEvent,
+} from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function ItemDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const groupSlug = useGroupSlug();
+  const scanPath = useGroupPath("/scan");
   const { language, locale, t, ready: localeReady } = useVisitorLocale();
   const itemId = Number(params.id);
   const similarityParam = searchParams.get("similarity");
@@ -115,6 +126,15 @@ export default function ItemDetailPage() {
   }, [itemId, persona, language, localeReady, preferencesLoaded, t.item.contentError, t.item.loadError]);
 
   useEffect(() => {
+    if (!itemId) return;
+    void trackVisitorEvent("item_view", {
+      groupId: readStoredGroupId() ?? undefined,
+      itemId,
+      searchSessionId: getActiveSearchSessionId(),
+    });
+  }, [itemId]);
+
+  useEffect(() => {
     setChatHistory([]);
     setChatInput("");
   }, [language]);
@@ -132,7 +152,10 @@ export default function ItemDetailPage() {
     setChatInput("");
     setIsChatting(true);
     try {
-      const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language);
+      const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language, {
+        sessionId: getVisitorSessionId(),
+        searchSessionId: getActiveSearchSessionId(),
+      });
       const assistantContent = res.content;
       setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
       if (autoSpeak && assistantContent.trim()) {
@@ -167,7 +190,7 @@ export default function ItemDetailPage() {
         <p className="mb-4" style={{ color: "var(--primary)" }}>
           {error || t.item.notFound}
         </p>
-        <BackButton onClick={() => router.push("/scan")} label={t.common.back} />
+        <BackButton onClick={() => router.push(scanPath)} label={t.common.back} />
       </div>
     );
   }
@@ -185,14 +208,20 @@ export default function ItemDetailPage() {
           fallbackLabel={t.common.noImage}
         />
         <div className="absolute inset-0 item-hero-scrim" />
-        <BackButton
-          onClick={() =>
-            router.push(inTour ? `/tour/${tourId}/play` : "/scan")
-          }
-          label={t.common.back}
-          variant="dark"
-          className="absolute left-4 top-4 z-10"
-        />
+        <div className="absolute left-4 top-4 z-10 flex items-center gap-2">
+          <HomeButton />
+          <BackButton
+            onClick={() =>
+              router.push(
+                inTour
+                  ? groupPath(groupSlug, `/tour/${tourId}/play`)
+                  : scanPath
+              )
+            }
+            label={t.common.back}
+            variant="dark"
+          />
+        </div>
         {confidence && (
           <span
             className="absolute right-4 top-4 z-10 rounded-full px-2.5 py-1 text-xs"
@@ -286,7 +315,7 @@ export default function ItemDetailPage() {
           {inTour && (
             <button
               type="button"
-              onClick={() => router.push(`/tour/${tourId}/play`)}
+              onClick={() => router.push(groupPath(groupSlug, `/tour/${tourId}/play`))}
               className="artifact-btn-primary w-full py-3 text-sm"
             >
               {t.item.continueTour} →

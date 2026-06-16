@@ -312,7 +312,10 @@ export default function AdminHomePage() {
               <li key={group.id} className="admin-list-item">
                 <div>
                   <p className="font-medium">{group.name}</p>
-                  <p className="admin-muted text-sm">{group.item_count} hiện vật</p>
+                  <p className="admin-muted text-sm">
+                    {group.item_count} hiện vật
+                    {group.is_public === false ? " · đang ẩn với khách" : ""}
+                  </p>
                 </div>
               </li>
             ))}

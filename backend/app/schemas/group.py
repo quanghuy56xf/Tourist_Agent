@@ -11,7 +11,12 @@ class GroupResponse(BaseModel):
     id: int
     name: str
     item_count: int
+    is_public: bool = True
     created_at: datetime
+
+
+class GroupVisibilityUpdate(BaseModel):
+    is_public: bool
 
 
 class ItemImageResponse(BaseModel):

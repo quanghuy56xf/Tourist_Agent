@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
+import HomeButton from "@/components/visitor/HomeButton";
 import TourStopCard from "@/components/visitor/TourStopCard";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { groupPath } from "@/lib/groupSlug";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
   getTourProgress,
   loadTourById,
@@ -16,8 +19,10 @@ import {
 
 export default function TourDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const tourId = String(params.id);
+  const groupSlug = useGroupSlug();
+  const tourListPath = useGroupPath("/tour");
+  const router = useRouter();
   const { locale, t } = useVisitorLocale();
   const [tour, setTour] = useState<ResolvedTour | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +55,7 @@ export default function TourDetailPage() {
         <p className="mb-4" style={{ color: "var(--primary)" }}>
           {t.tour.empty}
         </p>
-        <BackButton onClick={() => router.push("/tour")} label={t.common.back} />
+        <BackButton onClick={() => router.push(tourListPath)} label={t.common.back} />
       </div>
     );
   }
@@ -62,13 +67,16 @@ export default function TourDetailPage() {
 
   const handleStart = () => {
     if (finished) resetTourProgress(tourId);
-    router.push(`/tour/${tourId}/play`);
+    router.push(groupPath(groupSlug, `/tour/${tourId}/play`));
   };
 
   return (
     <div className="artifact-shell min-h-screen pb-8">
       <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BackButton onClick={() => router.push("/tour")} label={t.common.back} className="mb-4" />
+        <div className="mb-4 flex items-center gap-2">
+          <HomeButton />
+          <BackButton onClick={() => router.push(tourListPath)} label={t.common.back} />
+        </div>
         <h1 className="font-display text-xl">{tourTitle(tour, locale)}</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
           {tourDescription(tour, locale)}
@@ -105,7 +113,7 @@ export default function TourDetailPage() {
         {finished ? (
           <button
             type="button"
-            onClick={() => router.push(`/tour/${tourId}/complete`)}
+            onClick={() => router.push(groupPath(groupSlug, `/tour/${tourId}/complete`))}
             className="artifact-btn-primary mb-3 w-full"
           >
             ✦ {t.tour.completeTitle}
