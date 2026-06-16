@@ -118,6 +118,27 @@ def _daily_trend(
     return result
 
 
+def _event_counts_by_group(
+    db: Session,
+    *,
+    event_type: str,
+    since: datetime,
+    group_ids: list[int] | None,
+) -> dict[int, int]:
+    query = db.query(
+        AnalyticsEvent.group_id,
+        func.count(AnalyticsEvent.id).label("cnt"),
+    ).filter(
+        AnalyticsEvent.created_at >= since,
+        AnalyticsEvent.event_type == event_type,
+        AnalyticsEvent.group_id.isnot(None),
+    )
+    if group_ids is not None:
+        query = query.filter(AnalyticsEvent.group_id.in_(group_ids))
+    rows = query.group_by(AnalyticsEvent.group_id).all()
+    return {int(row.group_id): int(row.cnt) for row in rows if row.group_id is not None}
+
+
 def _timing_stats(
     db: Session,
     *,
@@ -126,16 +147,44 @@ def _timing_stats(
     since: datetime,
     group_ids: list[int] | None,
 ) -> TimingStats:
-    base = db.query(AnalyticsEvent).filter(
+    def apply_group_filter(query):
+        if group_ids is not None:
+            return query.filter(AnalyticsEvent.group_id.in_(group_ids))
+        return query
+
+    success_filters = (
         AnalyticsEvent.created_at >= since,
         AnalyticsEvent.event_type == event_type,
+        AnalyticsEvent.success == 1,
     )
-    if group_ids is not None:
-        base = base.filter(AnalyticsEvent.group_id.in_(group_ids))
 
-    success_rows = base.filter(AnalyticsEvent.success == 1).all()
+    count = (
+        apply_group_filter(db.query(func.count(AnalyticsEvent.id)))
+        .filter(*success_filters)
+        .scalar()
+        or 0
+    )
+
+    avg_ms_raw = (
+        apply_group_filter(db.query(func.avg(AnalyticsEvent.duration_ms)))
+        .filter(*success_filters, AnalyticsEvent.duration_ms.isnot(None))
+        .scalar()
+    )
+    avg_ms = round(float(avg_ms_raw), 1) if avg_ms_raw is not None else 0.0
+
+    slow_count = (
+        apply_group_filter(db.query(func.count(AnalyticsEvent.id)))
+        .filter(
+            *success_filters,
+            AnalyticsEvent.duration_ms.isnot(None),
+            AnalyticsEvent.duration_ms >= SLOW_THRESHOLD_MS,
+        )
+        .scalar()
+        or 0
+    )
+
     error_count = (
-        db.query(func.count(AnalyticsEvent.id))
+        apply_group_filter(db.query(func.count(AnalyticsEvent.id)))
         .filter(
             AnalyticsEvent.created_at >= since,
             AnalyticsEvent.event_type == error_type,
@@ -143,25 +192,11 @@ def _timing_stats(
         .scalar()
         or 0
     )
-    if group_ids is not None:
-        error_count = (
-            db.query(func.count(AnalyticsEvent.id))
-            .filter(
-                AnalyticsEvent.created_at >= since,
-                AnalyticsEvent.event_type == error_type,
-                AnalyticsEvent.group_id.in_(group_ids),
-            )
-            .scalar()
-            or 0
-        )
 
-    durations = [row.duration_ms for row in success_rows if row.duration_ms is not None]
-    slow_count = sum(1 for ms in durations if ms >= SLOW_THRESHOLD_MS)
-    avg_ms = sum(durations) / len(durations) if durations else 0.0
     return TimingStats(
-        count=len(success_rows),
-        avg_ms=round(avg_ms, 1),
-        slow_count=slow_count,
+        count=int(count),
+        avg_ms=avg_ms,
+        slow_count=int(slow_count),
         error_count=int(error_count),
     )
 
@@ -189,21 +224,12 @@ def build_summary(
         db, event_type="search", since=since, group_ids=group_filter
     )
 
-    visit_counts: dict[int, int] = {}
-    search_counts: dict[int, int] = {}
-    for group_id in group_ids:
-        visit_q = db.query(func.count(AnalyticsEvent.id)).filter(
-            AnalyticsEvent.created_at >= since,
-            AnalyticsEvent.event_type == "group_visit",
-            AnalyticsEvent.group_id == group_id,
-        )
-        search_q = db.query(func.count(AnalyticsEvent.id)).filter(
-            AnalyticsEvent.created_at >= since,
-            AnalyticsEvent.event_type == "search",
-            AnalyticsEvent.group_id == group_id,
-        )
-        visit_counts[group_id] = int(visit_q.scalar() or 0)
-        search_counts[group_id] = int(search_q.scalar() or 0)
+    visit_counts = _event_counts_by_group(
+        db, event_type="group_visit", since=since, group_ids=group_filter
+    )
+    search_counts = _event_counts_by_group(
+        db, event_type="search", since=since, group_ids=group_filter
+    )
 
     group_stats = [
         GroupActivityStats(

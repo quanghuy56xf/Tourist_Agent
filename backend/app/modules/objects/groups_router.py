@@ -11,8 +11,12 @@ from app.schemas.group import (
     GroupVisibilityUpdate,
 )
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_admin_role_if_enabled, resolve_current_user
-from app.modules.auth.service import ensure_group_access
+from app.modules.auth.dependencies import (
+    require_admin_role,
+    require_admin_role_if_enabled,
+    resolve_current_user,
+)
+from app.modules.auth.service import AuthUser, ensure_group_access
 from app.modules.objects.groups import ensure_visitor_can_access_group, get_group_or_404
 from app.modules.objects.items import item_to_response
 
@@ -115,7 +119,7 @@ def update_group_visibility(
     group_id: int,
     payload: GroupVisibilityUpdate,
     db: Session = Depends(get_db),
-    _user=Depends(require_admin_role_if_enabled),
+    _user: AuthUser = Depends(require_admin_role),
 ):
     group = get_group_or_404(db, group_id)
     group.is_public = payload.is_public
