@@ -3,6 +3,8 @@
 import { SearchMatch, resolveImageUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { groupPath } from "@/lib/groupSlug";
+import { useGroupSlug } from "@/lib/useGroupPath";
 
 interface ResultModalProps {
   found: boolean;
@@ -42,6 +44,7 @@ export default function ResultModal({
   onClose,
 }: ResultModalProps) {
   const router = useRouter();
+  const groupSlug = useGroupSlug();
   const { t } = useVisitorLocale();
   const hasResults = results.length > 0;
 
@@ -93,7 +96,7 @@ export default function ResultModal({
                     </p>
                     <button
                       type="button"
-                      onClick={() => router.push(`/item/${item.item_id}`)}
+                      onClick={() => router.push(groupPath(groupSlug, `/item/${item.item_id}`))}
                       className="artifact-btn-primary px-3 py-1.5 text-xs"
                     >
                       ✨ {t.results.explore}

@@ -3,24 +3,27 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
-import { fetchApi, resolveImageUrl } from "@/lib/api";
+import HomeButton from "@/components/visitor/HomeButton";
+import { getGroupItems, GroupItem, resolveImageUrl } from "@/lib/api";
+import { groupPath, VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
-
-type Item = {
-  id: number;
-  name: string;
-  description: string;
-  main_image_url: string | null;
-};
 
 export default function ManualSelectionPage() {
   const router = useRouter();
+  const groupSlug = useGroupSlug();
+  const methodPath = useGroupPath("/method");
   const { t } = useVisitorLocale();
-  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [allItems, setAllItems] = useState<GroupItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi("/api/objects/all")
+    const groupId = Number(localStorage.getItem(VISITOR_GROUP_ID_KEY));
+    if (!groupId) {
+      setLoading(false);
+      return;
+    }
+    getGroupItems(groupId)
       .then((res) => {
         setAllItems(res.items);
         setLoading(false);
@@ -31,7 +34,10 @@ export default function ManualSelectionPage() {
   return (
     <div className="artifact-shell min-h-screen">
       <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BackButton onClick={() => router.push("/method")} label={t.common.back} className="mb-4" />
+        <div className="mb-4 flex items-center gap-2">
+          <HomeButton />
+          <BackButton onClick={() => router.push(methodPath)} label={t.common.back} />
+        </div>
         <p className="artifact-section-label mb-1">{t.manual.catalog}</p>
         <h1 className="font-display text-xl">{t.manual.title}</h1>
       </header>
@@ -52,7 +58,7 @@ export default function ManualSelectionPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => router.push(`/item/${item.id}`)}
+                  onClick={() => router.push(groupPath(groupSlug, `/item/${item.id}`))}
                   className="artifact-card overflow-hidden p-2 text-left transition-transform active:scale-[0.98]"
                 >
                   <div

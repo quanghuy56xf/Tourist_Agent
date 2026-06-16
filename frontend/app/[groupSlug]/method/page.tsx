@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
+import HomeButton from "@/components/visitor/HomeButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ResultModal from "@/components/ResultModal";
 import { SearchResponse, searchObject } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
+import { groupPath } from "@/lib/groupSlug";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
+import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 const methods = [
@@ -17,6 +21,10 @@ const methods = [
 
 export default function MethodSelectionPage() {
   const router = useRouter();
+  const groupSlug = useGroupSlug();
+  const groupHomePath = useGroupPath();
+  const scanPath = useGroupPath("/scan");
+  const tourPath = useGroupPath("/tour");
   const { t } = useVisitorLocale();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -29,10 +37,13 @@ export default function MethodSelectionPage() {
     setSearchResult(null);
     try {
       const compressed = await compressImage(e.target.files[0]);
-      const response = await searchObject(compressed);
+      const response = await searchObject(
+        compressed,
+        buildSearchTrackingContext(readStoredGroupId() ?? undefined)
+      );
       if (response.found && response.results.length > 0) {
         router.push(
-          `/item/${response.results[0].item_id}?similarity=${response.results[0].similarity}`
+          `${groupPath(groupSlug, `/item/${response.results[0].item_id}`)}?similarity=${response.results[0].similarity}`
         );
       } else if (response.results.length > 0) {
         setSearchResult(response);
@@ -48,15 +59,18 @@ export default function MethodSelectionPage() {
   };
 
   const handleClick = (id: string) => {
-    if (id === "camera") router.push("/scan");
+    if (id === "camera") router.push(scanPath);
     else if (id === "upload") document.getElementById("file-upload")?.click();
-    else if (id === "tour") router.push("/tour");
+    else if (id === "tour") router.push(tourPath);
   };
 
   return (
     <div className="artifact-shell">
       <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BackButton onClick={() => router.push("/")} label={t.common.back} className="mb-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <HomeButton />
+          <BackButton onClick={() => router.push(groupHomePath)} label={t.common.back} />
+        </div>
         <div className="mb-1 flex items-center gap-3">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg"

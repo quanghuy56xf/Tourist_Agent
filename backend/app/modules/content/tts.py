@@ -6,11 +6,12 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 import edge_tts
 
 from app.modules.content.personas import language_to_edge_voice
+from app.modules.content.speech_text import prepare_text_for_speech
 
 logger = logging.getLogger(__name__)
 
 TTS_TIMEOUT_SECONDS = 60
-TTS_ENGINE_ID = "edge-tts/vi-VN-HoaiMyNeural"
+TTS_ENGINE_ID = "edge-tts/vi-VN-HoaiMyNeural-speech-v2"
 TTS_MEDIA_TYPE = "audio/mpeg"
 
 
@@ -42,7 +43,7 @@ async def _synthesize_speech_async(text: str, language: str) -> tuple[bytes, str
 
 
 def synthesize_speech(text: str, language: str) -> tuple[bytes, str] | None:
-    cleaned = text.strip()
+    cleaned = prepare_text_for_speech(text)
     if not cleaned:
         return None
 

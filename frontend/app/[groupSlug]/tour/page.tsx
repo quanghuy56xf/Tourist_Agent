@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
+import HomeButton from "@/components/visitor/HomeButton";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { groupPath } from "@/lib/groupSlug";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
   getTourProgress,
   loadSuggestedTours,
@@ -14,6 +17,8 @@ import {
 
 export default function TourListPage() {
   const router = useRouter();
+  const groupSlug = useGroupSlug();
+  const methodPath = useGroupPath("/method");
   const { locale, t } = useVisitorLocale();
   const [tours, setTours] = useState<ResolvedTour[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +32,10 @@ export default function TourListPage() {
   return (
     <div className="artifact-shell min-h-screen">
       <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
-        <BackButton onClick={() => router.push("/method")} label={t.common.back} className="mb-4" />
+        <div className="mb-4 flex items-center gap-2">
+          <HomeButton />
+          <BackButton onClick={() => router.push(methodPath)} label={t.common.back} />
+        </div>
         <p className="artifact-section-label mb-1">{t.productName}</p>
         <h1 className="font-display text-xl">{t.tour.pageTitle}</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -58,7 +66,7 @@ export default function TourListPage() {
                 <button
                   key={tour.id}
                   type="button"
-                  onClick={() => router.push(`/tour/${tour.id}`)}
+                  onClick={() => router.push(groupPath(groupSlug, `/tour/${tour.id}`))}
                   className="artifact-card w-full p-4 text-left transition-transform active:scale-[0.98]"
                 >
                   <div className="mb-2 flex items-start justify-between gap-3">

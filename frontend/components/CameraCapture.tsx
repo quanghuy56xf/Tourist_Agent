@@ -60,6 +60,15 @@ export default function CameraCapture({
     let mounted = true;
 
     async function startCamera() {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        setError(t.scan.cameraNeedsHttps);
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError(t.scan.cameraPermission);
+        return;
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia(
           buildCameraConstraints(mobile)
@@ -90,7 +99,7 @@ export default function CameraCapture({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, [frozen, mobile, t.scan.cameraPermission, updateVideoRotation]);
+  }, [frozen, mobile, t.scan.cameraNeedsHttps, t.scan.cameraPermission, updateVideoRotation]);
 
   const handleCapture = () => {
     const video = videoRef.current;

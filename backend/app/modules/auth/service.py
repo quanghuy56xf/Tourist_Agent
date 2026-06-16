@@ -138,6 +138,16 @@ def verify_access_token(token: str) -> AuthUser | None:
     )
 
 
+def get_user_group_ids(db: Session, user: AuthUser) -> tuple[int, ...]:
+    if user.role != "manager":
+        return ()
+    if user.user_id is not None:
+        db_user = db.query(User).filter(User.id == user.user_id).first()
+        if db_user is not None:
+            return tuple(sorted(group.id for group in db_user.groups))
+    return user.group_ids
+
+
 def ensure_group_access(user: AuthUser | None, group_id: int | None) -> None:
     from fastapi import HTTPException, status
 

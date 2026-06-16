@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import HomeButton from "@/components/visitor/HomeButton";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { useGroupPath } from "@/lib/useGroupPath";
 import { loadTourById, ResolvedTour, tourTitle } from "@/lib/tours";
 
 export default function TourCompletePage() {
   const params = useParams();
   const router = useRouter();
+  const tourListPath = useGroupPath("/tour");
+  const methodPath = useGroupPath("/method");
   const tourId = String(params.id);
   const { locale, t } = useVisitorLocale();
   const [tour, setTour] = useState<ResolvedTour | null>(null);
@@ -20,7 +24,10 @@ export default function TourCompletePage() {
   const summary = t.tour.completeSummary.replace("{count}", String(count));
 
   return (
-    <div className="artifact-shell flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
+    <div className="artifact-shell relative flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="absolute left-4 top-4">
+        <HomeButton />
+      </div>
       <div
         className="mb-6 flex h-24 w-24 items-center justify-center rounded-full text-4xl"
         style={{
@@ -47,14 +54,14 @@ export default function TourCompletePage() {
       <div className="mt-10 w-full max-w-xs space-y-3">
         <button
           type="button"
-          onClick={() => router.push("/tour")}
+          onClick={() => router.push(tourListPath)}
           className="artifact-btn-primary w-full"
         >
           {t.tour.backToTours}
         </button>
         <button
           type="button"
-          onClick={() => router.push("/method")}
+          onClick={() => router.push(methodPath)}
           className="w-full rounded-2xl py-3 text-sm"
           style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}
         >

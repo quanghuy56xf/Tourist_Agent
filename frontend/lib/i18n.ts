@@ -30,6 +30,7 @@ const vi = {
   productName: "HERA",
   common: {
     back: "Quay lại",
+    home: "Trang khu di tích",
     close: "Đóng",
     retry: "Thử lại",
     noImage: "Không có ảnh",
@@ -48,6 +49,13 @@ const vi = {
     start: "BẮT ĐẦU HÀNH TRÌNH →",
     management: "Dành cho Ban quản lý",
     languageLabel: "Ngôn ngữ",
+  },
+  groups: {
+    headline: "Chọn khu di tích",
+    subtitle: "Chọn một khu đang mở cho khách tham quan",
+    empty: "Hiện chưa có khu di tích nào được công khai.",
+    loadError: "Không tải được danh sách khu di tích.",
+    itemCount: "hiện vật",
   },
   method: {
     titleLine1: "Bạn muốn tìm hiểu",
@@ -78,6 +86,8 @@ const vi = {
       "Không nhận diện được hiện vật này. Hãy thử lại hoặc chọn thủ công.",
     searchError: "Lỗi khi tìm kiếm. Vui lòng thử lại.",
     cameraPermission: "Không thể truy cập camera. Vui lòng cấp quyền.",
+    cameraNeedsHttps:
+      "Camera chỉ hoạt động qua HTTPS (hoặc localhost). Trên cloud, hãy truy cập bằng https://... thay vì http://IP:3000.",
     capturedAlt: "Ảnh vừa chụp",
     hiddenCapture: "Quét hiện vật",
   },
@@ -159,6 +169,7 @@ const en: DeepStringShape<typeof vi> = {
   productName: "HERA",
   common: {
     back: "Back",
+    home: "Heritage site home",
     close: "Close",
     retry: "Try again",
     noImage: "No image",
@@ -177,6 +188,13 @@ const en: DeepStringShape<typeof vi> = {
     start: "START YOUR JOURNEY →",
     management: "Management access",
     languageLabel: "Language",
+  },
+  groups: {
+    headline: "Choose a heritage site",
+    subtitle: "Select a site that is open to visitors",
+    empty: "No heritage sites are publicly available yet.",
+    loadError: "Could not load heritage sites.",
+    itemCount: "objects",
   },
   method: {
     titleLine1: "How would you like",
@@ -204,6 +222,8 @@ const en: DeepStringShape<typeof vi> = {
     noMatch: "We could not identify this object. Try again or browse manually.",
     searchError: "Search failed. Please try again.",
     cameraPermission: "Camera access is unavailable. Please grant permission.",
+    cameraNeedsHttps:
+      "Camera only works over HTTPS (or localhost). On cloud, use https://... instead of http://IP:3000.",
     capturedAlt: "Captured photo",
     hiddenCapture: "Scan object",
   },

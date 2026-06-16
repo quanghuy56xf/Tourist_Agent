@@ -31,6 +31,7 @@ from app.modules.rag import group_documents_router
 from app.modules.auth import router as auth_router
 from app.modules.auth import users_router
 from app.modules.tours import router as tours_router
+from app.modules.analytics import router as analytics_router
 from app.modules.vision import embedding
 from app.core.database import init_db
 
@@ -95,6 +96,7 @@ app.include_router(group_documents_router.router)
 app.include_router(objects.router)
 app.include_router(content_router.router)
 app.include_router(tours_router.router)
+app.include_router(analytics_router.router)
 app.include_router(search.router)
 app.include_router(story_router.router)
 app.include_router(chat_router.router)

@@ -1,4 +1,5 @@
 import { AdminRole, getAdminSession } from "./adminAuth";
+import type { SearchTrackingContext } from "./visitorAnalytics";
 
 // De trong = dung Next.js rewrite (hoat dong qua ngrok frontend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -98,6 +99,7 @@ export interface GroupSummary {
   id: number;
   name: string;
   item_count: number;
+  is_public?: boolean;
   created_at: string;
 }
 
@@ -161,9 +163,17 @@ export async function registerObject(
   return res.json();
 }
 
-export async function searchObject(image: Blob): Promise<SearchResponse> {
+export async function searchObject(
+  image: Blob,
+  tracking?: SearchTrackingContext
+): Promise<SearchResponse> {
   const formData = new FormData();
   formData.append("search_image", image, "search.jpg");
+  if (tracking?.sessionId) formData.append("session_id", tracking.sessionId);
+  if (tracking?.groupId != null) formData.append("group_id", String(tracking.groupId));
+  if (tracking?.searchSessionId) {
+    formData.append("search_session_id", tracking.searchSessionId);
+  }
 
   const res = await fetch(`${API_URL}/api/search`, {
     method: "POST",
@@ -191,10 +201,35 @@ async function parseApiError(res: Response, fallback: string): Promise<string> {
     : JSON.stringify(err.detail) || fallback;
 }
 
+export async function listPublicGroups(): Promise<GroupSummary[]> {
+  const res = await fetch(`${API_URL}/api/groups/public`, {
+    headers: { ...NGROK_HEADERS },
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được danh sách khu di tích"));
+  }
+  return res.json();
+}
+
 export async function listGroups(): Promise<GroupSummary[]> {
   const res = await fetch(`${API_URL}/api/groups`, { headers: apiHeaders() });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Không tải được danh sách khu di tích"));
+  }
+  return res.json();
+}
+
+export async function updateGroupVisibility(
+  groupId: number,
+  isPublic: boolean
+): Promise<GroupSummary> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/visibility`, {
+    method: "PATCH",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ is_public: isPublic }),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không cập nhật được trạng thái hiển thị"));
   }
   return res.json();
 }
@@ -569,12 +604,21 @@ export async function chatWithAI(
   message: string,
   history: ChatMessage[],
   persona: string = "Mặc định",
-  language: string = "Tiếng Việt"
+  language: string = "Tiếng Việt",
+  tracking?: { sessionId?: string; searchSessionId?: string | null }
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ item_id: itemId, message, history, persona, language }),
+    body: JSON.stringify({
+      item_id: itemId,
+      message,
+      history,
+      persona,
+      language,
+      session_id: tracking?.sessionId,
+      search_session_id: tracking?.searchSessionId ?? undefined,
+    }),
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Chat thất bại"));
@@ -708,6 +752,80 @@ export async function fetchApi(path: string, options?: RequestInit) {
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "API request failed"));
+  }
+  return res.json();
+}
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface GroupActivityStats {
+  group_id: number;
+  group_name: string;
+  visits: number;
+  searches: number;
+  visit_trend: DailyCount[];
+  search_trend: DailyCount[];
+}
+
+export interface AnalyticsSummary {
+  range_days: number;
+  total_visits: number;
+  total_searches: number;
+  groups: GroupActivityStats[];
+  chat_per_search: {
+    avg_questions: number;
+    sessions_with_search: number;
+    distribution: Array<{ questions: number; sessions: number }>;
+  };
+  session_durations: Array<{
+    group_id: number;
+    group_name: string;
+    client_ip: string;
+    session_id: string;
+    duration_seconds: number;
+    event_count: number;
+    last_seen: string;
+  }>;
+  search_timing: {
+    count: number;
+    avg_ms: number;
+    slow_count: number;
+    error_count: number;
+  };
+  chat_timing: {
+    count: number;
+    avg_ms: number;
+    slow_count: number;
+    error_count: number;
+  };
+  slow_events: AnalyticsIssueRow[];
+  recent_errors: AnalyticsIssueRow[];
+}
+
+export interface AnalyticsIssueRow {
+  event_type: string;
+  duration_ms: number | null;
+  group_name: string | null;
+  item_name: string | null;
+  client_ip: string | null;
+  error_detail: string | null;
+  created_at: string;
+}
+
+export async function fetchAnalyticsSummary(
+  days = 30,
+  groupId?: number
+): Promise<AnalyticsSummary> {
+  const params = new URLSearchParams({ days: String(days) });
+  if (groupId != null) params.set("group_id", String(groupId));
+  const res = await fetch(`${API_URL}/api/analytics/summary?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được thống kê"));
   }
   return res.json();
 }
