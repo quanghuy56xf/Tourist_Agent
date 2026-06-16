@@ -31,7 +31,7 @@ export default function TourListPage() {
 
   return (
     <div className="artifact-shell min-h-screen">
-      <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
+      <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
           <BackButton onClick={() => router.push(methodPath)} label={t.common.back} />

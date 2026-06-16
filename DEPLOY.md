@@ -1,399 +1,207 @@
-# Kế hoạch: Docker + Deploy Cloud (Cloudflare & Free Hosting)
-
-## Bối cảnh quan trọng
+# Kế hoạch & Hướng dẫn: Deploy Cloud (Cloudflare & VM Hosting)
 
 Dự án gồm **2 phần** với yêu cầu tài nguyên khác nhau:
 
-| Phần | Cloudflare được? | Lý do |
-|------|------------------|-------|
-| **Frontend** (Next.js) | **Có** — Cloudflare Pages | Chỉ HTML/JS/CSS |
-| **Backend** (FastAPI + DINOv2) | **Không** — Workers/Pages | PyTorch cần ~1.5–2 GB RAM |
-
-**Kết luận:** Deploy **tách 2 phần** — frontend lên Cloudflare, backend lên host khác hỗ trợ Docker/RAM đủ.
+| Phần | Cloudflare được? | Lý do | Phương án Triển khai |
+|------|------------------|-------|---------------------|
+| **Frontend** (Next.js) | **Có** — Cloudflare Pages | Chỉ chứa HTML/JS/CSS tĩnh (Static Export) | Deploy lên Cloudflare Pages (Miễn phí) |
+| **Backend** (FastAPI) | **Không** — Workers/Pages | DINOv2 + PyTorch cần ~1.5–2 GB RAM | Deploy lên Cloud VM/VPS chạy Python trực tiếp |
 
 ```
 Người dùng
     ↓
-Cloudflare Pages (frontend FREE)
+Cloudflare Pages (Frontend - static hosting)
     ↓ HTTPS API
-Hugging Face Spaces / Oracle VM (backend)
+Cloud VM / VPS (Backend FastAPI - Python/uv)
     ↓
-SQLite + Chroma + uploads (volume)
+SQLite + Chroma + uploads (lưu trữ cục bộ trên VM)
 ```
 
 ---
 
-## Phương án free được khuyến nghị
+## 1. Yêu cầu Môi trường & Hosting Khuyên Dùng
 
-### Phương án A — Dễ nhất (khuyên dùng cho demo)
+### Frontend (Next.js 14)
+- **Nền tảng**: **Cloudflare Pages** (hoặc Vercel)
+- **Chi phí**: Miễn phí (Free plan)
+- **Hình thức**: Static HTML Export
 
-| Thành phần | Nền tảng | Chi phí |
-|------------|----------|---------|
-| Frontend | **Cloudflare Pages** | Free |
-| Backend | **Hugging Face Spaces** (Docker) | Free CPU |
+### Backend AI (FastAPI + DINOv2)
+- **Nền tảng**: **Oracle Cloud Always Free VM** (ARM Ampere, 24 GB RAM) hoặc bất kỳ VPS nào có tối thiểu 2 GB RAM (như DigitalOcean, Linode, AWS EC2, Google Compute Engine).
+- **Chi phí**: Miễn phí (với Oracle Free tier) hoặc giá rẻ (~5-10$/tháng).
+- **Môi trường chạy**: Python 3.10+ quản lý bằng công cụ `uv`.
 
-- HF Spaces hỗ trợ Docker, phù hợp ML
-- RAM free ~16 GB — đủ DINOv2 (CPU)
-- URL: `https://<user>-<space>.hf.space`
-
-### Phương án B — Ổn định nhất (data không mất)
-
-| Thành phần | Nền tảng |
-|------------|----------|
-| Full stack | **Oracle Cloud Always Free VM** (ARM, 24 GB RAM) |
-
-- Chạy `docker-compose up` — backend + frontend + nginx
-- Docker volumes — SQLite, Chroma, ảnh **không mất** khi restart
-- Cloudflare DNS (free) + HTTPS
-
-### Không khuyến nghị
-
-| Nền tảng | Lý do |
-|----------|-------|
-| Render Free | 512 MB RAM — không đủ PyTorch |
-| Cloudflare Workers | Không chạy PyTorch |
-| Vercel serverless | Không chạy backend AI |
+> ⚠️ **Lưu ý**: Các nền tảng Serverless miễn phí như Render (bản Free - 512MB RAM), Vercel Serverless, hay Cloudflare Workers không đủ tài nguyên để tải model PyTorch DINOv2.
 
 ---
 
-## 1. Cấu trúc Docker cần tạo
+## 2. Deploy Frontend — Cloudflare Pages
 
-```
-TestDinoV2/
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── .dockerignore
-├── backend/
-│   └── Dockerfile
-├── frontend/
-│   └── Dockerfile              # chỉ Phương án B
-└── nginx/
-    └── nginx.conf              # chỉ Phương án B
-```
+### Bước 1: Chuẩn bị Static Export ở Local
+Next.js hỗ trợ chế độ xuất tĩnh (Static Export). Hãy kiểm tra file [next.config.mjs](file:///d:/HocAI/Code%20Team60/frontend/next.config.mjs) ở local, đảm bảo đã cấu hình đúng cổng API. Để deploy lên Cloudflare, chúng ta sẽ thiết lập biến môi trường `NEXT_PUBLIC_API_URL` trỏ tới URL API thực tế của Backend.
 
-### `backend/Dockerfile`
-
-```dockerfile
-FROM python:3.12-slim-bookworm
-
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir torch torchvision \
-    --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY app/ ./app/
-RUN mkdir -p data uploads
-
-ENV DATABASE_URL=sqlite:///./data/app.db
-ENV CHROMA_PATH=./data/chroma
-ENV UPLOAD_DIR=./uploads
-
-EXPOSE 8000
-HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-> Image ~2–3 GB. Build lần đầu 10–15 phút.
-
-### `docker-compose.yml`
-
-```yaml
-services:
-  backend:
-    build: ./backend
-    ports: ["8000:8000"]
-    volumes:
-      - backend_data:/app/data
-      - backend_uploads:/app/uploads
-    environment:
-      - CORS_ORIGINS=https://your-app.pages.dev
-      - CORS_ALLOW_ALL=false
-      - SIMILARITY_THRESHOLD=0.75
-
-volumes:
-  backend_data:
-  backend_uploads:
-```
-
-### `.dockerignore`
-
-```
-**/__pycache__
-**/.venv
-backend/data/
-backend/uploads/
-frontend/node_modules/
-frontend/.next/
-.git/
-*.md
-```
-
----
-
-## 2. Thay đổi code trước khi deploy
-
-### Frontend — tách dev vs production
-
-Hiện tại `next.config.mjs` proxy `/api` → `127.0.0.1:8000` — **chỉ chạy local**.
-
-| Môi trường | `NEXT_PUBLIC_API_URL` | Rewrites |
-|------------|----------------------|----------|
-| Local dev | *(trống)* | Có |
-| Cloudflare Pages | `https://xxx.hf.space` | Không (static export) |
-| Oracle VM | `https://api.domain.com` | Không |
-
-**Cần thêm** trong `next.config.mjs`:
-
-```js
-const isStatic = process.env.BUILD_STATIC === "true";
-
-const nextConfig = {
-  output: isStatic ? "export" : undefined,
-  async rewrites() {
-    if (isStatic) return [];
-    return [
-      { source: "/api/:path*", destination: "http://127.0.0.1:8000/api/:path*" },
-      { source: "/uploads/:path*", destination: "http://127.0.0.1:8000/uploads/:path*" },
-    ];
-  },
-};
-```
-
-**Script build Cloudflare** trong `package.json`:
-
-```json
-"build:static": "cross-env BUILD_STATIC=true next build"
-```
-
-### Backend — CORS production
-
-```env
-CORS_ORIGINS=https://your-app.pages.dev
-CORS_ALLOW_ALL=false
-```
-
-### Hugging Face Spaces — đổi port
-
-HF Spaces dùng port **7860**:
-
-```dockerfile
-EXPOSE 7860
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
-```
-
----
-
-## 3. Deploy Frontend — Cloudflare Pages
-
-### Bước 1: Push code lên GitHub
-
+### Bước 2: Push code lên GitHub
 ```bash
 git init
 git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/<user>/TestDinoV2.git
+git commit -m "Deploy chuẩn bị"
+git remote add origin https://github.com/<username>/<repo-name>.git
 git push -u origin main
 ```
 
-### Bước 2: Tạo Cloudflare Pages project
-
-1. Vào https://dash.cloudflare.com → **Workers & Pages** → **Create** → **Pages** → Connect Git
-2. Chọn repo GitHub
-
-### Bước 3: Cấu hình build
-
-| Setting | Giá trị |
-|---------|--------|
-| Root directory | `frontend` |
-| Build command | `npm install && npm run build:static` |
-| Build output directory | `out` |
-| Node version | 20 |
-
-### Bước 4: Biến môi trường
-
-```
-NEXT_PUBLIC_API_URL=https://<your-space>.hf.space
-BUILD_STATIC=true
-```
-
-### Bước 5: Deploy
-
-Cloudflare tự build và deploy. URL: `https://<project>.pages.dev`
+### Bước 3: Tạo dự án Cloudflare Pages
+1. Truy cập [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
+2. Chọn kho lưu trữ GitHub của bạn.
+3. Thiết lập thông số Build:
+   - **Framework preset**: `Next.js (Static HTML Export)`
+   - **Build command**: `npm run build` (hoặc `npm run build:static`)
+   - **Build output directory**: `frontend/out` (nếu đặt thư mục gốc Next.js ở subdirectory `frontend`) hoặc `out`.
+   - **Root directory**: `frontend`
+4. Thêm các Biến Môi Trường (Environment Variables):
+   - `NEXT_PUBLIC_API_URL`: Điền link URL Backend của bạn (ví dụ: `https://api.yourdomain.com`).
+   - `NODE_VERSION`: `20`
+5. Nhấn **Save and Deploy**. Cloudflare sẽ tự động tải source code và build ra trang tĩnh.
 
 ---
 
-## 4. Deploy Backend — Hugging Face Spaces
+## 3. Deploy Backend — Cloud VM / VPS
 
-### Bước 1: Tạo Space
+Dưới đây là hướng dẫn cài đặt trực tiếp trên một máy chủ Linux (Ubuntu) sử dụng công cụ `uv`.
 
-1. https://huggingface.co/new-space
-2. SDK: **Docker**
-3. Hardware: **CPU basic** (free)
-
-### Bước 2: Cấu trúc repo Space
-
-```
-README.md          # metadata (title, emoji, colorFrom...)
-Dockerfile         # từ backend/Dockerfile (port 7860)
-requirements.txt   # từ backend/requirements.txt
-app/               # copy toàn bộ backend/app/
-```
-
-### Bước 3: README.md metadata
-
-```yaml
----
-title: DINOv2 Object Search API
-emoji: 🔍
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 7860
----
-```
-
-### Bước 4: Push & chờ build
-
+### Bước 1: Cài đặt Python và uv trên VM
+Kết nối SSH vào máy chủ VPS của bạn và chạy các lệnh:
 ```bash
-git clone https://huggingface.co/spaces/<user>/<space-name>
-# copy files, commit, push
+# Cập nhật hệ thống
+sudo apt update && sudo apt upgrade -y
+
+# Cài đặt các thư viện bổ sung cần thiết cho xử lý ảnh (OpenCV/DINOv2)
+sudo apt install -y curl git python3-pip python3-venv libgl1 libglib2.0-0
+
+# Cài đặt công cụ quản lý uv siêu tốc của Astral
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
 ```
 
-Space tự build Docker image. Lần đầu tải DINOv2 ~2–5 phút.
+### Bước 2: Clone Code và Cài đặt dependencies
+```bash
+git clone https://github.com/<username>/<repo-name>.git
+cd <repo-name>/backend
 
-### Bước 5: Lấy URL
-
-`https://<user>-<space>.hf.space` — dùng làm `NEXT_PUBLIC_API_URL` trên Cloudflare.
-
-### Lưu ý HF Spaces free
-
-- **Data mất khi restart** Space (SQLite + Chroma + uploads)
-- Cold start ~30–60 giây lần đầu
-- Phù hợp demo; production dùng Oracle VM
-
----
-
-## 5. Deploy Full Stack — Oracle Cloud (Phương án B)
-
-### Tổng quan
-
-```
-Cloudflare DNS (free SSL)
-        ↓
-Oracle VM (ARM, 24 GB RAM, free)
-  ├── nginx :443
-  │     ├── /        → frontend:3000
-  │     ├── /api     → backend:8000
-  │     └── /uploads → backend:8000
-  ├── frontend container
-  ├── backend container
-  └── Docker volumes (persistent data)
+# Đồng bộ hóa môi trường ảo và cài đặt tất cả thư viện tự động qua uv
+uv sync
 ```
 
-### Các bước
-
-1. **Tạo VM** — Oracle Cloud → Always Free → ARM Ampere (4 OCPU, 24 GB)
-2. **Cài Docker:**
-   ```bash
-   curl -fsSL https://get.docker.com | sh
-   sudo usermod -aG docker $USER
-   ```
-3. **Clone & chạy:**
-   ```bash
-   git clone https://github.com/<user>/TestDinoV2.git
-   cd TestDinoV2
-   docker compose -f docker-compose.prod.yml up -d --build
-   ```
-4. **Nginx** — reverse proxy HTTPS (Let's Encrypt hoặc Cloudflare proxy)
-5. **Cloudflare DNS** — trỏ A record về IP VM, bật proxy (orange cloud)
-
-**Ưu điểm:** Một domain, data persistent, không cold-start.
-
----
-
-## 6. So sánh phương án
-
-| Tiêu chí | A: CF Pages + HF Spaces | B: Oracle VM |
-|----------|-------------------------|--------------|
-| Chi phí | Free | Free |
-| Độ khó | Trung bình | Khó hơn |
-| Data persistent | Không | Có |
-| Cold start | ~30–60s | Không |
-| HTTPS | Có sẵn | Qua Cloudflare |
-| Phù hợp | Demo, học tập | Production nhỏ |
-
----
-
-## 7. Thứ tự triển khai (checklist)
-
+### Bước 3: Cấu hình biến môi trường (`.env`)
+Tạo file `.env` trên VPS:
+```bash
+cp .env.example .env
+nano .env
 ```
-1. Tạo backend/Dockerfile
-       ↓
-2. Test docker build local
-   docker compose up --build
-       ↓
-3. Deploy backend → Hugging Face Spaces
-   Lấy URL: https://xxx.hf.space
-       ↓
-4. Cấu hình frontend static export
-   BUILD_STATIC=true, bỏ rewrites
-       ↓
-5. Deploy frontend → Cloudflare Pages
-   NEXT_PUBLIC_API_URL = URL HF Spaces
-       ↓
-6. Cập nhật CORS backend = URL Cloudflare Pages
-       ↓
-7. Test E2E: đăng ký → quét → top 3
-       ↓
-8. (Tùy chọn) Nâng cấp Oracle VM nếu cần data lâu dài
+Cấu hình các giá trị cần thiết:
+```env
+GOOGLE_API_KEY=your-gemini-api-key
+LLM_MODEL=gemini-2.5-flash
+MODEL_WARMUP_ENABLED=true
+
+# Địa chỉ URL của Frontend chạy trên Cloudflare Pages (dùng cho CORS bảo mật)
+CORS_ORIGINS=https://your-frontend-app.pages.dev
+CORS_ALLOW_ALL=false
+
+# Cấu hình admin đăng nhập
+ADMIN_AUTH_ENABLED=true
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=strong-password-here
 ```
 
-- [ ] `backend/Dockerfile` + `.dockerignore`
-- [ ] `docker-compose.yml` — test local
-- [ ] Frontend `build:static` + `next.config.mjs` production
-- [ ] Deploy HF Spaces — lấy backend URL
-- [ ] Deploy Cloudflare Pages — set `NEXT_PUBLIC_API_URL`
-- [ ] `CORS_ORIGINS` = URL Cloudflare Pages
-- [ ] Test E2E trên mobile (camera cần HTTPS)
-- [ ] (Tùy chọn) Oracle VM + nginx + volumes
+### Bước 4: Chạy Backend bằng Systemd (Vận hành lâu dài)
+Để đảm bảo Backend tự động khởi chạy lại khi server restart hoặc khi gặp lỗi, ta cấu hình nó chạy dưới dạng một Systemd Service.
+
+Tạo file service:
+```bash
+sudo nano /etc/systemd/system/hera-backend.service
+```
+Nhập nội dung sau (thay thế `/home/ubuntu/<repo-name>` bằng đường dẫn thực tế trên VPS của bạn):
+```ini
+[Unit]
+Description=HERA Backend FastAPI Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/<repo-name>/backend
+ExecStart=/home/ubuntu/.local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/ubuntu/<repo-name>/backend/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Kích hoạt và khởi chạy dịch vụ:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable hera-backend
+sudo systemctl start hera-backend
+
+# Kiểm tra trạng thái hoạt động
+sudo systemctl status hera-backend
+```
 
 ---
 
-## 8. Ước tính tài nguyên
+## 4. Reverse Proxy & HTTPS cho Backend (Nginx)
 
-| Resource | Giá trị |
-|----------|---------|
-| RAM backend | 1.5–2 GB |
-| Docker image | ~2.5 GB |
-| Disk data | Tăng theo số vật thể |
-| CPU | 1–2 cores đủ inference |
+Để Frontend trên HTTPS gọi được vào Backend, Backend cũng phải sử dụng HTTPS. Chúng ta sử dụng Nginx làm reverse proxy và cài đặt SSL miễn phí với Let's Encrypt.
+
+### Bước 1: Cài đặt Nginx
+```bash
+sudo apt install -y nginx
+```
+
+### Bước 2: Cấu hình Server Block
+Tạo cấu hình virtual host:
+```bash
+sudo nano /etc/nginx/sites-available/hera-api
+```
+Nội dung cấu hình:
+```nginx
+server {
+    listen 80;
+    server_name api.yourdomain.com; # Thay bằng subdomain/domain thực tế
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Tăng kích thước tối đa cho upload ảnh/tài liệu hiện vật
+        client_max_body_size 50M;
+    }
+}
+```
+Kích hoạt config và restart Nginx:
+```bash
+sudo ln -s /etc/nginx/sites-available/hera-api /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### Bước 3: Cài đặt SSL Let's Encrypt
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d api.yourdomain.com
+```
+Certbot sẽ tự động đăng ký và cấu hình chứng chỉ SSL HTTPS cho subdomain của bạn.
 
 ---
 
-## 9. Troubleshooting
+## 5. Ước tính tài nguyên trên VPS
 
-| Vấn đề | Nguyên nhân | Giải pháp |
-|--------|-------------|-----------|
-| CORS error trên Cloudflare | `CORS_ORIGINS` chưa đúng | Thêm URL `.pages.dev` vào backend env |
-| Ảnh không hiển thị | `image_url` là relative path | Dùng full URL: `NEXT_PUBLIC_API_URL + image_url` |
-| HF Space timeout | Model load lâu | Tăng startup timeout, dùng `warmup()` sẵn |
-| Camera không hoạt động | Thiếu HTTPS | Cloudflare Pages có HTTPS — OK |
-| Data mất sau restart HF | Không có persistent disk | Chuyển Oracle VM hoặc HF paid storage |
-| Build Docker quá lâu | PyTorch lớn | Dùng `--index-url cpu-only` torch |
-
----
-
-## 10. File cần tạo khi implement
-
-| File | Phương án A | Phương án B |
-|------|-------------|-------------|
-| `backend/Dockerfile` | Có | Có |
-| `docker-compose.yml` | Test local | Production |
-| `.dockerignore` | Có | Có |
-| `frontend/Dockerfile` | Không cần | Có |
-| `nginx/nginx.conf` | Không cần | Có |
-| `docker-compose.prod.yml` | Không cần | Có |
+| Resource | Giá trị ước lượng | Ghi chú |
+|----------|---------|---------|
+| RAM trống cần cho Backend | 1.5 – 2 GB | Tốn chủ yếu do DINOv2 load vào PyTorch CPU |
+| Disk space | ~5 - 10 GB | Bao gồm Python, virtual environment và dữ liệu hiện vật/ảnh |
+| CPU | 1 - 2 Cores | Đủ tốt cho việc xử lý ảnh đơn lẻ và sinh RAG |

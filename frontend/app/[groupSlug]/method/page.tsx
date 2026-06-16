@@ -66,7 +66,7 @@ export default function MethodSelectionPage() {
 
   return (
     <div className="artifact-shell">
-      <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
+      <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-6 flex items-center gap-2">
           <HomeButton />
           <BackButton onClick={() => router.push(groupHomePath)} label={t.common.back} />
@@ -90,7 +90,7 @@ export default function MethodSelectionPage() {
         </p>
       </header>
 
-      <div className="flex-1 space-y-3 px-6 py-8">
+      <div className="artifact-page-body flex-1 space-y-3">
         {errorMsg && (
           <div
             className="rounded-xl px-4 py-3 text-sm"

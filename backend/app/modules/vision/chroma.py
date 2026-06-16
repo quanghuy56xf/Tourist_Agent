@@ -87,6 +87,7 @@ def _merge_results(
 def search_best_item(
     vectors: list[list[float]],
     n_results: int | None = None,
+    item_ids: list[int] | None = None,
 ) -> SearchResult | None:
     """
     Tìm vật thể tốt nhất bằng cách:
@@ -99,8 +100,12 @@ def search_best_item(
     if count == 0:
         return None
 
+    if item_ids is not None and not item_ids:
+        return None
+
     k = n_results or SEARCH_TOP_K
-    k = min(k, count)
+    k = min(k, count if item_ids is None else len(item_ids))
+    where = {"item_id": {"$in": [int(item_id) for item_id in item_ids]}} if item_ids else None
 
     best_per_item: dict[int, SearchResult] = {}
 
@@ -109,6 +114,7 @@ def search_best_item(
             query_embeddings=[vector],
             n_results=k,
             include=["metadatas", "distances"],
+            where=where,
         )
         if not results["ids"] or not results["ids"][0]:
             continue
@@ -128,16 +134,20 @@ def search_top_items(
     vectors: list[list[float]],
     top_n: int | None = None,
     n_results: int | None = None,
+    item_ids: list[int] | None = None,
 ) -> list[SearchResult]:
     """Trả về top N vật thể có similarity cao nhất (đã gộp theo item_id)."""
     collection = get_collection()
     count = collection.count()
     if count == 0:
         return []
+    if item_ids is not None and not item_ids:
+        return []
 
     k = n_results or SEARCH_TOP_K
-    k = min(k, count)
+    k = min(k, count if item_ids is None else len(item_ids))
     limit = top_n or SEARCH_TOP_N
+    where = {"item_id": {"$in": [int(item_id) for item_id in item_ids]}} if item_ids else None
 
     best_per_item: dict[int, SearchResult] = {}
 
@@ -146,6 +156,7 @@ def search_top_items(
             query_embeddings=[vector],
             n_results=k,
             include=["metadatas", "distances"],
+            where=where,
         )
         if not results["ids"] or not results["ids"][0]:
             continue

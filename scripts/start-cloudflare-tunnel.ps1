@@ -1,5 +1,5 @@
 # Cloudflare Tunnel — expose frontend local ra internet
-# Yeu cau: cloudflared da cai, Docker frontend dang chay port 3000
+# Yeu cau: cloudflared da cai, frontend dang chay port 3000
 
 $ErrorActionPreference = "Stop"
 $FrontendPort = 3000
@@ -10,8 +10,7 @@ try {
     Write-Host "[OK] Frontend dang chay tai port $FrontendPort"
 } catch {
     Write-Host "[LOI] Frontend chua chay. Chay truoc:"
-    Write-Host "  .\scripts\start-docker.ps1"
-    Write-Host "  hoac: cd frontend && npm run dev"
+    Write-Host "  cd frontend && npm run dev"
     exit 1
 }
 

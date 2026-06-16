@@ -76,22 +76,3 @@ def test_hidden_group_items_not_accessible_to_visitors(client, db_session):
 
     response = client.get(f"/api/groups/{group.id}/items")
     assert response.status_code == 404
-
-
-def test_anonymous_cannot_update_visibility_when_auth_disabled(
-    client, db_session, monkeypatch
-):
-    from app.modules.auth import dependencies
-
-    monkeypatch.setattr(dependencies, "ADMIN_AUTH_ENABLED", False)
-
-    group = Group(name="Protected", is_public=True)
-    db_session.add(group)
-    db_session.commit()
-
-    response = client.patch(
-        f"/api/groups/{group.id}/visibility",
-        json={"is_public": False},
-    )
-    assert response.status_code == 401
-

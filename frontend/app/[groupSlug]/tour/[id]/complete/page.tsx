@@ -24,7 +24,7 @@ export default function TourCompletePage() {
   const summary = t.tour.completeSummary.replace("{count}", String(count));
 
   return (
-    <div className="artifact-shell relative flex min-h-screen flex-col items-center justify-center px-6 py-12 text-center">
+    <div className="artifact-shell artifact-shell-pad relative flex min-h-screen flex-col items-center justify-center text-center">
       <div className="absolute left-4 top-4">
         <HomeButton />
       </div>

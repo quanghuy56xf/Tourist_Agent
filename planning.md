@@ -59,7 +59,7 @@ flowchart TB
 | AI | DINOv2 ViT-S/14 qua HuggingFace `facebook/dinov2-small` (384-dim) |
 | Vector DB | Chroma (persistent, cosine similarity) |
 | Metadata DB | SQLite |
-| Docker + Tunnel | Docker local + Cloudflare Tunnel (khuyên dùng) |
+| Tunnel | Cloudflare Tunnel (khuyên dùng để test camera trên mobile) |
 
 ---
 
@@ -245,10 +245,9 @@ Frontend proxy `/api/*` và `/uploads/*` sang backend qua `next.config.mjs` — 
 
 ---
 
-## Docker + Cloudflare Tunnel (khuyên dùng)
-
+## Chạy Cloudflare Tunnel
+Để kết nối internet phục vụ test camera trên điện thoại:
 ```powershell
-.\scripts\start-docker.ps1              # Backend + Frontend trong Docker
 .\scripts\start-cloudflare-tunnel.ps1   # Expose ra internet (HTTPS)
 ```
 

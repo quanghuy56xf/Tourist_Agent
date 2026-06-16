@@ -60,9 +60,11 @@ async def test_image_embedding_failure_does_not_replace_existing_artifacts(
 def test_upsert_item_document_replaces_existing_item_chunk(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    import threading
     instance = retriever_module.HybridRetriever.__new__(
         retriever_module.HybridRetriever
     )
+    instance._index_lock = threading.RLock()
     instance.vector_store = FakeVectorStore()
     instance.chunks = [
         Document(

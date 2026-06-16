@@ -31,6 +31,22 @@ def _build_llm(model_name: str | None, temperature: float):
             max_retries=LLM_MAX_RETRIES,
         )
 
+    if not GOOGLE_API_KEY:
+        raise ValueError("GOOGLE_API_KEY is not set.")
+
+    return ChatGoogleGenerativeAI(
+        model=model,
+        temperature=temperature,
+        api_key=GOOGLE_API_KEY,
+        request_timeout=LLM_TIMEOUT_SECONDS,
+        retries=LLM_MAX_RETRIES,
+    )
+
+
+class RAGGenerator:
+    def __init__(self, model_name: str | None = None, temperature: float = 0.2):
+        self.llm = _build_llm(model_name, temperature)
+
     def _format_context(self, docs: List[Document]) -> str:
         formatted_docs = []
         for doc in docs:
@@ -138,10 +154,11 @@ Mô tả đã viết lại:"""
         base_instructions = f"""Nhiệm vụ của bạn:
 1. Bạn đang đóng vai trò một trợ lý ảo tư vấn về di tích lịch sử.
 2. Trả lời câu hỏi dựa trên các thông tin có trong Tài liệu được cung cấp (nếu có).
-3. Nếu thông tin không có trong tài liệu, hãy nói "Tôi chưa có đủ thông tin xác thực để trả lời chính xác câu hỏi này." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-4. {lang_instruction}
-5. Giới hạn độ dài: câu trả lời không quá 300 từ.
-6. Length limit: the response must not exceed 300 words."""
+3. Khi khách hỏi thêm chi tiết, điều thú vị, hoặc thông tin liên quan, hãy tổng hợp từ các đoạn tài liệu được cung cấp — kể cả khi đoạn không nhắc trực tiếp tên hiện vật — nếu nội dung liên quan đến khu di tích hoặc hiện vật đang xem.
+4. Nếu thông tin không có trong tài liệu, hãy nói "Tôi chưa có đủ thông tin xác thực để trả lời chính xác câu hỏi này." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
+5. {lang_instruction}
+6. Giới hạn độ dài: câu trả lời không quá 300 từ.
+7. Length limit: the response must not exceed 300 words."""
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):

@@ -15,8 +15,18 @@
   --radius: 0.625rem;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   @apply antialiased;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+  min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-lato), Lato, system-ui, sans-serif;
@@ -36,7 +46,25 @@ html[lang="en"] .font-display {
 
 @layer components {
   .artifact-shell {
-    @apply mx-auto flex min-h-screen w-full max-w-[480px] flex-col;
+    @apply mx-auto box-border flex min-h-screen w-full max-w-phone flex-col overflow-x-hidden;
+  }
+
+  .artifact-shell-pad {
+    @apply px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6;
+  }
+
+  .artifact-fixed-bar {
+    @apply fixed bottom-0 left-1/2 z-20 w-full max-w-phone -translate-x-1/2;
+    padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+  }
+
+  .artifact-page-head {
+    @apply px-4 pb-4 pt-8 sm:px-6;
+  }
+
+  .artifact-page-body {
+    @apply px-4 py-8 sm:px-6;
   }
 
   .artifact-card {
@@ -46,7 +74,7 @@ html[lang="en"] .font-display {
   }
 
   .artifact-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 font-medium transition-all active:scale-95 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 font-medium transition-all active:scale-95 disabled:opacity-50 sm:px-8;
     background: var(--primary);
     color: var(--primary-foreground);
   }
@@ -389,7 +417,7 @@ html[lang="en"] .font-display {
 @media (orientation: portrait) {
   .camera-fullscreen-video--rotated {
     width: 100dvh;
-    height: 100vw;
+    height: 100dvw;
     max-width: none;
     max-height: none;
     transform: translate(-50%, -50%) rotate(90deg);
@@ -449,8 +477,7 @@ html[lang="en"] .font-display {
   font-family: var(--font-lato), Lato, system-ui, sans-serif;
   font-weight: 600;
   letter-spacing: 0;
-  word-break: normal;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
 }
 
 .item-hero-scrim {
@@ -525,18 +552,24 @@ html[lang="en"] .font-display {
 
 .hera-mascot-fixed {
   position: fixed;
-  bottom: 7rem;
-  right: calc((100vw - min(100vw, 480px)) / 2);
+  bottom: calc(7rem + env(safe-area-inset-bottom));
+  left: 50%;
   z-index: 30;
-  height: 13.5rem;
+  height: min(13.5rem, 28vh);
   width: auto;
-  max-width: 210px;
+  max-width: min(210px, 42vw);
   object-fit: contain;
   object-position: right bottom;
   pointer-events: none;
   filter: drop-shadow(0 4px 24px rgba(201, 168, 76, 0.4));
-  /* Một nửa GIF ngoài màn hình, lùi trái 10% so với translateX(50%) */
-  transform: translateX(40%);
+  transform: translateX(calc(min(240px, 50vw) - 100%));
+}
+
+@media (min-width: 481px) {
+  .hera-mascot-fixed {
+    left: calc(50% + 240px - min(210px, 42vw));
+    transform: none;
+  }
 }
 
 .hera-text-scroll {

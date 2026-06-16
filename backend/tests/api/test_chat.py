@@ -45,11 +45,11 @@ def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
     db_session.add(item)
     db_session.commit()
 
-    def fake_build_verified_item_context(**kwargs):
+    def fake_build_chat_item_context(**kwargs):
         captured.update(kwargs)
         return [], True
 
-    monkeypatch.setattr(chat_router, "build_verified_item_context", fake_build_verified_item_context)
+    monkeypatch.setattr(chat_router, "build_chat_item_context", fake_build_chat_item_context)
     monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
     monkeypatch.setattr(chat_router, "get_rag_generator", lambda: QueryGenerator())
 

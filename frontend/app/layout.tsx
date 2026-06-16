@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Lato, Playfair_Display } from "next/font/google";
 import { VisitorLocaleProvider } from "@/components/VisitorLocaleProvider";
 import "./globals.css";
@@ -22,6 +22,12 @@ export const metadata: Metadata = {
   description: "Explore heritage objects with AI",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -29,7 +35,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className={`${lato.variable} ${playfair.variable}`}>
-      <body className={lato.className}>
+      <body className={`${lato.className} overflow-x-hidden`}>
         <div className="artifact-grain" aria-hidden="true" />
         <VisitorLocaleProvider>{children}</VisitorLocaleProvider>
       </body>

@@ -1,54 +1,47 @@
-# AI Heritage Guide
+# HERA - AI Heritage Guide 🏛️
 
-Ứng dụng nhận diện hiện vật bằng ảnh và tạo nội dung giới thiệu bằng AI.
+HERA (AI Heritage Guide) là ứng dụng nhận diện hiện vật di sản bằng hình ảnh và tự động tạo nội dung giới thiệu thông minh tích hợp công nghệ trí tuệ nhân tạo (AI).
 
-## Công Nghệ
+Ứng dụng hỗ trợ nhận diện hiện vật qua camera, tra cứu thông tin chi tiết bằng mô hình ngôn ngữ lớn (RAG) và hỗ trợ giọng nói thuyết minh (TTS).
 
-- Frontend: Next.js 14, TypeScript, Tailwind CSS.
-- Backend: FastAPI, SQLAlchemy.
-- Metadata: SQLite.
-- Tìm kiếm ảnh: DINOv2 + Chroma.
-- RAG văn bản: Chroma + BM25.
-- Sinh nội dung: Google Gemini.
-- Chuyển văn bản thành giọng nói: gTTS.
+---
 
-## Luồng Chính
+## 🚀 Công Nghệ Sử Dụng
 
-1. Admin đăng ký item và ảnh nhiều góc.
-2. Backend lưu metadata trong SQLite, ảnh trong `uploads/` và embedding ảnh trong Chroma.
-3. Người dùng chụp ảnh để tìm top item gần nhất.
-4. Story/chat luôn dùng `Item.description` làm context nền.
-5. Hybrid RAG bổ sung tài liệu khi index và model khả dụng.
-6. Nếu RAG lỗi, story/chat vẫn có thể hoạt động bằng description.
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS.
+- **Backend**: FastAPI (Python), SQLAlchemy.
+- **Metadata Database**: SQLite.
+- **Nhận diện hình ảnh**: DINOv2 + Chroma DB (Vector Database).
+- **Retrieval-Augmented Generation (RAG)**: Chroma + BM25 (Hybrid Search).
+- **Tạo nội dung (Generative AI)**: Google Gemini API (gemini-2.5-flash).
+- **Chuyển đổi văn bản thành giọng nói (TTS)**: gTTS (Google Text-to-Speech).
 
-## Chạy Local
+---
 
-### Backend
+## 🔄 Luồng Hoạt Động Chính
 
-```powershell
-cd backend
-uv sync
-.\.venv\Scripts\Activate.ps1
-copy .env.example .env
-python -m uvicorn app.main:app --reload --port 8000
-```
+1. **Quản lý Hiện Vật**: Quản trị viên (Admin) đăng ký các hiện vật kèm theo hình ảnh đa góc chụp.
+2. **Lưu trữ & Vector hóa**: Backend lưu metadata vào SQLite, hình ảnh vào thư mục `uploads/` và tạo các vector embedding lưu vào Chroma.
+3. **Tìm kiếm & Nhận diện**: Người dùng chụp ảnh hiện vật để hệ thống tìm kiếm 3 hiện vật tương đồng nhất.
+4. **Tạo cốt truyện & Trò chuyện**: Hệ thống sử dụng thông tin hiện vật làm ngữ cảnh nền để AI sinh nội dung giới thiệu (Story) hoặc giải đáp câu hỏi của người dùng (Chat).
+5. **Tìm kiếm lai (Hybrid RAG)**: Tích hợp thông tin tài liệu bổ sung từ Chroma và BM25 khi thực hiện RAG nhằm nâng cao độ chính xác của câu trả lời.
+6. **Cơ chế Dự phòng (Fallback)**: Khi dịch vụ RAG gặp sự cố, hệ thống tự động sử dụng mô tả sẵn có của hiện vật để duy trì tính năng Story/Chat mà không bị gián đoạn.
 
-### Frontend
+---
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+## 🛠️ Hướng Dẫn Chạy Local
 
-- Frontend: `http://localhost:3000`
-- Swagger: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
+> [!NOTE]
+> Các file cấu hình Docker đã được gỡ bỏ khỏi dự án để ưu tiên chạy trực tiếp và phát triển trên môi trường local thông thường.
 
-## Cấu Hình Quan Trọng
+### 1. Cấu Hình Biến Môi Trường (`.env`)
+Sao chép file cấu hình mẫu và điền đầy đủ các thông tin cần thiết:
+- Backend: Sao chép từ `backend/.env.example` sang `backend/.env`
+- Frontend: Sao chép từ `frontend/.env.local` hoặc tạo cấu hình phù hợp.
 
+Các cấu hình quan trọng:
 ```env
-GOOGLE_API_KEY=
+GOOGLE_API_KEY=your_gemini_api_key_here
 LLM_MODEL=gemini-2.5-flash
 LLM_TIMEOUT_SECONDS=60
 LLM_MAX_RETRIES=2
@@ -56,55 +49,79 @@ MODEL_WARMUP_ENABLED=false
 
 ADMIN_AUTH_ENABLED=false
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=replace-with-a-strong-password
+ADMIN_PASSWORD=strong-password-here
 ```
+*Lưu ý: Khi bật `ADMIN_AUTH_ENABLED=true`, các endpoint thay đổi dữ liệu yêu cầu HTTP Basic Auth. Các tính năng công khai như search, story, chat và TTS vẫn cho phép truy cập public.*
 
-Khi `ADMIN_AUTH_ENABLED=true`, các endpoint thay đổi group, item và ảnh yêu cầu HTTP Basic Auth. Endpoint đọc, search, story, chat và TTS vẫn public.
+### 2. Chạy Backend (FastAPI)
+Yêu cầu đã cài đặt [uv](https://github.com/astral-sh/uv).
 
-## Chạy Test
+```powershell
+cd backend
+# Cài đặt thư viện dependencies bằng uv
+uv sync
+# Kích hoạt môi trường ảo (venv)
+.\.venv\Scripts\Activate.ps1
+# Khởi chạy server FastAPI
+python -m uvicorn app.main:app --reload --port 8000
+```
+- **Swagger UI (API Docs)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health check**: [http://localhost:8000/health](http://localhost:8000/health)
 
-Test offline không tải model thật và không gọi provider:
+### 3. Chạy Frontend (Next.js)
+```powershell
+cd frontend
+# Cài đặt các thư viện dependencies
+npm install
+# Khởi chạy môi trường phát triển (development mode)
+npm run dev
+```
+- **Trang chủ**: [http://localhost:3000](http://localhost:3000)
 
+---
+
+## 🧪 Chạy Kiểm Thử (Tests)
+
+### Chạy Unit Test Offline (Không gọi API LLM/RAG thật)
 ```powershell
 cd backend
 pytest -m "not integration"
 ```
 
-Test provider/model thật là opt-in:
-
+### Chạy Integration Test (Sử dụng Model và API RAG thật)
 ```powershell
 $env:RUN_EXTERNAL_LLM_TESTS="true"
 $env:RUN_REAL_RAG_TESTS="true"
 pytest -m integration -v
 ```
 
-Build frontend:
-
+### Build Frontend
 ```powershell
 cd frontend
-npm.cmd run build
+npm run build
 ```
 
-## Kiểm Tra Và Repair RAG Index
+---
 
-Audit không thay đổi dữ liệu:
+## 🧹 Kiểm Tra & Sửa Lỗi RAG Index
 
+Để kiểm tra (audit) mà không làm thay đổi dữ liệu gốc:
 ```powershell
 cd backend
 $env:PYTHONPATH="."
 python scripts/repair_rag_index.py --data-dir data
 ```
 
-Repair duplicate vectors:
-
+Để tự động sửa các vector bị trùng lặp (duplicate vectors):
 ```powershell
 python scripts/repair_rag_index.py --data-dir data --apply
 ```
+*Lưu ý: Script sẽ tự động sao lưu dữ liệu `rag_chroma`, `chunks.pkl` và `bm25_index.pkl` vào thư mục `backend/data/backups/` trước khi áp dụng thay đổi.*
 
-Script chỉ tự repair khi mọi chunk đều đã có vector. Trước khi sửa, script backup `rag_chroma`, `chunks.pkl` và `bm25_index.pkl` vào `backend/data/backups/`.
+---
 
-## Tài Liệu
+## 📄 Tài Liệu Liên Quan
 
-- [Kiến trúc](docs/architecture_and_tech_stack.md)
-- [API](docs/api.md)
-- [Implementation plan](docs/superpowers/plans/2026-06-12-stabilize-api-rag-llm.md)
+- [Kiến trúc & Công nghệ](docs/architecture_and_tech_stack.md)
+- [Tài liệu API](docs/api.md)
+- [Kế hoạch ổn định API/RAG/LLM](docs/superpowers/plans/2026-06-12-stabilize-api-rag-llm.md)

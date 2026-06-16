@@ -4,11 +4,25 @@ import type { SearchTrackingContext } from "./visitorAnalytics";
 // De trong = dung Next.js rewrite (hoat dong qua ngrok frontend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-// File lon (vd PDF scan) upload thang vao backend de tranh gioi han proxy Next.js.
-// De trong = dung proxy nhu cu (hop ngrok).
-const UPLOAD_BASE = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || API_URL;
-// Sinh/tai noi dung persona co the mat 30s+ — goi thang backend neu co.
-const CONTENT_API_BASE = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || API_URL;
+// Goi thang backend chi khi truy cap tu localhost (dev tren may tinh).
+// Qua Cloudflare/ngrok tren dien thoai phai dung proxy Next.js (/api -> backend).
+function backendDirectBase(): string {
+  const configured = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || "";
+  if (!configured) return "";
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") return "";
+  }
+  return configured;
+}
+
+function uploadBase(): string {
+  return backendDirectBase() || API_URL;
+}
+
+function contentApiBase(): string {
+  return backendDirectBase() || API_URL;
+}
 
 const NGROK_HEADERS: HeadersInit = API_URL.includes("ngrok")
   ? { "ngrok-skip-browser-warning": "true" }
@@ -394,7 +408,7 @@ export function createGroupDocument(
 ): Promise<GroupDocumentSummary> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    const url = `${UPLOAD_BASE}/api/groups/${groupId}/documents`;
+    const url = `${uploadBase()}/api/groups/${groupId}/documents`;
 
     onPhaseChange?.("uploading");
 
@@ -440,7 +454,7 @@ export function createGroupDocument(
     });
 
     xhr.open("POST", url);
-    if (UPLOAD_BASE.includes("ngrok")) {
+    if (uploadBase().includes("ngrok")) {
       xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
     }
     xhr.send(formData);
@@ -495,7 +509,7 @@ export async function getItemContent(
   language: string = "Tiếng Việt"
 ): Promise<ItemContentResponse> {
   const params = new URLSearchParams({ persona, language });
-  const res = await fetch(`${CONTENT_API_BASE}/api/objects/${itemId}/content?${params}`, {
+  const res = await fetch(`${contentApiBase()}/api/objects/${itemId}/content?${params}`, {
     headers: apiHeaders(),
   });
   if (!res.ok) {

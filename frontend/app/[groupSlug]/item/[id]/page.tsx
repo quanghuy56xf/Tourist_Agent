@@ -8,6 +8,7 @@ import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
+import { playChatTts, stopChatTts } from "@/lib/chatTts";
 import {
   getItem,
   getItemContent,
@@ -199,7 +200,7 @@ export default function ItemDetailPage() {
   const slideshowImages = getItemImageUrls(item);
 
   return (
-    <div className="artifact-shell mx-auto flex min-h-screen max-w-phone flex-col overflow-hidden pb-24">
+    <div className="artifact-shell flex min-h-screen flex-col overflow-hidden pb-24">
       <div className="relative h-44 shrink-0 overflow-hidden">
         <ItemHeroSlideshow
           images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
@@ -232,7 +233,7 @@ export default function ItemDetailPage() {
         )}
         <div className="absolute bottom-3 left-4 right-4 z-10">
           <p className="artifact-section-label mb-1">{t.item.objectLabel}</p>
-          <h1 className="font-display text-xl" lang={locale}>
+          <h1 className="font-display break-words text-xl" lang={locale}>
             {item.name}
           </h1>
         </div>
@@ -308,10 +309,10 @@ export default function ItemDetailPage() {
       </section>
 
       <div
-        className="fixed bottom-0 left-0 right-0 z-20 p-4"
+        className="artifact-fixed-bar"
         style={{ background: "rgba(14,11,7,0.95)", borderTop: "1px solid var(--border)" }}
       >
-        <div className="mx-auto max-w-phone space-y-2">
+        <div className="space-y-2">
           {inTour && (
             <button
               type="button"
@@ -322,6 +323,29 @@ export default function ItemDetailPage() {
             </button>
           )}
           <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !autoSpeak;
+              setAutoSpeak(next);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("chat_auto_speak", String(next));
+              }
+              if (!next) {
+                stopChatTts();
+              }
+            }}
+            aria-label={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
+            title={autoSpeak ? t.item.autoSpeakOn : t.item.autoSpeakOff}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg"
+            style={{
+              background: "var(--secondary)",
+              border: `1px solid ${autoSpeak ? "var(--primary)" : "var(--border)"}`,
+              color: autoSpeak ? "var(--primary)" : "var(--muted-foreground)",
+            }}
+          >
+            {autoSpeak ? "🔊" : "🔇"}
+          </button>
           <input
             type="text"
             value={chatInput}

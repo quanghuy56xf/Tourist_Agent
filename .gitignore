@@ -17,7 +17,7 @@ backend/.test_tmp/
 .DS_Store
 
 # AI logs — tracked structure, ignored content
-.ai-log/*.jsonl
+.ai-log/
 
 
 # Backend data

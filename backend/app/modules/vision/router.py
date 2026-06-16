@@ -33,7 +33,31 @@ async def search_object(
         content = await search_image.read()
         vectors = embedding.extract_vectors_augmented(content, augment=USE_AUGMENTATION)
 
-        matches = chroma.search_top_items(vectors)
+        scoped_item_ids: list[int] | None = None
+        if group_id is not None:
+            scoped_item_ids = [
+                item_id
+                for (item_id,) in db.query(Item.id).filter(Item.group_id == group_id).all()
+            ]
+            if not scoped_item_ids:
+                duration_ms = int((time.perf_counter() - started) * 1000)
+                record_event(
+                    db,
+                    event_type="search",
+                    group_id=group_id,
+                    session_id=session_id,
+                    search_session_id=search_session_id,
+                    client_ip=client_ip,
+                    duration_ms=duration_ms,
+                    success=True,
+                    metadata={"found": False, "result_count": 0},
+                )
+                return SearchResponse(
+                    found=False,
+                    message="Không tìm thấy hiện vật gần giống",
+                )
+
+        matches = chroma.search_top_items(vectors, item_ids=scoped_item_ids)
         if not matches:
             duration_ms = int((time.perf_counter() - started) * 1000)
             record_event(
@@ -58,6 +82,9 @@ async def search_object(
             item = db.query(Item).filter(Item.id == match.item_id).first()
             if item is None:
                 chroma.delete_embeddings_for_item(match.item_id)
+                continue
+
+            if group_id is not None and item.group_id != group_id:
                 continue
 
             if resolved_group_id is None and item.group_id is not None:

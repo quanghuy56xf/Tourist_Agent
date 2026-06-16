@@ -27,7 +27,7 @@ export default function GroupSelectionPage() {
   };
 
   return (
-    <div className="artifact-shell px-6 py-8">
+    <div className="artifact-shell artifact-shell-pad">
       <div className="mb-6 flex justify-end">
         <LanguageSelector />
       </div>

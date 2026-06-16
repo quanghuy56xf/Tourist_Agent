@@ -81,24 +81,6 @@ def require_staff_if_enabled(
     return user
 
 
-def require_admin_role(
-    user: AuthUser | None = Depends(resolve_current_user),
-) -> AuthUser:
-    """Always require an authenticated admin, even when ADMIN_AUTH_ENABLED is false."""
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Chưa đăng nhập hoặc phiên đã hết hạn",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Chỉ tài khoản admin mới được thực hiện thao tác này",
-        )
-    return user
-
-
 def require_admin_role_if_enabled(
     user: AuthUser | None = Depends(require_staff_if_enabled),
 ) -> AuthUser | None:

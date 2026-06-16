@@ -53,7 +53,7 @@ export default function ResultModal({
       className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
       style={{ background: "rgba(14,11,7,0.7)" }}
     >
-      <div className="artifact-card max-h-[90vh] w-full max-w-lg overflow-y-auto p-5">
+      <div className="artifact-card max-h-[90dvh] w-full max-w-phone overflow-y-auto p-4 sm:p-5">
         <h2 className="font-display mb-1 text-xl" style={{ color: found ? "var(--primary)" : "var(--foreground)" }}>
           {found ? t.results.found : hasResults ? t.results.suggestions : t.results.notFound}
         </h2>

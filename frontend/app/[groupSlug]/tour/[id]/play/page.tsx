@@ -168,7 +168,7 @@ export default function TourPlayPage() {
 
   return (
     <div className="artifact-shell min-h-screen">
-      <header className="px-6 pb-4 pt-8" style={{ borderBottom: "1px solid var(--border)" }}>
+      <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <HomeButton />
@@ -190,7 +190,7 @@ export default function TourPlayPage() {
         </p>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-8">
+      <div className="artifact-page-body flex flex-1 flex-col items-center justify-center gap-6">
         <ScanViewfinderFrame
           scanning={scanPhase === "scanning"}
           scanProgress={scanProgress}
