@@ -110,7 +110,7 @@ export default function TourPlayPage() {
       const expectedId = currentStop.itemId;
       const matched =
         best &&
-        best.item_id === expectedId &&
+        String(best.item_id) === String(expectedId) &&
         (response.found || best.similarity >= TOUR_MATCH_MIN);
 
       if (matched) {
@@ -128,7 +128,7 @@ export default function TourPlayPage() {
         return;
       }
 
-      if (best && best.item_id !== expectedId) {
+      if (best && String(best.item_id) !== String(expectedId)) {
         setErrorMsg(`${t.tour.wrongStop} ${currentStop.name}`);
       } else {
         setErrorMsg(response.message || t.scan.noMatch);

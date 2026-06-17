@@ -44,6 +44,20 @@ export default function TourListPage() {
       </header>
 
       <div className="flex-1 p-4">
+        <button
+          type="button"
+          onClick={() => router.push(groupPath(groupSlug, "/tour-match"))}
+          className="artifact-btn-primary w-full mb-4 flex items-center justify-center gap-2 font-bold py-3 text-sm active:scale-95"
+          style={{
+            background: "rgba(201, 168, 76, 0.12)",
+            border: "1px solid var(--primary)",
+            color: "var(--primary)",
+            minHeight: "0px",
+          }}
+        >
+          ⚔ Thi Đấu Trực Tuyến (Tạo Room)
+        </button>
+
         {loading ? (
           <div className="flex h-40 items-center justify-center">
             <div
