@@ -28,6 +28,39 @@ def normalize_text(value: str) -> str:
     return " ".join((value or "").split()).strip().lower()
 
 
+GENERIC_ITEM_TERMS = {
+    "các",
+    "cổng",
+    "giám",
+    "hiện",
+    "khu",
+    "miếu",
+    "môn",
+    "quốc",
+    "tử",
+    "văn",
+    "vật",
+}
+
+
+def _primary_item_terms(item_name: str) -> set[str]:
+    words = normalize_text(item_name).split()
+    terms: set[str] = set()
+
+    for word in words:
+        if len(word) >= 3 and word not in GENERIC_ITEM_TERMS:
+            terms.add(word)
+
+    for left, right in zip(words, words[1:]):
+        if len(left) < 2 or len(right) < 2:
+            continue
+        if left in GENERIC_ITEM_TERMS and right in GENERIC_ITEM_TERMS:
+            continue
+        terms.add(f"{left} {right}")
+
+    return terms
+
+
 def is_substantive_item_description(description: str, item_name: str) -> bool:
     desc = " ".join((description or "").split()).strip()
     name = " ".join((item_name or "").split()).strip()
@@ -47,12 +80,22 @@ def is_substantive_item_description(description: str, item_name: str) -> bool:
 
 
 def text_mentions_item(item_name: str, item_description: str, text: str) -> bool:
-    lowered = text.lower()
-    name = item_name.strip().lower()
+    lowered = normalize_text(text)
+    name = normalize_text(item_name)
     if name and name in lowered:
         return True
-    description = (item_description or "").strip().lower()
-    return bool(description and len(description) >= 8 and description in lowered)
+    description = normalize_text(item_description)
+    if description and len(description) >= 8 and description in lowered:
+        return True
+    return any(term in lowered for term in _primary_item_terms(item_name))
+
+
+def _group_documents(documents: list[Document]) -> list[Document]:
+    return [
+        document
+        for document in documents
+        if document.metadata.get("source") == "group_doc"
+    ]
 
 
 def no_item_knowledge_message(language: str) -> str:
@@ -145,7 +188,9 @@ def build_verified_item_context(
     verified_docs: list[Document] = []
     if has_substantive_description and all_docs:
         verified_docs.append(all_docs[0])
-    verified_docs.extend(relevant_group_docs)
+        verified_docs.extend(_group_documents(all_docs))
+    else:
+        verified_docs.extend(relevant_group_docs)
     return verified_docs, has_verified_knowledge
 
 

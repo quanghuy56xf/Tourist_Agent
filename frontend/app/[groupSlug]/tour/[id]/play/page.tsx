@@ -7,11 +7,9 @@ import BackButton from "@/components/visitor/BackButton";
 import HomeButton from "@/components/visitor/HomeButton";
 import ScanViewfinderFrame from "@/components/visitor/ScanViewfinderFrame";
 import LanguageSelector from "@/components/LanguageSelector";
-import { searchObject } from "@/lib/api";
-import { compressImage } from "@/lib/imageCompress";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupSlug } from "@/lib/useGroupPath";
-import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
+import { useObjectSearch } from "@/lib/useObjectSearch";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import {
   getTourProgress,
@@ -31,6 +29,7 @@ export default function TourPlayPage() {
   const groupSlug = useGroupSlug();
   const tourId = String(params.id);
   const { locale, t } = useVisitorLocale();
+  const { searchImage } = useObjectSearch();
 
   const [tour, setTour] = useState<ResolvedTour | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,12 +95,7 @@ export default function TourPlayPage() {
     startProgress();
 
     try {
-      const file = new File([blob], "tour-scan.jpg", { type: "image/jpeg" });
-      const compressed = await compressImage(file);
-      const response = await searchObject(
-        compressed,
-        buildSearchTrackingContext(readStoredGroupId() ?? undefined)
-      );
+      const response = await searchImage(blob, "tour-scan.jpg");
 
       stopProgress();
       setScanProgress(100);

@@ -8,11 +8,10 @@ import BackButton from "@/components/visitor/BackButton";
 import HomeButton from "@/components/visitor/HomeButton";
 import ScanViewfinderFrame from "@/components/visitor/ScanViewfinderFrame";
 import LanguageSelector from "@/components/LanguageSelector";
-import { SearchResponse, searchObject } from "@/lib/api";
-import { compressImage } from "@/lib/imageCompress";
+import type { SearchResponse } from "@/lib/api/search";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
-import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
+import { useObjectSearch } from "@/lib/useObjectSearch";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 type ScanPhase = "idle" | "scanning" | "found";
@@ -22,6 +21,7 @@ export default function SearchPage() {
   const groupSlug = useGroupSlug();
   const methodPath = useGroupPath("/method");
   const { t } = useVisitorLocale();
+  const { searchImage } = useObjectSearch();
   const [frozen, setFrozen] = useState(false);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
@@ -71,12 +71,7 @@ export default function SearchPage() {
     startProgress();
 
     try {
-      const file = new File([blob], "search.jpg", { type: "image/jpeg" });
-      const compressed = await compressImage(file);
-      const response = await searchObject(
-        compressed,
-        buildSearchTrackingContext(readStoredGroupId() ?? undefined)
-      );
+      const response = await searchImage(blob);
 
       stopProgress();
       setScanProgress(100);

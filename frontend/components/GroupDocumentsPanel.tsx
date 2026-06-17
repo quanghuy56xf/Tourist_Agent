@@ -95,11 +95,15 @@ export default function GroupDocumentsPanel({
     setUploadPhase("uploading");
     setMessage(null);
     try {
+      let successCount = 0;
+      const failedUploads: string[] = [];
+
       if (hasText && !hasFiles) {
         const formData = new FormData();
         formData.append("title", title.trim());
         formData.append("text", text.trim());
         await createGroupDocument(groupId, formData, setUploadPhase);
+        successCount = 1;
       } else {
         for (const file of files) {
           const formData = new FormData();
@@ -111,7 +115,32 @@ export default function GroupDocumentsPanel({
                 : titleFromFilename(file.name);
           formData.append("title", docTitle);
           formData.append("file", file);
-          await createGroupDocument(groupId, formData, setUploadPhase);
+          try {
+            await createGroupDocument(groupId, formData, setUploadPhase);
+            successCount += 1;
+          } catch (err) {
+            const reason =
+              err instanceof Error ? err.message : "Thêm tài liệu thất bại";
+            failedUploads.push(`${file.name}: ${reason}`);
+          }
+        }
+
+        if (failedUploads.length > 0) {
+          await loadDocuments();
+          setUploadPhase(null);
+          if (successCount > 0) {
+            setTitle("");
+            setText("");
+            setFiles([]);
+          }
+          setMessage({
+            type: "error",
+            text:
+              successCount > 0
+                ? `Đã thêm ${successCount}/${files.length} tài liệu. Lỗi: ${failedUploads.join("; ")}`
+                : `Thêm tài liệu thất bại: ${failedUploads.join("; ")}`,
+          });
+          return;
         }
       }
 

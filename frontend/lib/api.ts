@@ -8,12 +8,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 // Qua Cloudflare/ngrok tren dien thoai phai dung proxy Next.js (/api -> backend).
 function backendDirectBase(): string {
   const configured = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || "";
-  if (!configured) return "";
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host !== "localhost" && host !== "127.0.0.1") return "";
   }
-  return configured;
+  return configured || "http://127.0.0.1:8000";
 }
 
 function uploadBase(): string {
@@ -225,6 +224,16 @@ export async function listPublicGroups(): Promise<GroupSummary[]> {
   return res.json();
 }
 
+export async function listDiscoverableGroups(): Promise<GroupSummary[]> {
+  const res = await fetch(`${API_URL}/api/groups/discover`, {
+    headers: { ...NGROK_HEADERS },
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được danh sách khu di tích"));
+  }
+  return res.json();
+}
+
 export async function listGroups(): Promise<GroupSummary[]> {
   const res = await fetch(`${API_URL}/api/groups`, { headers: apiHeaders() });
   if (!res.ok) {
@@ -408,7 +417,8 @@ export function createGroupDocument(
 ): Promise<GroupDocumentSummary> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    const url = `${uploadBase()}/api/groups/${groupId}/documents`;
+    const base = uploadBase();
+    const url = `${base}/api/groups/${groupId}/documents`;
 
     onPhaseChange?.("uploading");
 
@@ -441,12 +451,14 @@ export function createGroupDocument(
           )
         );
       } catch {
-        reject(new Error(fallback));
+        const body = xhr.responseText?.trim();
+        const suffix = body ? `: ${body.slice(0, 300)}` : "";
+        reject(new Error(`HTTP ${xhr.status} ${fallback}${suffix}`));
       }
     });
 
     xhr.addEventListener("error", () => {
-      reject(new Error("Thêm tài liệu thất bại"));
+      reject(new Error("Không thể kết nối tới máy chủ khi thêm tài liệu"));
     });
 
     xhr.addEventListener("abort", () => {
@@ -454,7 +466,10 @@ export function createGroupDocument(
     });
 
     xhr.open("POST", url);
-    if (uploadBase().includes("ngrok")) {
+    new Headers(apiHeaders()).forEach((value, key) => {
+      xhr.setRequestHeader(key, value);
+    });
+    if (base.includes("ngrok")) {
       xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
     }
     xhr.send(formData);

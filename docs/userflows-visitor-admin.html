@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HERA Userflows</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --panel: #171a21;
+      --line: #394150;
+      --text: #f3f4f6;
+      --muted: #a7afbd;
+      --gold: #d6b45c;
+      --blue: #62a8ff;
+      --green: #65d49b;
+      --red: #ff7b86;
+      --orange: #f4a261;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1a1f2a, var(--bg) 42%);
+      color: var(--text);
+      font: 15px/1.45 Inter, system-ui, sans-serif;
+    }
+    main { max-width: 1460px; margin: auto; padding: 32px 22px 64px; }
+    h1 { margin: 0 0 6px; font-size: 30px; }
+    h2 { margin: 0 0 18px; font-size: 22px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    p { margin: 0; }
+    .muted { color: var(--muted); }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0 28px; }
+    .legend span { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .section {
+      background: rgba(23, 26, 33, .94);
+      border: 1px solid #2d3440;
+      border-radius: 18px;
+      padding: 22px;
+      margin-top: 20px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .22);
+    }
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 4px 2px 14px;
+    }
+    .node {
+      flex: 0 0 185px;
+      min-height: 112px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--blue);
+      border-radius: 12px;
+      background: #11151c;
+    }
+    .node.choice { border-top-color: var(--gold); }
+    .node.success { border-top-color: var(--green); }
+    .node.problem { border-top-color: var(--red); background: #211418; }
+    .node.system { border-top-color: var(--orange); }
+    .arrow {
+      flex: 0 0 25px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 24px;
+    }
+    .branches {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(250px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .branch {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      background: #12161d;
+    }
+    .branch b { color: var(--gold); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .finding {
+      border-left: 4px solid var(--blue);
+      background: #12161d;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .finding.high { border-left-color: var(--red); }
+    .finding.medium { border-left-color: var(--orange); }
+    .finding.good { border-left-color: var(--green); }
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #101318;
+      background: var(--blue);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+    .high .tag { background: var(--red); }
+    .medium .tag { background: var(--orange); }
+    .good .tag { background: var(--green); }
+    code { color: #a9d2ff; }
+    @media (max-width: 900px) {
+      .grid, .branches { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>HERA: Userflow hiện tại</h1>
+  <p class="muted">Đối chiếu trực tiếp từ frontend, backend và luồng RAG trong codebase ngày 15/06/2026.</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--blue)"></i>Thao tác người dùng</span>
+    <span><i class="dot" style="background:var(--gold)"></i>Điểm lựa chọn</span>
+    <span><i class="dot" style="background:var(--orange)"></i>Xử lý hệ thống</span>
+    <span><i class="dot" style="background:var(--green)"></i>Kết quả</span>
+    <span><i class="dot" style="background:var(--red)"></i>Điểm lỗi/rủi ro</span>
+  </div>
+
+  <section class="section">
+    <h2>1. Khách tham quan</h2>
+    <div class="flow">
+      <article class="node"><h3>Mở HERA</h3><p class="muted">Chọn ngôn ngữ và nhóm trải nghiệm.</p></article>
+      <div class="arrow">→</div>
+      <article class="node choice"><h3>Chọn cách khám phá</h3><p class="muted">Camera, tải ảnh hoặc tour.</p></article>
+      <div class="arrow">→</div>
+      <article class="node system"><h3>Nhận diện hiện vật</h3><p class="muted">Nén ảnh → API search → xếp hạng kết quả.</p></article>
+      <div class="arrow">→</div>
+      <article class="node success"><h3>Xem nội dung</h3><p class="muted">Ảnh, câu chuyện theo persona/ngôn ngữ, âm thanh.</p></article>
+      <div class="arrow">→</div>
+      <article class="node"><h3>Tương tác tiếp</h3><p class="muted">Hỏi đáp AI, quét hiện vật khác hoặc tiếp tục tour.</p></article>
+    </div>
+    <div class="branches">
+      <div class="branch"><b>Camera</b><p>Chụp → tìm kết quả → tự mở hiện vật tốt nhất; kết quả yếu thì cho khách chọn.</p></div>
+      <div class="branch"><b>Tải ảnh</b><p>Chọn ảnh có sẵn → cùng pipeline nhận diện → trang chi tiết hiện vật.</p></div>
+      <div class="branch"><b>Tour</b><p>Chọn tour → xem các điểm → quét đúng hiện vật theo thứ tự → hoàn thành tour.</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2. Ban quản trị</h2>
+    <div class="flow">
+      <article class="node"><h3>Đăng nhập</h3><p class="muted">Admin hoặc manager; manager bị giới hạn theo khu.</p></article>
+      <div class="arrow">→</div>
+      <article class="node choice"><h3>Chọn khu di tích</h3><p class="muted">Ngữ cảnh dùng chung cho tài liệu và hiện vật.</p></article>
+      <div class="arrow">→</div>
+      <article class="node"><h3>Quản lý nội dung</h3><p class="muted">Tài liệu RAG, hiện vật, tour, tài khoản.</p></article>
+      <div class="arrow">→</div>
+      <article class="node system"><h3>Backend xử lý</h3><p class="muted">Lưu DB/file, embedding, Chroma + BM25, sinh lại nội dung liên quan.</p></article>
+      <div class="arrow">→</div>
+      <article class="node success"><h3>Xuất bản cho khách</h3><p class="muted">Nhận diện, thuyết minh, chat và tour dùng dữ liệu mới.</p></article>
+    </div>
+    <div class="branches">
+      <div class="branch"><b>Admin</b><p>Tạo khu, tạo/vô hiệu hóa manager, gán quyền theo khu.</p></div>
+      <div class="branch"><b>Tài liệu RAG</b><p>Chọn khu → nhập text hoặc upload TXT/DOCX/PDF → parse → chunk → index → cập nhật item liên quan.</p></div>
+      <div class="branch"><b>Hiện vật & tour</b><p>Đăng ký ảnh nhiều góc, mô tả, gán khu; sau đó tạo tour và sắp xếp điểm dừng.</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Điểm lỗi upload RAG</h2>
+    <div class="flow">
+      <article class="node"><h3>Admin đã đăng nhập</h3><p class="muted">Token nằm trong <code>sessionStorage</code>.</p></article>
+      <div class="arrow">→</div>
+      <article class="node problem"><h3>Upload bằng XHR</h3><p>Request không gắn header <code>Authorization</code>.</p></article>
+      <div class="arrow">→</div>
+      <article class="node problem"><h3>Backend từ chối</h3><p>Khi bật auth: trả 401 trước khi đọc/parse file.</p></article>
+      <div class="arrow">→</div>
+      <article class="node"><h3>UI báo lỗi chung</h3><p class="muted">Người dùng dễ hiểu nhầm là RAG/PDF bị lỗi.</p></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Đánh giá và ưu tiên cải tiến</h2>
+    <div class="grid">
+      <article class="finding high">
+        <span class="tag">P0</span>
+        <h3>Sửa xác thực upload</h3>
+        <p>Gắn Bearer token cho XHR và thêm test đảm bảo request upload có token khi admin đã đăng nhập.</p>
+      </article>
+      <article class="finding high">
+        <span class="tag">P0</span>
+        <h3>Phân biệt các loại lỗi</h3>
+        <p>Hiển thị rõ 401/403, PDF scan không có text, RAG unavailable, lỗi mạng và lỗi quá dung lượng.</p>
+      </article>
+      <article class="finding medium">
+        <span class="tag">P1</span>
+        <h3>Trạng thái ingest thực</h3>
+        <p>Hiện UI đang gọi “uploading/encoding” nhưng backend xử lý đồng bộ. Nên có trạng thái queued, parsing, indexing, ready/failed và retry.</p>
+      </article>
+      <article class="finding medium">
+        <span class="tag">P1</span>
+        <h3>Giới hạn và OCR</h3>
+        <p>Cấu hình hiện cho phép 0 = không giới hạn. Nên đặt giới hạn file/chunk và hướng dẫn OCR khi PDF chỉ chứa ảnh.</p>
+      </article>
+      <article class="finding medium">
+        <span class="tag">P1</span>
+        <h3>Tour phải theo khu đang chọn</h3>
+        <p>Trang tạo tour đang lấy toàn bộ hiện vật, dễ tạo tour trộn nhiều khu. Nên lọc theo active group.</p>
+      </article>
+      <article class="finding good">
+        <span class="tag">ĐIỂM TỐT</span>
+        <h3>Phân quyền theo khu đã có nền tảng</h3>
+        <p>Admin/manager, active group và kiểm tra quyền backend đã được tách khá rõ; chỉ còn một số request chưa dùng thống nhất helper xác thực.</p>
+      </article>
+    </div>
+  </section>
+</main>
+</body>
+</html>

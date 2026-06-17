@@ -1,5 +1,6 @@
 # Environment
 .env
+.env.production
 
 # Python
 __pycache__/
@@ -13,11 +14,18 @@ build/
 .mypy_cache/
 *.egg-info/
 backend/.test_tmp/
+backend/.pytest_tmp_review/
+.uv-cache-codex/
 # OS
 .DS_Store
+Thumbs.db
 
 # AI logs — tracked structure, ignored content
 .ai-log/
+.codex/
+.cursor/
+.deepeval/
+.gemini/
 
 
 # Backend data
@@ -27,19 +35,25 @@ backend/uploads/
 # Node
 frontend/node_modules/
 frontend/.next/
+frontend/out/
+frontend/.test-dist/
 frontend/.env.local
 *.tsbuildinfo
 
 # Logs
 *.log
 
-# IDE
+# IDE & Caches
 .vscode/
 .idea/
 .worktrees/
+.npm-cache-playwright/
+.playwright-cli/
+.uv-cache/
 
 # Cloudflare tunnel credentials
 cloudflared/config.yml
 cloudflared/*.json
 
 data/
+raw/

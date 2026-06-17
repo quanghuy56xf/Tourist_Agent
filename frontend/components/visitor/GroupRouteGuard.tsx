@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { findGroupBySlug, rememberVisitorGroup } from "@/lib/groupSlug";
-import { GroupSummary, listPublicGroups } from "@/lib/api";
+import { GroupSummary, listDiscoverableGroups } from "@/lib/api";
 
 export default function GroupRouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function GroupRouteGuard({ children }: { children: React.ReactNod
 
     let cancelled = false;
 
-    listPublicGroups()
+    listDiscoverableGroups()
       .then((groups: GroupSummary[]) => {
         if (cancelled) return;
         const group = findGroupBySlug(groups, slug);

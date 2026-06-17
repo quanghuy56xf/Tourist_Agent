@@ -6,11 +6,10 @@ import BackButton from "@/components/visitor/BackButton";
 import HomeButton from "@/components/visitor/HomeButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ResultModal from "@/components/ResultModal";
-import { SearchResponse, searchObject } from "@/lib/api";
-import { compressImage } from "@/lib/imageCompress";
+import type { SearchResponse } from "@/lib/api/search";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
-import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
+import { useObjectSearch } from "@/lib/useObjectSearch";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 const methods = [
@@ -26,6 +25,7 @@ export default function MethodSelectionPage() {
   const scanPath = useGroupPath("/scan");
   const tourPath = useGroupPath("/tour");
   const { t } = useVisitorLocale();
+  const { searchImage } = useObjectSearch();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
@@ -36,11 +36,7 @@ export default function MethodSelectionPage() {
     setErrorMsg(null);
     setSearchResult(null);
     try {
-      const compressed = await compressImage(e.target.files[0]);
-      const response = await searchObject(
-        compressed,
-        buildSearchTrackingContext(readStoredGroupId() ?? undefined)
-      );
+      const response = await searchImage(e.target.files[0]);
       if (response.found && response.results.length > 0) {
         router.push(
           `${groupPath(groupSlug, `/item/${response.results[0].item_id}`)}?similarity=${response.results[0].similarity}`

@@ -39,7 +39,10 @@ async def _synthesize_speech_async(text: str, language: str) -> tuple[bytes, str
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             output.write(chunk["data"])
-    return output.getvalue(), "audio/mpeg"
+    audio = output.getvalue()
+    if not audio:
+        raise RuntimeError("Text-to-speech returned empty audio")
+    return audio, "audio/mpeg"
 
 
 def synthesize_speech(text: str, language: str) -> tuple[bytes, str] | None:

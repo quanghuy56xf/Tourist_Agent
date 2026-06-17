@@ -13,6 +13,8 @@
   --muted-foreground: #9a8a6a;
   --border: rgba(201, 168, 76, 0.2);
   --radius: 0.625rem;
+  --font-lato: Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-playfair: "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 html {

@@ -51,6 +51,7 @@ export default function ItemDetailPage() {
   const [item, setItem] = useState<GroupItem | null>(null);
   const [content, setContent] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioReady, setAudioReady] = useState(false);
   const [loadingItem, setLoadingItem] = useState(true);
   const [loadingContent, setLoadingContent] = useState(true);
   const [error, setError] = useState("");
@@ -102,13 +103,18 @@ export default function ItemDetailPage() {
           if (!cancelled) {
             setContent(itemContent.content);
             setAudioUrl(
-              itemContent.has_audio && itemContent.audio_url
+              itemContent.audio_url
                 ? resolveImageUrl(itemContent.audio_url)
                 : null
             );
+            setAudioReady(itemContent.has_audio);
           }
         } catch {
-          if (!cancelled) setContent(t.item.contentError);
+          if (!cancelled) {
+            setContent(t.item.contentError);
+            setAudioUrl(null);
+            setAudioReady(false);
+          }
         }
       } catch {
         if (!cancelled) setError(t.item.loadError);
@@ -251,6 +257,7 @@ export default function ItemDetailPage() {
             ref={heraPanelRef}
             content={content}
             audioUrl={audioUrl}
+            audioReady={audioReady}
             loading={loadingContent}
             language={language}
             overlay={introActive}

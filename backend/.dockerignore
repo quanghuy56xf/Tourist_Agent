@@ -1,0 +1,10 @@
+.venv
+__pycache__
+.pytest_cache
+.test_tmp
+.pytest_tmp_review
+data
+uploads
+*.pyc
+*.pyo
+*.log
