@@ -92,8 +92,9 @@ uv sync
 ```
 
 ### Bước 3: Cấu hình biến môi trường (`.env`)
-Tạo file `.env` trên VPS:
+Tạo file `.env` ở thư mục gốc của dự án (trên một cấp so với backend):
 ```bash
+cd /home/ubuntu/<repo-name>
 cp .env.example .env
 nano .env
 ```
@@ -101,7 +102,6 @@ Cấu hình các giá trị cần thiết:
 ```env
 GOOGLE_API_KEY=your-gemini-api-key
 LLM_MODEL=gemini-2.5-flash
-MODEL_WARMUP_ENABLED=true
 
 # Địa chỉ URL của Frontend chạy trên Cloudflare Pages (dùng cho CORS bảo mật)
 CORS_ORIGINS=https://your-frontend-app.pages.dev
@@ -132,7 +132,7 @@ WorkingDirectory=/home/ubuntu/<repo-name>/backend
 ExecStart=/home/ubuntu/.local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
-EnvironmentFile=/home/ubuntu/<repo-name>/backend/.env
+EnvironmentFile=/home/ubuntu/<repo-name>/.env
 
 [Install]
 WantedBy=multi-user.target

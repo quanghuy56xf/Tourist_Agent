@@ -19,6 +19,7 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 interface HeraGuidePanelProps {
   content: string;
   audioUrl: string | null;
+  audioReady?: boolean;
   loading: boolean;
   language: string;
   overlay?: boolean;
@@ -40,6 +41,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
   {
   content,
   audioUrl,
+  audioReady = false,
   loading,
   language,
   overlay = false,
@@ -67,6 +69,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
   const plainContent = content.trim();
   const canSpeak = Boolean(plainContent);
   const hasServerAudio = Boolean(audioUrl);
+  const serverAudioPending = hasServerAudio && !audioReady;
   const wantsSpeech = hasServerAudio || browserSpeechReady;
   contentRef.current = plainContent;
 
@@ -215,20 +218,28 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
   );
 
   const startSpeech = useCallback(
-    async (restart: boolean, offset: number, runId: number): Promise<boolean> => {
+    async (
+      restart: boolean,
+      offset: number,
+      runId: number,
+      allowBrowserFallback = false
+    ): Promise<boolean> => {
       if (!plainContent || !isRunActive(runId)) return false;
       if (!hasServerAudio && !browserSpeechReady) return true;
 
       stopAllSpeech();
       if (!isRunActive(runId)) return false;
 
-      if (hasServerAudio) {
-        const fullRestart = restart || offset === 0 || !plainContent.slice(restart ? 0 : offset).trim();
-        return playServerAudio(fullRestart, runId);
-      }
-
       const spokenText = plainContent.slice(restart ? 0 : offset);
       const textToSpeak = spokenText.trim() ? spokenText : plainContent;
+
+      if (hasServerAudio) {
+        const fullRestart = restart || offset === 0 || !plainContent.slice(restart ? 0 : offset).trim();
+        const serverAudioStarted = await playServerAudio(fullRestart, runId);
+        if (serverAudioStarted || !allowBrowserFallback || !browserSpeechReady) return serverAudioStarted;
+        return startBrowserSpeech(textToSpeak, runId);
+      }
+
       return startBrowserSpeech(textToSpeak, runId);
     },
     [
@@ -242,7 +253,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
   );
 
   const startIntro = useCallback(
-    async (restart: boolean) => {
+    async (restart: boolean, allowBrowserFallback = false) => {
       if (!plainContent) return;
       const runId = introRunRef.current;
       setSpeechBlocked(false);
@@ -255,7 +266,8 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
       const speechStarted = await startSpeech(
         restart,
         restart ? 0 : revealedLength,
-        runId
+        runId,
+        allowBrowserFallback
       );
       if (!isRunActive(runId)) return;
       if (!speechStarted) {
@@ -300,7 +312,8 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
     const speechStarted = await startSpeech(
       speakFromStart,
       speakFromStart ? 0 : revealedLength,
-      runId
+      runId,
+      true
     );
     if (!isRunActive(runId)) return;
     if (!speechStarted) {
@@ -350,12 +363,21 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
 
   const replayIntro = () => {
     introRunRef.current += 1;
-    void startIntro(true);
+    void startIntro(true, true);
   };
 
   const showControls = canSpeak && !loading;
   const isRunning = sessionState === "running";
   const isFinished = sessionState === "finished";
+  const statusText = loading
+    ? t.item.composing
+    : speechBlocked
+      ? t.item.tapToListen
+      : serverAudioPending && !isSpeaking
+        ? t.item.audioPreparing
+        : isSpeaking
+          ? t.item.playingAudio
+          : t.item.chatTitle;
 
   const handlePlay = () => {
     if (speechBlocked || isFinished) {
@@ -400,11 +422,7 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm font-medium">{t.productName}</p>
             <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {loading
-                ? t.item.composing
-                : speechBlocked
-                  ? t.item.tapToListen
-                  : t.item.chatTitle}
+              {statusText}
             </p>
           </div>
           {showControls && (

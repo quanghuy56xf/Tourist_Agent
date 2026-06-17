@@ -9,23 +9,21 @@ Tài liệu này hướng dẫn cách chạy từng thành phần của hệ th�
 Backend cung cấp API, giao tiếp với Database, tìm kiếm ảnh và RAG. Bạn cần bật một Terminal/PowerShell mới.
 
 ```powershell
-# 1. Di chuyển vào thư mục backend
-cd backend
-
-# 2. Tạo môi trường và cài đặt thư viện tự động siêu tốc
-uv sync
-
-# 3. Kích hoạt môi trường ảo
-.\.venv\Scripts\Activate.ps1
-
-# 5. Khởi tạo file biến môi trường (nếu chưa có)
+# 1. Khởi tạo file biến môi trường ở thư mục gốc (nếu chưa có)
 copy .env.example .env
 
-# 6. Khởi chạy server Backend
-python -m uvicorn app.main:app --reload --port 8000
+# 2. Di chuyển vào thư mục backend
+cd backend
+
+# 3. Tạo môi trường và cài đặt thư viện bằng uv
+uv sync
+
+# 4. Khởi chạy server Backend bằng uv
+uv run uvicorn app.main:app --reload --port 8000
 ```
 > **Lưu ý:**
-> - Nếu bạn muốn dùng tính năng AI tạo sinh, nhớ mở file `backend/.env` và thêm `GOOGLE_API_KEY`.
+> - Nếu bạn muốn dùng tính năng AI tạo sinh, nhớ mở file `.env` ở thư mục gốc và cung cấp `GOOGLE_API_KEY` (hoặc key tương ứng nếu cấu hình sử dụng LLM khác).
+> - Backend sẽ load biến môi trường từ file `.env` ở gốc dự án.
 > - Backend sẽ chạy tại: `http://localhost:8000`
 > - Giao diện API Docs (Swagger): `http://localhost:8000/docs`
 
@@ -47,13 +45,13 @@ npm run dev
 ```
 > **Lưu ý:**
 > - Frontend sẽ chạy tại: `http://localhost:3000`
-> - Nó sẽ tự động gọi API tới `http://localhost:8000` của Backend.
+> - Quá trình kết nối proxy tự động gọi API tới `http://localhost:8000` của Backend.
 
 ---
 
 ## 3. Chạy Cloudflare Tunnel (Để test trên điện thoại)
 
-Khi test các tính năng như "Chụp ảnh trên điện thoại", bạn bắt buộc phải có đường dẫn **HTTPS**. Cloudflare Tunnel sẽ giúp public port `3000` của máy tính bạn ra ngoài Internet bằng HTTPS hoàn toàn miễn phí.
+Khi test các tính năng như "Chụp ảnh trên điện thoại", hệ thống đòi hỏi phải có giao thức **HTTPS**. Cloudflare Tunnel sẽ giúp public port `3000` của máy tính bạn ra ngoài Internet bằng HTTPS hoàn toàn miễn phí.
 
 Mở Terminal/PowerShell thứ 3:
 

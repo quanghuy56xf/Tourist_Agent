@@ -9,7 +9,7 @@ $FrontendPort = 3000
 $BackendPort = 8000
 $ProjectRoot = Split-Path $PSScriptRoot -Parent
 $FrontendEnv = Join-Path $ProjectRoot "frontend\.env.local"
-$BackendEnv = Join-Path $ProjectRoot "backend\.env"
+$BackendEnv = Join-Path $ProjectRoot ".env"
 
 # Check backend + frontend
 try {
@@ -81,7 +81,7 @@ if ($backendEnvContent -match "CORS_ALLOW_ALL=true") {
     Write-Host "[OK] CORS_ALLOW_ALL da bat san"
 } else {
     Add-Content -Path $BackendEnv -Value "`nCORS_ALLOW_ALL=true"
-    Write-Host "[!] Da them CORS_ALLOW_ALL=true vao backend/.env"
+    Write-Host "[!] Da them CORS_ALLOW_ALL=true vao .env"
     Write-Host "    RESTART backend de ap dung CORS moi!"
 }
 

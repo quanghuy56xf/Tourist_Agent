@@ -2,24 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import LanguageSelector from "@/components/LanguageSelector";
-import { GroupSummary, listPublicGroups } from "@/lib/api";
+import { GroupSummary, listDiscoverableGroups } from "@/lib/api";
 import { rememberVisitorGroup } from "@/lib/groupSlug";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+
+const GROUP_LOAD_RETRY_MS = 1500;
 
 export default function GroupSelectionPage() {
   const router = useRouter();
   const { t } = useVisitorLocale();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    listPublicGroups()
-      .then(setGroups)
-      .catch(() => setError(t.groups.loadError))
-      .finally(() => setLoading(false));
-  }, [t.groups.loadError]);
+    let cancelled = false;
+    let retryTimer: number | undefined;
+
+    async function loadGroups() {
+      try {
+        const data = await listDiscoverableGroups();
+        if (cancelled) return;
+        setGroups(data);
+        setLoading(false);
+      } catch {
+        if (cancelled) return;
+        setLoading(true);
+        retryTimer = window.setTimeout(loadGroups, GROUP_LOAD_RETRY_MS);
+      }
+    }
+
+    void loadGroups();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, []);
 
   const handleSelect = (group: GroupSummary) => {
     const slug = rememberVisitorGroup(group);
@@ -40,8 +59,16 @@ export default function GroupSelectionPage() {
           >
             <span style={{ color: "var(--primary-foreground)" }}>✦</span>
           </div>
-          <span className="artifact-section-label">{t.productName}</span>
+          <span className="text-2xl font-bold uppercase tracking-[0.18em]" style={{ color: "var(--primary)" }}>{t.productName}</span>
         </div>
+        <Image
+          src="/hera-app-icon.png"
+          alt="HERA"
+          width={192}
+          height={192}
+          priority
+          className="mx-auto mb-4 h-48 w-48 rounded-2xl object-cover"
+        />
         <h1 className="font-display text-3xl" style={{ color: "var(--foreground)" }}>
           {t.groups.headline}
         </h1>
@@ -58,8 +85,6 @@ export default function GroupSelectionPage() {
               style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
             />
           </div>
-        ) : error ? (
-          <p className="rounded-xl px-4 py-3 text-center text-sm text-red-400">{error}</p>
         ) : groups.length === 0 ? (
           <p className="py-12 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
             {t.groups.empty}

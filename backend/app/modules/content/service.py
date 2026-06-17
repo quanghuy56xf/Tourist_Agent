@@ -355,7 +355,7 @@ class ItemContentService:
             return variant
 
         audio_result = synthesize_speech(variant.text_content, language)
-        if audio_result is None:
+        if audio_result is None or not audio_result[0]:
             return variant
 
         return self.upsert_variant(

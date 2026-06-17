@@ -64,16 +64,15 @@ export default function GroupHomePage() {
           >
             <span style={{ color: "var(--primary-foreground)" }}>✦</span>
           </div>
-          <span className="artifact-section-label">{groupName || t.home.siteName}</span>
+          <span className="text-2xl font-bold uppercase tracking-[0.18em]" style={{ color: "var(--primary)" }}>{groupName || t.home.siteName}</span>
         </div>
         <Image
           src="/hera-app-icon.png"
           alt="HERA"
-          width={96}
-          height={96}
+          width={192}
+          height={192}
           priority
-          className="mx-auto mb-4 h-24 w-24 rounded-2xl border object-cover"
-          style={{ borderColor: "var(--border)" }}
+          className="mx-auto mb-4 h-48 w-48 rounded-2xl object-cover"
         />
         <h1 className="font-display text-3xl" style={{ color: "var(--foreground)" }}>
           {t.home.headline}

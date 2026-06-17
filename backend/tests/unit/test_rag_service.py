@@ -163,6 +163,52 @@ def test_verified_context_keeps_group_docs_that_mention_item():
     assert len(filtered) == 1
 
 
+def test_verified_context_keeps_group_docs_that_match_primary_keywords():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Tiếng trống báo hiệu giờ học và các nghi thức quan trọng.",
+            metadata={"source": "group_doc", "page": "kb-drum"},
+        )
+    ]
+
+    docs, has_verified = build_verified_item_context(
+        item_id=13,
+        item_name="Trống Văn Miếu",
+        item_description="Trống Văn Miếu",
+        retriever=retriever,
+        group_id=2,
+    )
+
+    assert has_verified is True
+    assert len(docs) == 1
+    assert docs[0].metadata["page"] == "kb-drum"
+
+
+def test_verified_context_includes_retrieved_group_docs_for_substantive_description():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Đại Trung là cách gọi đề cao đạo Trung dung.",
+            metadata={"source": "group_doc", "page": "kb-dai-trung"},
+        )
+    ]
+
+    docs, has_verified = build_verified_item_context(
+        item_id=8,
+        item_name="Đại Trung Môn",
+        item_description=(
+            "Cổng nằm sau khu vực nhập môn, dẫn vào không gian trung tâm "
+            "của Văn Miếu. Tên gọi Đại Trung thể hiện tư tưởng trung dung."
+        ),
+        retriever=retriever,
+        group_id=2,
+    )
+
+    assert has_verified is True
+    assert [doc.metadata["source"] for doc in docs] == ["item", "group_doc"]
+
+
 def test_chat_context_includes_query_aligned_docs_without_item_name():
     retriever = WorkingRetriever()
     retriever.retrieve = lambda query, top_k, group_id=None: [
@@ -205,8 +251,5 @@ def test_chat_context_includes_query_aligned_docs_without_item_name():
         query="còn thông tin nào thú vị nữa",
         top_k=8,
     )
-    assert len(verified_docs) == 2
-    assert all(
-        "Quốc Tử Giám từng là trường đại học" not in doc.page_content
-        for doc in verified_docs
-    )
+    assert len(verified_docs) == 3
+    assert "Quốc Tử Giám từng là trường đại học" in verified_docs[2].page_content

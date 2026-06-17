@@ -5,6 +5,7 @@ import pytest
 
 from app.models.content_variant import ItemContentVariant
 from app.models.item import Item
+from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA
 from app.modules.content import router as content_router
 from app.modules.content.service import (
     ItemContentResult,
@@ -307,6 +308,39 @@ def test_get_item_content_audio_generates_when_missing(client, db_session, monke
 
     assert response.status_code == 200
     assert response.content == b"generated-audio"
+
+
+def test_ensure_audio_ignores_empty_tts_result(db_session, monkeypatch):
+    item = _add_item(db_session)
+    db_session.add(
+        ItemContentVariant(
+            item_id=item.id,
+            persona=DEFAULT_PERSONA,
+            language=DEFAULT_LANGUAGE,
+            text_content="Stored story",
+            audio_data=None,
+            audio_mime=None,
+            content_hash=compute_content_hash(item.description),
+            status="ready",
+            source="generated",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(
+        "app.modules.content.service.synthesize_speech",
+        lambda text, language: (b"", "audio/mpeg"),
+    )
+
+    variant = ItemContentService().ensure_audio(
+        db_session,
+        item,
+        DEFAULT_PERSONA,
+        DEFAULT_LANGUAGE,
+    )
+
+    assert variant is not None
+    assert variant.audio_data is None
+    assert variant.audio_mime is None
 
 
 def test_get_item_content_audio_streams_blob(client, db_session):

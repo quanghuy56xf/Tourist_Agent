@@ -13,7 +13,7 @@ from app.schemas.group import (
 from app.core.database import get_db
 from app.modules.auth.dependencies import require_admin_role_if_enabled, resolve_current_user
 from app.modules.auth.service import ensure_group_access
-from app.modules.objects.groups import ensure_visitor_can_access_group, get_group_or_404
+from app.modules.objects.groups import get_group_or_404
 from app.modules.objects.items import item_to_response
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -54,6 +54,12 @@ def list_public_groups(db: Session = Depends(get_db)):
         .order_by(Group.name.asc())
         .all()
     )
+    return _to_group_responses(rows)
+
+
+@router.get("/discover", response_model=list[GroupResponse])
+def list_discoverable_groups(db: Session = Depends(get_db)):
+    rows = _group_rows_query(db).order_by(Group.name.asc()).all()
     return _to_group_responses(rows)
 
 
@@ -140,8 +146,6 @@ def list_group_items(
     group = get_group_or_404(db, group_id)
     if user and user.role == "manager":
         ensure_group_access(user, group_id)
-    else:
-        ensure_visitor_can_access_group(group, user)
     items = (
         db.query(Item)
         .filter(Item.group_id == group_id)
