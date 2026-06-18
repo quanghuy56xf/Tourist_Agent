@@ -134,3 +134,35 @@ Xác nhận (Verification):
 Các cải tiến cần làm tiếp theo (Follow-up candidates):
 - Tạo lại hoặc sửa lỗi môi trường ảo của backend, sau đó chạy lại các unit test về config/auth.
 - Xem xét xóa hẳn `backend/.env.example` sau khi toàn bộ docs và ghi chú (onboarding notes) đều đã điều hướng hoàn toàn về file `.env.example` gốc.
+## 2026-06-19 - Loại bỏ gọi TTS trùng và giới hạn lịch sử chat gửi lên LLM
+
+Bối cảnh:
+- Sau khi nhận diện ảnh và sinh nội dung LLM, API content vừa lên lịch sinh TTS
+  nền, vừa trả về `audio_url`.
+- Frontend dùng ngay `audio_url`; endpoint audio cũng tự sinh TTS nếu audio chưa
+  tồn tại. Hai đường này có thể cùng gọi Edge TTS cho một nội dung.
+- Frontend gửi toàn bộ lịch sử chat lên backend, trong khi backend chỉ chấp nhận
+  tối đa 20 message và generator chỉ sử dụng 10 message gần nhất.
+
+Các thay đổi:
+- Bỏ việc lên lịch background TTS trong `GET /api/objects/{item_id}/content`.
+- API content vẫn trả `audio_url` khi chưa có audio; TTS chỉ được sinh khi
+  endpoint audio thực sự được yêu cầu.
+- Giữ nguyên cơ chế lưu audio vào biến thể nội dung để những lần phát sau dùng
+  lại audio đã tạo.
+- Frontend chỉ gửi `chatHistory.slice(-10)` khi gọi API chat.
+- Lịch sử hiển thị trên giao diện vẫn được giữ đầy đủ trong phiên hiện tại.
+
+Xác nhận:
+- Test flow TTS:
+  - `test_get_item_content_defers_tts_until_audio_endpoint_is_requested`
+  - `test_get_item_content_audio_generates_when_missing`
+  - `test_get_item_content_audio_streams_blob`
+  - Kết quả: `3 passed`.
+- Test hợp đồng frontend về giới hạn lịch sử chat:
+  - Chạy `node frontend/tests/visitor-persona-flow.test.cjs`.
+  - Kết quả: thành công.
+- Test API chat đại diện:
+  - `test_chat_uses_item_description_when_rag_is_unavailable`
+  - `test_chat_uses_user_message_as_rag_query`
+  - Kết quả: `2 passed`.

@@ -7,6 +7,7 @@ from app.core.config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
     GOOGLE_API_KEY,
+    LLM_MAX_OUTPUT_TOKENS,
     LLM_MAX_RETRIES,
     LLM_MODEL,
     LLM_PROVIDER,
@@ -29,6 +30,7 @@ def _build_llm(model_name: str | None, temperature: float):
             base_url=DEEPSEEK_BASE_URL,
             timeout=LLM_TIMEOUT_SECONDS,
             max_retries=LLM_MAX_RETRIES,
+            max_tokens=LLM_MAX_OUTPUT_TOKENS,
         )
 
     if not GOOGLE_API_KEY:
@@ -40,6 +42,7 @@ def _build_llm(model_name: str | None, temperature: float):
         api_key=GOOGLE_API_KEY,
         request_timeout=LLM_TIMEOUT_SECONDS,
         retries=LLM_MAX_RETRIES,
+        max_output_tokens=LLM_MAX_OUTPUT_TOKENS,
     )
 
 

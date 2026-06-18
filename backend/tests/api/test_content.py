@@ -38,7 +38,7 @@ def test_generation_rules_change_generated_hash_but_preserve_manual_hash():
     assert manual == hashlib.sha256(b"Description").hexdigest()
 
 
-def test_generated_item_content_is_limited_before_persistence(
+def test_generated_item_content_is_preserved_before_persistence(
     db_session,
     monkeypatch,
 ):
@@ -61,9 +61,33 @@ def test_generated_item_content_is_limited_before_persistence(
         db_session, item, "Mặc định", "Tiếng Việt"
     )
 
-    assert len(result.content.removesuffix("...").split()) == 300
+    assert result.content == long_text
     stored = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
     assert stored.text_content == result.content
+
+
+def test_adapted_item_content_is_preserved_before_persistence(
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    long_text = " ".join(f"word{i}" for i in range(301))
+    monkeypatch.setattr(
+        "app.modules.content.service.get_rag_generator",
+        lambda: Mock(adapt_content=Mock(return_value=long_text)),
+    )
+
+    result = ItemContentService().generate_adapted_variant(
+        db_session,
+        item,
+        "Gen Z Explorer",
+        "Tiếng Việt",
+        "Base content",
+    )
+
+    assert result.content == long_text
+    stored = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
+    assert stored.text_content == long_text
 
 
 def test_manual_content_is_not_truncated(db_session, monkeypatch):
@@ -278,6 +302,39 @@ def test_get_item_content_generates_when_missing(client, db_session, monkeypatch
     assert response.json()["stored"] is False
     fake_service.get_or_generate.assert_called_once()
     fake_service.finalize_with_audio.assert_not_called()
+
+
+def test_get_item_content_defers_tts_until_audio_endpoint_is_requested(
+    client,
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    fake_service = Mock()
+    fake_service.get_or_generate.return_value = ItemContentResult(
+        item_id=item.id,
+        persona="Mặc định",
+        language="Tiếng Việt",
+        content="Generated story",
+        has_audio=False,
+        audio_url=None,
+        stored=False,
+        source="generated",
+    )
+    background_tts_calls = []
+    monkeypatch.setattr(content_router, "get_item_content_service", lambda: fake_service)
+    monkeypatch.setattr(
+        content_router,
+        "_ensure_audio_task",
+        lambda *args: background_tts_calls.append(args),
+    )
+
+    response = client.get(f"/api/objects/{item.id}/content")
+
+    assert response.status_code == 200
+    assert response.json()["has_audio"] is False
+    assert response.json()["audio_url"] is not None
+    assert background_tts_calls == []
 
 
 def test_get_item_content_audio_generates_when_missing(client, db_session, monkeypatch):

@@ -158,7 +158,7 @@ export default function ItemDetailPage() {
     setChatInput("");
     setIsChatting(true);
     try {
-      const res = await chatWithAI(itemId, userMsg.content, chatHistory, persona, language, {
+      const res = await chatWithAI(itemId, userMsg.content, chatHistory.slice(-10), persona, language, {
         sessionId: getVisitorSessionId(),
         searchSessionId: getActiveSearchSessionId(),
       });

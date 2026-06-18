@@ -1,5 +1,6 @@
 import pytest
 import httpx
+import types
 from google.api_core.exceptions import ServiceUnavailable
 from google.genai.errors import ClientError, ServerError
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
@@ -19,6 +20,7 @@ def test_generator_uses_configured_model_timeout_and_retries(monkeypatch):
     monkeypatch.setattr(generator, "LLM_MODEL", "configured-model", raising=False)
     monkeypatch.setattr(generator, "LLM_TIMEOUT_SECONDS", 12.5, raising=False)
     monkeypatch.setattr(generator, "LLM_MAX_RETRIES", 3, raising=False)
+    monkeypatch.setattr(generator, "LLM_MAX_OUTPUT_TOKENS", 768, raising=False)
     monkeypatch.setattr(
         generator,
         "ChatGoogleGenerativeAI",
@@ -30,6 +32,36 @@ def test_generator_uses_configured_model_timeout_and_retries(monkeypatch):
     assert captured["model"] == "configured-model"
     assert captured["request_timeout"] == 12.5
     assert captured["retries"] == 3
+    assert captured["max_output_tokens"] == 768
+
+
+def test_deepseek_uses_configured_max_output_tokens(monkeypatch):
+    captured = {}
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "langchain_openai",
+        types.SimpleNamespace(ChatOpenAI=FakeChatOpenAI),
+    )
+    monkeypatch.setattr(generator, "LLM_PROVIDER", "deepseek", raising=False)
+    monkeypatch.setattr(generator, "DEEPSEEK_API_KEY", "test-key", raising=False)
+    monkeypatch.setattr(generator, "DEEPSEEK_BASE_URL", "https://deepseek.test", raising=False)
+    monkeypatch.setattr(generator, "LLM_MODEL", "deepseek-chat", raising=False)
+    monkeypatch.setattr(generator, "LLM_TIMEOUT_SECONDS", 15, raising=False)
+    monkeypatch.setattr(generator, "LLM_MAX_RETRIES", 4, raising=False)
+    monkeypatch.setattr(generator, "LLM_MAX_OUTPUT_TOKENS", 1024, raising=False)
+
+    generator.RAGGenerator()
+
+    assert captured["model"] == "deepseek-chat"
+    assert captured["base_url"] == "https://deepseek.test"
+    assert captured["timeout"] == 15
+    assert captured["max_retries"] == 4
+    assert captured["max_tokens"] == 1024
 
 
 def test_provider_unavailable_error_is_translated():

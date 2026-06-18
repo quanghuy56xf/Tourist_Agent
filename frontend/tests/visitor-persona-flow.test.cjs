@@ -168,3 +168,8 @@ assert.match(
   /trackVisitorEvent\("item_view",[\s\S]*metadata: \{ persona, language \}/,
   "item views should record anonymous persona and language metadata"
 );
+assert.match(
+  itemSource,
+  /chatWithAI\(itemId, userMsg\.content, chatHistory\.slice\(-10\), persona, language/,
+  "chat requests should send only the 10 most recent history messages"
+);
