@@ -117,6 +117,41 @@ uv run python scripts/repair_rag_index.py --data-dir data --apply
 
 ---
 
+## 💡 Truy Vấn Mẫu (Sample Queries)
+
+Dưới đây là một số ví dụ cURL để gọi API trực tiếp (thử nghiệm trên Terminal/Postman):
+
+### 1. Nhận diện Hiện vật (Vision Search)
+```bash
+curl -X POST "http://localhost:8000/api/vision/search" \
+     -H "Content-Type: multipart/form-data" \
+     -F "image=@/path/to/your/image.jpg"
+```
+
+### 2. Sinh Câu chuyện Thuyết minh (Story Generation)
+```bash
+curl -X POST "http://localhost:8000/api/llm/generate" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "item_id": 1,
+           "persona": "adult",
+           "language": "vi"
+         }'
+```
+
+### 3. Hỏi đáp cùng Chatbot (RAG Contextual Chat)
+```bash
+curl -X POST "http://localhost:8000/api/llm/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "item_id": 1,
+           "message": "Chi tiết hoa văn trên hiện vật này có ý nghĩa gì?",
+           "history": []
+         }'
+```
+
+---
+
 ## 📄 Tài Liệu Liên Quan
 
 - **Tài liệu Yêu cầu (PRD)**: [docs/prd/PRD_v2.md](docs/prd/PRD_v2.md)
