@@ -11,6 +11,8 @@ import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { useObjectSearch } from "@/lib/useObjectSearch";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import LanguageSelector from "@/components/LanguageSelector";
+import PersonaSelector from "@/components/PersonaSelector";
 
 const methods = [
   { id: "camera", icon: "📸", titleKey: "cameraTitle" as const, subKey: "cameraSubtitle" as const },
@@ -21,7 +23,6 @@ const methods = [
 export default function MethodSelectionPage() {
   const router = useRouter();
   const groupSlug = useGroupSlug();
-  const groupHomePath = useGroupPath();
   const scanPath = useGroupPath("/scan");
   const tourPath = useGroupPath("/tour");
   const { t } = useVisitorLocale();
@@ -63,9 +64,15 @@ export default function MethodSelectionPage() {
   return (
     <div className="artifact-shell">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="mb-6 flex items-center gap-2">
-          <HomeButton />
-          <BackButton onClick={() => router.push(groupHomePath)} label={t.common.back} />
+        <div className="mb-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <HomeButton />
+            <BackButton onClick={() => router.push("/")} label={t.common.back} />
+          </div>
+          <div className="flex items-center gap-2">
+            <LanguageSelector compact />
+            <PersonaSelector compact />
+          </div>
         </div>
         <div className="mb-1 flex items-center gap-3">
           <div

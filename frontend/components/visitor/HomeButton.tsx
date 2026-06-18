@@ -11,7 +11,7 @@ interface HomeButtonProps {
 
 export default function HomeButton({ className = "" }: HomeButtonProps) {
   const { t } = useVisitorLocale();
-  const groupHomePath = useGroupPath();
+  const groupHomePath = useGroupPath("/method");
 
   return (
     <Link

@@ -27,6 +27,7 @@ import {
   trackVisitorEvent,
 } from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -35,6 +36,7 @@ export default function ItemDetailPage() {
   const groupSlug = useGroupSlug();
   const scanPath = useGroupPath("/scan");
   const { language, locale, t, ready: localeReady } = useVisitorLocale();
+  const { persona, ready: personaReady } = useVisitorPersona();
   const itemId = Number(params.id);
   const similarityParam = searchParams.get("similarity");
   const similarity = Number(similarityParam);
@@ -55,13 +57,11 @@ export default function ItemDetailPage() {
   const [loadingItem, setLoadingItem] = useState(true);
   const [loadingContent, setLoadingContent] = useState(true);
   const [error, setError] = useState("");
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
-  const [persona, setPersona] = useState("Mặc định");
   const [introActive, setIntroActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
 
@@ -73,10 +73,8 @@ export default function ItemDetailPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setPersona(localStorage.getItem("user_persona") || "Mặc định");
       setAutoSpeak(localStorage.getItem("chat_auto_speak") === "true");
     }
-    setPreferencesLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -86,7 +84,7 @@ export default function ItemDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (!itemId || !preferencesLoaded || !localeReady) return;
+    if (!itemId || !personaReady || !localeReady) return;
     let cancelled = false;
 
     async function loadItemAndStory() {
@@ -130,16 +128,17 @@ export default function ItemDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [itemId, persona, language, localeReady, preferencesLoaded, t.item.contentError, t.item.loadError]);
+  }, [itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
 
   useEffect(() => {
-    if (!itemId) return;
+    if (!itemId || !personaReady || !localeReady) return;
     void trackVisitorEvent("item_view", {
       groupId: readStoredGroupId() ?? undefined,
       itemId,
       searchSessionId: getActiveSearchSessionId(),
+      metadata: { persona, language },
     });
-  }, [itemId]);
+  }, [itemId, language, localeReady, persona, personaReady]);
 
   useEffect(() => {
     setChatHistory([]);
