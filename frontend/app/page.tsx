@@ -7,12 +7,19 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { GroupSummary, listDiscoverableGroups } from "@/lib/api";
 import { rememberVisitorGroup } from "@/lib/groupSlug";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
+import {
+  DEFAULT_VISITOR_PERSONA,
+  startVisitorSession,
+} from "@/lib/visitorPersona";
+import { trackVisitorEvent } from "@/lib/visitorAnalytics";
 
 const GROUP_LOAD_RETRY_MS = 1500;
 
 export default function GroupSelectionPage() {
   const router = useRouter();
-  const { t } = useVisitorLocale();
+  const { language, t } = useVisitorLocale();
+  const { setPersona } = useVisitorPersona();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +49,16 @@ export default function GroupSelectionPage() {
 
   const handleSelect = (group: GroupSummary) => {
     const slug = rememberVisitorGroup(group);
-    router.push(`/${slug}`);
+    startVisitorSession(window.sessionStorage, window.localStorage);
+    setPersona(DEFAULT_VISITOR_PERSONA);
+    void trackVisitorEvent("group_visit", {
+      groupId: group.id,
+      metadata: {
+        language,
+        persona: DEFAULT_VISITOR_PERSONA,
+      },
+    });
+    router.push(`/${slug}/method`);
   };
 
   return (

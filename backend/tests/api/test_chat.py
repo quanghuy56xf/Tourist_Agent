@@ -66,7 +66,7 @@ def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
     assert captured["query"] == "Ai là người xây dựng hiện vật này?"
 
 
-def test_chat_limits_generated_response_to_300_words(
+def test_chat_preserves_complete_generated_response(
     client,
     db_session,
     monkeypatch,
@@ -89,8 +89,8 @@ def test_chat_limits_generated_response_to_300_words(
 
     assert response.status_code == 200
     content = response.json()["content"]
-    assert len(content.removesuffix("...").split()) == 300
-    assert content.endswith("...")
+    assert len(content.split()) == 301
+    assert content.endswith("word300")
 
 
 def test_chat_rejects_empty_message(client):

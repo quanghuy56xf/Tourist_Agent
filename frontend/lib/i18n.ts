@@ -35,6 +35,12 @@ const vi = {
     retry: "Thử lại",
     noImage: "Không có ảnh",
   },
+  persona: {
+    label: "Đối tượng",
+    general: "Phổ thông",
+    family: "Trẻ em / Gia đình",
+    genZ: "Gen Z",
+  },
   home: {
     siteName: "HERA",
     headline: "Khám phá Hiện vật",
@@ -175,6 +181,12 @@ const en: DeepStringShape<typeof vi> = {
     close: "Close",
     retry: "Try again",
     noImage: "No image",
+  },
+  persona: {
+    label: "Audience",
+    general: "General",
+    family: "Children / Family",
+    genZ: "Gen Z",
   },
   home: {
     siteName: "HERA",

@@ -8,7 +8,6 @@ from app.core.config import RAG_CHAT_TOP_K
 from app.core.database import get_db
 from app.models.item import Item
 from app.modules.analytics.service import get_client_ip, record_event
-from app.modules.content.text_utils import limit_words
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
@@ -131,4 +130,4 @@ def chat_with_ai(
         duration_ms=duration_ms,
         success=True,
     )
-    return ChatResponse(content=limit_words(content))
+    return ChatResponse(content=content)

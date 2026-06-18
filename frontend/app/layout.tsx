@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { VisitorLocaleProvider } from "@/components/VisitorLocaleProvider";
+import { VisitorPersonaProvider } from "@/components/VisitorPersonaProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,9 @@ export default function RootLayout({
     <html lang="vi">
       <body className="overflow-x-hidden">
         <div className="artifact-grain" aria-hidden="true" />
-        <VisitorLocaleProvider>{children}</VisitorLocaleProvider>
+        <VisitorLocaleProvider>
+          <VisitorPersonaProvider>{children}</VisitorPersonaProvider>
+        </VisitorLocaleProvider>
       </body>
     </html>
   );

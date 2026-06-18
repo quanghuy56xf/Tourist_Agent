@@ -100,12 +100,6 @@ def get_item_content(
             result.language,
             result.content,
         )
-        background_tasks.add_task(
-            _ensure_audio_task,
-            item.id,
-            result.persona,
-            result.language,
-        )
 
     return ItemContentResponse(
         item_id=result.item_id,

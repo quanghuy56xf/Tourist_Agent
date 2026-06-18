@@ -17,7 +17,6 @@ from app.modules.content.personas import (
 )
 from app.modules.content.text_utils import (
     GENERATION_RULES_VERSION,
-    limit_words,
     strip_citations,
 )
 from app.modules.content.tts import build_audio_mime, is_current_audio_mime, synthesize_speech
@@ -205,7 +204,7 @@ class ItemContentService:
                 persona=persona,
                 language=language,
             )
-            return limit_words(strip_citations(content)), "generated"
+            return strip_citations(content), "generated"
         except LLMServiceUnavailableError:
             raise
         except Exception:
@@ -322,7 +321,7 @@ class ItemContentService:
             persona,
             language,
         )
-        text_content = limit_words(strip_citations(adapted))
+        text_content = strip_citations(adapted)
         variant = self.upsert_variant(
             db,
             item=item,
