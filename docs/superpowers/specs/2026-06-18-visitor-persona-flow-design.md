@@ -1,210 +1,210 @@
-# HERA Visitor Persona Flow Design
+# Thiết kế luồng persona cho khách tham quan HERA
 
-## Objective
+## Mục tiêu
 
-Reduce the number of decisions required before a visitor can scan or upload an
-image, while preserving optional content personalization.
+Giảm số quyết định người dùng phải thực hiện trước khi có thể quét hoặc tải ảnh,
+đồng thời vẫn hỗ trợ cá nhân hóa nội dung khi khách có nhu cầu.
 
-After selecting a heritage site, visitors go directly to the existing
-exploration-method page. HERA uses a general-audience persona by default and
-allows the visitor to change persona without introducing a mandatory setup
-screen.
+Sau khi chọn khu di tích, khách được đưa thẳng đến trang chọn phương thức khám
+phá hiện tại. HERA mặc định sử dụng persona dành cho khách phổ thông và cho phép
+đổi persona mà không tạo thêm một bước thiết lập bắt buộc.
 
-The existing visual theme, colors, typography, cards, spacing style, and
-branding remain unchanged. The approved mockup defines information hierarchy
-and navigation flow only.
+Giữ nguyên theme, màu sắc, kiểu chữ, cách trình bày thẻ, khoảng cách và nhận diện
+thương hiệu hiện tại. Mockup đã duyệt chỉ mô tả thứ bậc thông tin và luồng điều
+hướng, không phải đề xuất thay đổi giao diện trực quan.
 
-## Product Decisions
+## Các quyết định sản phẩm
 
-- Remove the mandatory persona-selection page from the visitor journey.
-- Display the default persona to visitors as `Phổ thông` in Vietnamese and
-  `General` in English.
-- Keep the backend persona value `Mặc định` to avoid unnecessary content-cache
-  and database migration.
-- Keep these optional persona choices:
-  - `Phổ thông` / `General` -> backend value `Mặc định`
-  - `Trẻ em / Gia đình` / `Children / Family` -> backend value
+- Bỏ màn hình bắt buộc chọn persona khỏi hành trình của khách.
+- Hiển thị persona mặc định là `Phổ thông` khi dùng tiếng Việt và `General` khi
+  dùng tiếng Anh.
+- Giữ giá trị backend là `Mặc định` để không phải chuyển đổi cơ sở dữ liệu hoặc
+  bộ nhớ đệm nội dung.
+- Các persona tùy chọn gồm:
+  - `Phổ thông` / `General` → giá trị backend `Mặc định`
+  - `Trẻ em / Gia đình` / `Children / Family` → giá trị backend
     `Family Visitor`
-  - `Gen Z` / `Gen Z` -> backend value `Gen Z Explorer`
-- Do not create a separate international-visitor persona. Language controls the
-  output language; persona controls tone, complexity, and storytelling style.
-- Keep language and persona independent. Every persona works in Vietnamese and
-  English.
+  - `Gen Z` / `Gen Z` → giá trị backend `Gen Z Explorer`
+- Không tạo persona riêng cho khách quốc tế. Ngôn ngữ quyết định ngôn ngữ đầu
+  ra; persona quyết định giọng kể, độ phức tạp và phong cách trình bày.
+- Ngôn ngữ và persona hoạt động độc lập. Mọi persona đều dùng được với tiếng
+  Việt và tiếng Anh.
 
-## Visitor Journey
+## Hành trình khách tham quan
 
-The primary visitor flow becomes:
+Luồng chính mới:
 
 ```text
-Choose heritage site
--> initialize a new visit with the General persona
--> open exploration methods
--> scan image, upload image, or choose a tour
--> view item content
+Chọn khu di tích
+→ khởi tạo lượt tham quan mới với persona Phổ thông
+→ mở trang phương thức khám phá
+→ quét ảnh, tải ảnh hoặc chọn tour
+→ xem nội dung hiện vật
 ```
 
-The current group home page no longer asks `Tôi là...` or requires a persona
-before continuing. Selecting a heritage site routes directly to that site's
-existing method page.
+Trang chủ của khu di tích không còn hỏi `Tôi là...` và không yêu cầu chọn
+persona trước khi tiếp tục. Khi chọn một khu di tích, người dùng được chuyển
+thẳng đến trang phương thức khám phá của khu đó.
 
-The method page retains its current three primary choices:
+Trang phương thức tiếp tục giữ ba lựa chọn chính:
 
-- Scan with the camera
-- Upload an existing image
-- Start an exploration tour
+- Quét hiện vật bằng camera
+- Tải ảnh có sẵn
+- Bắt đầu tour khám phá
 
-Persona is secondary to these actions and must not block them.
+Persona là tùy chọn phụ và không được cản trở các thao tác chính này.
 
-## Preference Controls
+## Bộ chọn tùy chỉnh
 
-Add a compact persona selector beside the existing `VI | EN` language selector
-in the upper-right preference area of the exploration-method page.
+Thêm bộ chọn persona dạng gọn bên cạnh bộ chọn ngôn ngữ `VI | EN` ở góc trên
+bên phải của trang phương thức khám phá.
 
-The controls use the current HERA theme and existing compact control styling.
-No new visual theme or design system is introduced.
+Các bộ chọn sử dụng theme và phong cách điều khiển hiện tại của HERA. Không tạo
+theme hoặc hệ thống thiết kế mới.
 
-The persona selector:
+Bộ chọn persona:
 
-- Initially displays `Phổ thông` or `General`.
-- Opens the three persona choices when tapped.
-- Updates the active persona immediately.
-- Uses localized visitor-facing labels while storing stable backend values.
-- Remains optional; a visitor can ignore it and begin exploring immediately.
+- Ban đầu hiển thị `Phổ thông` hoặc `General`.
+- Mở danh sách ba persona khi được chạm vào.
+- Cập nhật persona đang dùng ngay sau khi chọn.
+- Hiển thị nhãn theo ngôn ngữ giao diện nhưng lưu giá trị backend ổn định.
+- Hoàn toàn không bắt buộc; khách có thể bỏ qua và bắt đầu khám phá ngay.
 
-Changing language does not change the selected persona. Changing persona does
-not change the selected language.
+Đổi ngôn ngữ không làm thay đổi persona. Đổi persona không làm thay đổi ngôn
+ngữ.
 
-## Preference Lifetime
+## Thời hạn lưu tùy chọn
 
-Language and persona intentionally have different persistence rules.
+Ngôn ngữ và persona có quy tắc lưu khác nhau.
 
-### Language
+### Ngôn ngữ
 
-Continue storing language in `localStorage`. A visitor using the same browser
-and personal phone can retain their Vietnamese or English preference across
-browser restarts and future visits.
+Tiếp tục lưu ngôn ngữ trong `localStorage`. Khách dùng cùng trình duyệt trên
+điện thoại cá nhân có thể giữ tùy chọn tiếng Việt hoặc tiếng Anh sau khi đóng
+trình duyệt và trong những lần truy cập sau.
 
 ### Persona
 
-Store the active persona in `sessionStorage`, not `localStorage`.
+Lưu persona đang dùng trong `sessionStorage`, không lưu trong `localStorage`.
 
-- It remains available while navigating between the method, scan, upload
-  result, item, and tour pages.
-- It remains available after a page reload in the same tab.
-- It is not treated as a long-term visitor profile.
-- Selecting a heritage site starts a new visit and explicitly resets persona to
-  the General backend value `Mặc định`.
-- If a visitor opens a deep visitor URL without an initialized persona, HERA
-  falls back to `Mặc định`.
+- Persona được giữ khi chuyển giữa trang phương thức, quét ảnh, kết quả tải
+  ảnh, nội dung hiện vật và tour.
+- Persona vẫn được giữ khi tải lại trang trong cùng tab.
+- Persona không được xem là hồ sơ dài hạn của khách.
+- Mỗi lần chọn một khu di tích sẽ bắt đầu lượt tham quan mới và đặt lại persona
+  thành giá trị backend `Mặc định`.
+- Nếu khách mở trực tiếp một trang con mà chưa có persona trong phiên, HERA dùng
+  `Mặc định`.
 
-Browsers may restore tabs after a crash or restart, so `sessionStorage` alone is
-not used as evidence of a returning visitor. The explicit reset when selecting
-a heritage site defines the start of a new visit.
+Trình duyệt có thể khôi phục tab sau sự cố hoặc khởi động lại, vì vậy không dùng
+riêng `sessionStorage` để xác định khách quay lại. Hành động chọn khu di tích là
+mốc rõ ràng bắt đầu một lượt tham quan mới.
 
-## Data Flow
+## Luồng dữ liệu
 
 ```text
-Visitor selects a heritage site
--> write Mặc định to sessionStorage
--> navigate directly to /[groupSlug]/method
--> optional persona change updates sessionStorage
--> scan/upload/tour navigation preserves the same tab session
--> item content and chat read persona from sessionStorage
--> frontend sends stable persona and language values to existing APIs
--> backend selects or generates the matching content variant
+Khách chọn khu di tích
+→ ghi Mặc định vào sessionStorage
+→ chuyển thẳng đến /[groupSlug]/method
+→ nếu đổi persona, cập nhật sessionStorage
+→ các trang quét ảnh, tải ảnh và tour dùng chung phiên của tab
+→ trang hiện vật và chat đọc persona từ sessionStorage
+→ frontend gửi persona và ngôn ngữ ổn định đến API hiện tại
+→ backend chọn hoặc sinh biến thể nội dung tương ứng
 ```
 
-The backend normalization and existing default value remain safeguards when the
-persona value is missing or invalid.
+Việc chuẩn hóa ở backend và giá trị mặc định hiện tại tiếp tục là lớp bảo vệ khi
+persona bị thiếu hoặc không hợp lệ.
 
-## Anonymous Analytics
+## Thống kê ẩn danh
 
-Do not create visitor accounts, persistent profiles, fingerprints, or
-cross-visit histories as part of this work.
+Không tạo tài khoản khách, hồ sơ lâu dài, dấu vân tay thiết bị hoặc lịch sử liên
+kết qua nhiều lượt tham quan trong phạm vi thay đổi này.
 
-Analytics may record anonymous product-usage events such as:
+Hệ thống có thể ghi nhận các sự kiện sử dụng sản phẩm ẩn danh như:
 
-- Heritage site selected
-- Language active at the time of an event
-- Persona active at the time of an event
-- Exploration method selected
-- Item viewed
-- Tour started or completed
+- Khu di tích được chọn
+- Ngôn ngữ đang dùng tại thời điểm phát sinh sự kiện
+- Persona đang dùng tại thời điểm phát sinh sự kiện
+- Phương thức khám phá được chọn
+- Hiện vật được xem
+- Tour được bắt đầu hoặc hoàn thành
 
-Events may use the existing anonymous visit/session identifier for grouping
-actions within the current experience. They must not include a name, email,
-phone number, advertising identifier, or another identifier intended to
-recognize the same person on future visits.
+Các sự kiện có thể dùng mã lượt tham quan hoặc mã phiên ẩn danh hiện tại để nhóm
+các thao tác trong cùng trải nghiệm. Không lưu tên, email, số điện thoại, mã
+quảng cáo hoặc định danh nhằm nhận ra cùng một người trong những lần truy cập
+sau.
 
-## Compatibility and Migration
+## Tương thích và chuyển đổi
 
-Existing browsers may contain `user_persona` in `localStorage` from the current
-implementation. The revised flow must ignore and remove this legacy value so an
-old selection cannot silently become a long-term preference.
+Một số trình duyệt có thể đang lưu `user_persona` trong `localStorage` từ phiên
+bản hiện tại. Luồng mới phải bỏ qua và xóa giá trị cũ này để lựa chọn trước đây
+không vô tình trở thành sở thích dài hạn.
 
-Existing backend content variants remain valid because their stable persona
-values do not change. Only visitor-facing labels and frontend persistence
-behavior change.
+Các biến thể nội dung backend hiện có vẫn hợp lệ vì giá trị persona ổn định
+không thay đổi. Chỉ nhãn hiển thị và cách lưu tùy chọn ở frontend thay đổi.
 
-## Error and Fallback Behavior
+## Xử lý lỗi và phương án dự phòng
 
-- Missing, malformed, or unsupported session persona -> use `Mặc định`.
-- Unavailable `sessionStorage` -> keep `Mặc định` in in-memory state for the
-  current page and continue without blocking exploration.
-- A content request for a missing persona/language variant -> retain the
-  backend's existing generation and fallback behavior.
-- Missing saved language -> continue using the existing Vietnamese default.
-- Preference-control failure must never prevent camera, upload, or tour use.
+- Persona trong phiên bị thiếu, sai định dạng hoặc không được hỗ trợ → dùng
+  `Mặc định`.
+- Không thể sử dụng `sessionStorage` → giữ `Mặc định` trong bộ nhớ của trang
+  hiện tại và không chặn hành trình khám phá.
+- Thiếu biến thể nội dung theo persona/ngôn ngữ → giữ nguyên cơ chế sinh và dự
+  phòng hiện tại của backend.
+- Không có ngôn ngữ đã lưu → tiếp tục dùng tiếng Việt mặc định.
+- Lỗi ở bộ chọn tùy chỉnh không được ngăn khách dùng camera, tải ảnh hoặc tour.
 
-## Testing Strategy
+## Chiến lược kiểm thử
 
-### Frontend automated tests
+### Kiểm thử tự động frontend
 
-- Selecting a heritage site routes directly to `/<groupSlug>/method`.
-- A new heritage-site selection resets persona to `Mặc định`.
-- The removed page no longer requires a persona choice.
-- The method page renders language and persona controls using localized labels.
-- Default visitor-facing persona is `Phổ thông` in Vietnamese and `General` in
-  English.
-- Persona changes are written to `sessionStorage`.
-- Persona remains active across visitor-page navigation and reload.
-- Persona is not written to `localStorage`.
-- A legacy `localStorage.user_persona` value is removed and ignored.
-- Missing or invalid session persona falls back to `Mặc định`.
-- Language changes preserve persona, and persona changes preserve language.
-- Item content and chat APIs receive the resolved persona and language.
+- Chọn khu di tích sẽ chuyển thẳng đến `/<groupSlug>/method`.
+- Mỗi lần chọn khu di tích sẽ đặt lại persona thành `Mặc định`.
+- Không còn màn hình bắt buộc chọn persona.
+- Trang phương thức hiển thị bộ chọn ngôn ngữ và persona với nhãn đã bản địa
+  hóa.
+- Persona mặc định hiển thị là `Phổ thông` trong tiếng Việt và `General` trong
+  tiếng Anh.
+- Thay đổi persona được ghi vào `sessionStorage`.
+- Persona được giữ khi chuyển trang và tải lại trang trong cùng phiên.
+- Persona không được ghi vào `localStorage`.
+- Giá trị cũ `localStorage.user_persona` được xóa và bỏ qua.
+- Persona thiếu hoặc không hợp lệ sẽ trở về `Mặc định`.
+- Đổi ngôn ngữ giữ nguyên persona và đổi persona giữ nguyên ngôn ngữ.
+- API nội dung hiện vật và chat nhận đúng persona cùng ngôn ngữ đã chọn.
 
-### Backend regression tests
+### Kiểm thử hồi quy backend
 
-- Existing persona values and normalization continue to work.
-- `Mặc định` remains the API default.
-- All three personas remain available in Vietnamese and English.
-- No new `International Visitor` backend persona is introduced.
+- Các giá trị persona và cơ chế chuẩn hóa hiện tại tiếp tục hoạt động.
+- `Mặc định` tiếp tục là giá trị mặc định của API.
+- Cả ba persona tiếp tục dùng được với tiếng Việt và tiếng Anh.
+- Không tạo persona backend mới dành riêng cho khách quốc tế.
 
-### Manual verification
+### Kiểm tra thủ công
 
-- Confirm the current theme is visually unchanged.
-- Choose a heritage site and confirm the method page opens immediately.
-- Begin scanning without touching persona and confirm General content is used.
-- Change persona, scan or upload an item, and confirm the selected style is
-  used for item content and chat.
-- Switch between Vietnamese and English and confirm persona remains unchanged.
-- Close the visit, select a heritage site again, and confirm persona resets to
-  General.
-- Confirm anonymous analytics contain product events without personal
-  identifiers.
+- Xác nhận theme hiện tại không thay đổi về mặt trực quan.
+- Chọn khu di tích và xác nhận trang phương thức mở ngay.
+- Quét ảnh mà không chạm vào persona và xác nhận nội dung Phổ thông được dùng.
+- Đổi persona, quét hoặc tải ảnh và xác nhận nội dung hiện vật cùng chat sử dụng
+  đúng phong cách đã chọn.
+- Chuyển giữa tiếng Việt và tiếng Anh, xác nhận persona không thay đổi.
+- Bắt đầu lượt tham quan mới bằng cách chọn lại khu di tích và xác nhận persona
+  trở về Phổ thông.
+- Xác nhận dữ liệu thống kê chỉ chứa sự kiện sản phẩm, không có định danh cá
+  nhân.
 
-## Acceptance Criteria
+## Tiêu chí nghiệm thu
 
-- Persona selection is no longer a mandatory visitor step.
-- Selecting a heritage site opens the exploration-method page directly.
-- General-audience content is used when the visitor makes no persona choice.
-- A compact optional persona selector appears beside the language selector.
-- The existing HERA visual theme remains unchanged.
-- Persona persists only for the active visit and resets on a new heritage-site
-  selection.
-- Language retains its existing long-term browser preference behavior.
-- No persistent per-person visitor history is created.
-- Analytics remain anonymous and may include language, persona, method, and
-  item-view events.
-- Existing backend persona variants and content caches remain compatible.
+- Persona không còn là bước bắt buộc trong hành trình của khách.
+- Chọn khu di tích sẽ mở thẳng trang phương thức khám phá.
+- Nội dung Phổ thông được dùng khi khách không chọn persona.
+- Bộ chọn persona gọn được đặt cạnh bộ chọn ngôn ngữ.
+- Theme trực quan hiện tại của HERA được giữ nguyên.
+- Persona chỉ được giữ trong lượt tham quan hiện tại và đặt lại khi chọn khu di
+  tích cho lượt mới.
+- Ngôn ngữ tiếp tục được ghi nhớ lâu dài trên trình duyệt như hiện tại.
+- Không tạo lịch sử lâu dài theo từng cá nhân.
+- Thống kê ẩn danh có thể ghi nhận ngôn ngữ, persona, phương thức và lượt xem
+  hiện vật.
+- Các biến thể persona và bộ nhớ đệm nội dung backend hiện có vẫn tương thích.
