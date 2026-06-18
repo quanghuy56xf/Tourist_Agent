@@ -109,18 +109,31 @@ export default function TourDetailPage() {
         })}
       </div>
 
-      <div className="px-4">
+      <div className="px-4 space-y-2">
         {finished ? (
           <button
             type="button"
             onClick={() => router.push(groupPath(groupSlug, `/tour/${tourId}/complete`))}
-            className="artifact-btn-primary mb-3 w-full"
+            className="artifact-btn-primary w-full"
           >
             ✦ {t.tour.completeTitle}
           </button>
         ) : null}
         <button type="button" onClick={handleStart} className="artifact-btn-primary w-full">
           {actionLabel} →
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push(`${groupPath(groupSlug, "/tour-match")}?tour=${tourId}`)}
+          className="artifact-btn-primary w-full flex items-center justify-center gap-2 font-bold py-3.5 text-xs active:scale-95"
+          style={{
+            background: "rgba(201, 168, 76, 0.12)",
+            border: "1px solid var(--primary)",
+            color: "var(--primary)",
+            minHeight: "0px",
+          }}
+        >
+          ⚔ Thi Đấu Tour Này (Tạo Room)
         </button>
       </div>
     </div>
