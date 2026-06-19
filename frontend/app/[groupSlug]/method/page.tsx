@@ -63,17 +63,22 @@ export default function MethodSelectionPage() {
 
   return (
     <div className="artifact-shell">
-      <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="mb-6 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <HomeButton />
-            <BackButton onClick={() => router.push("/")} label={t.common.back} />
+      <header className="artifact-page-head">
+        <div className="mb-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <HomeButton />
+              <BackButton onClick={() => router.push("/")} label={t.common.back} />
+            </div>
+            <div className="flex items-center gap-2">
+              <LanguageSelector compact />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <LanguageSelector compact />
-            <PersonaSelector compact />
+          <div className="w-full pt-1">
+            <PersonaSelector />
           </div>
         </div>
+
         <div className="mb-1 flex items-center gap-3">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg"
