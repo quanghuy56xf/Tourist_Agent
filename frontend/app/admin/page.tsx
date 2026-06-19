@@ -11,7 +11,7 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "@/components/admin/ui";
-import { setActiveGroup } from "@/lib/activeGroup";
+import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 import {
   createGroup,
   createManagerUser,
@@ -71,6 +71,7 @@ function GroupCheckboxList({
 }
 
 export default function AdminHomePage() {
+  const { setActiveGroup } = useAdminGroup();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [managers, setManagers] = useState<ManagerUser[]>([]);
   const [newGroupName, setNewGroupName] = useState("");

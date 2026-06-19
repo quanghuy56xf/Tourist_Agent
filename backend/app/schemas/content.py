@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -8,6 +9,7 @@ class ItemContentResponse(BaseModel):
     content: str
     has_audio: bool
     audio_url: str | None = None
+    audio_status: Literal["pending", "ready", "failed"] = "pending"
     stored: bool
     source: str
 

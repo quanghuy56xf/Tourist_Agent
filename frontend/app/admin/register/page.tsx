@@ -15,7 +15,7 @@ import {
   AdminTextarea,
   alertClass,
 } from "@/components/admin/ui";
-import { ActiveGroup, getActiveGroup } from "@/lib/activeGroup";
+import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 import { bulkRegisterItem, listGroupDocuments, registerObject } from "@/lib/api";
 import { groupBulkFiles, parseDescriptionMap } from "@/lib/bulkRegistration";
 import { compressImage } from "@/lib/imageCompress";
@@ -45,7 +45,7 @@ const STATUS_STYLES: Record<BulkStatus, string> = {
 };
 
 export default function RegisterPage() {
-  const [activeGroup, setActiveGroupState] = useState<ActiveGroup | null>(null);
+  const { activeGroup } = useAdminGroup();
   const [mode, setMode] = useState<RegisterMode>("single");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -59,18 +59,7 @@ export default function RegisterPage() {
   const [skipExisting, setSkipExisting] = useState(false);
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
 
-  const refreshActiveGroup = useCallback(() => setActiveGroupState(getActiveGroup()), []);
 
-  useEffect(() => {
-    refreshActiveGroup();
-    const onChange = () => refreshActiveGroup();
-    window.addEventListener("active-group-changed", onChange);
-    window.addEventListener("focus", onChange);
-    return () => {
-      window.removeEventListener("active-group-changed", onChange);
-      window.removeEventListener("focus", onChange);
-    };
-  }, [refreshActiveGroup]);
 
   useEffect(() => {
     if (!activeGroup) {

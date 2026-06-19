@@ -42,3 +42,10 @@ class GroupItemsResponse(BaseModel):
 
 class UngroupedItemsResponse(BaseModel):
     items: list[GroupItemResponse]
+
+
+class GroupSyncStatusResponse(BaseModel):
+    total_items: int
+    synced_items: int
+    is_fully_synced: bool
+

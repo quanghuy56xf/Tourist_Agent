@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AdminSession,
   canAccessGroup,
@@ -10,13 +10,8 @@ import {
   defaultAdminPath,
   getAdminSession,
 } from "@/lib/adminAuth";
-import {
-  ActiveGroup,
-  clearActiveGroup,
-  getActiveGroup,
-  setActiveGroup,
-} from "@/lib/activeGroup";
 import { GroupSummary, listGroups } from "@/lib/api";
+import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Quản lý tài khoản", adminOnly: true },
@@ -42,7 +37,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const [session, setSession] = useState<AdminSession | null>(null);
   const [groups, setGroups] = useState<GroupSummary[]>([]);
-  const [activeGroup, setActiveGroupState] = useState<ActiveGroup | null>(null);
+  const { activeGroup, setActiveGroup } = useAdminGroup();
   const [groupsLoading, setGroupsLoading] = useState(true);
 
   const navItems = useMemo(() => {
@@ -64,46 +59,44 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener("admin-auth-changed", onAuthChange);
   }, []);
 
-  const syncActiveGroup = useCallback((data: GroupSummary[]) => {
-    const stored = getActiveGroup();
-    if (!stored) {
-      setActiveGroupState(null);
-      return;
-    }
-    const found = data.find((g) => g.id === stored.id);
-    const session = getAdminSession();
-    if (found && (!session || session.role === "admin" || canAccessGroup(session, found.id))) {
-      const synced = { id: found.id, name: found.name };
-      setActiveGroup(synced);
-      setActiveGroupState(synced);
-    } else {
-      clearActiveGroup();
-      setActiveGroupState(null);
-    }
-  }, []);
+  const activeGroupRef = useRef(activeGroup);
+  useEffect(() => {
+    activeGroupRef.current = activeGroup;
+  }, [activeGroup]);
 
   const loadGroups = useCallback(async () => {
     setGroupsLoading(true);
     try {
       const data = await listGroups();
       setGroups(data);
-      syncActiveGroup(data);
+      
+      const stored = activeGroupRef.current;
+      if (!stored) {
+        setActiveGroup(null);
+      } else {
+        const found = data.find((g) => g.id === stored.id);
+        const session = getAdminSession();
+        if (found && (!session || session.role === "admin" || canAccessGroup(session, found.id))) {
+          if (stored.name !== found.name) {
+            setActiveGroup({ id: found.id, name: found.name });
+          }
+        } else {
+          setActiveGroup(null);
+        }
+      }
     } catch {
       setGroups([]);
     } finally {
       setGroupsLoading(false);
     }
-  }, [syncActiveGroup]);
+  }, [setActiveGroup]);
 
   useEffect(() => {
     loadGroups();
     const onGroupsChanged = () => loadGroups();
-    const onActiveChanged = () => setActiveGroupState(getActiveGroup());
     window.addEventListener("groups-changed", onGroupsChanged);
-    window.addEventListener("active-group-changed", onActiveChanged);
     return () => {
       window.removeEventListener("groups-changed", onGroupsChanged);
-      window.removeEventListener("active-group-changed", onActiveChanged);
     };
   }, [loadGroups]);
 
@@ -113,8 +106,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const handleGroupChange = (value: string) => {
     if (!value) {
-      clearActiveGroup();
-      setActiveGroupState(null);
+      setActiveGroup(null);
       return;
     }
     const groupId = Number(value);
@@ -122,7 +114,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     if (!group) return;
     const next = { id: group.id, name: group.name };
     setActiveGroup(next);
-    setActiveGroupState(next);
   };
 
   const handleLogout = () => {

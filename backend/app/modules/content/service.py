@@ -39,6 +39,7 @@ class ItemContentResult:
     content: str
     has_audio: bool
     audio_url: str | None
+    audio_status: str
     stored: bool
     source: str
 
@@ -101,7 +102,8 @@ class ItemContentService:
         )
         if variant is None:
             return None
-        expected_hash = compute_content_hash(item.description, source=variant.source)
+        group_knowledge_version = item.group.knowledge_version if item.group else 0
+        expected_hash = compute_content_hash(item.description, group_knowledge_version=group_knowledge_version, source=variant.source)
         if variant.content_hash != expected_hash:
             return None
         return variant
@@ -121,7 +123,8 @@ class ItemContentService:
     ) -> ItemContentVariant:
         persona = normalize_persona(persona)
         language = normalize_language(language)
-        content_hash = compute_content_hash(item.description, source=source)
+        group_knowledge_version = item.group.knowledge_version if item.group else 0
+        content_hash = compute_content_hash(item.description, group_knowledge_version=group_knowledge_version, source=source)
 
         def _load_variant() -> ItemContentVariant | None:
             return (
@@ -312,6 +315,7 @@ class ItemContentService:
                 content=result.content,
                 has_audio=False,
                 audio_url=None,
+                audio_status="failed",
                 stored=result.stored,
                 source=result.source,
             )
@@ -503,6 +507,7 @@ class ItemContentService:
                 if has_audio and text_content.strip()
                 else None
             ),
+            audio_status="ready" if has_audio else "pending",
             stored=stored,
             source=source,
         )
