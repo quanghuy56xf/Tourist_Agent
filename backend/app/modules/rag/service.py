@@ -188,7 +188,7 @@ def build_verified_item_context(
     verified_docs: list[Document] = []
     if has_substantive_description and all_docs:
         verified_docs.append(all_docs[0])
-        verified_docs.extend(_group_documents(all_docs))
+        verified_docs.extend(relevant_group_docs)
     else:
         verified_docs.extend(relevant_group_docs)
     return verified_docs, has_verified_knowledge

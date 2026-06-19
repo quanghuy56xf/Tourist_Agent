@@ -59,7 +59,12 @@ def list_public_groups(db: Session = Depends(get_db)):
 
 @router.get("/discover", response_model=list[GroupResponse])
 def list_discoverable_groups(db: Session = Depends(get_db)):
-    rows = _group_rows_query(db).order_by(Group.name.asc()).all()
+    rows = (
+        _group_rows_query(db)
+        .filter(Group.is_public.is_(True))
+        .order_by(Group.name.asc())
+        .all()
+    )
     return _to_group_responses(rows)
 
 

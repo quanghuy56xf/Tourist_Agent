@@ -176,6 +176,25 @@ export async function registerObject(
   return res.json();
 }
 
+export interface BulkRegisterItemResponse {
+  status: "success" | "skipped";
+  item_id: number | null;
+  message: string;
+}
+
+export async function bulkRegisterItem(
+  formData: FormData
+): Promise<BulkRegisterItemResponse> {
+  const res = await fetch(`${API_URL}/api/objects/bulk-register-item`, {
+    method: "POST",
+    body: formData,
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Đăng ký hàng loạt thất bại"));
+  }
+  return res.json();
+}
 export async function searchObject(
   image: Blob,
   tracking?: SearchTrackingContext

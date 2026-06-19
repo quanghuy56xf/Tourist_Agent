@@ -21,6 +21,7 @@ from app.modules.objects.groups import get_group_or_404
 from app.modules.objects.item_images import VALID_ANGLES, ingest_image
 from app.modules.objects.items import item_to_response
 from app.modules.content.prewarm import invalidate_and_prewarm_item_content
+from app.modules.content.service import get_item_content_service
 from app.modules.rag.retriever import try_get_rag_retriever
 
 router = APIRouter(prefix="/api/objects", tags=["objects"])
@@ -162,6 +163,8 @@ async def update_item_image(
         item.main_image_url = image_url
         db.commit()
 
+    get_item_content_service().delete_all_variants(db)
+
     return ImageUpdateResponse(
         item_id=item_id,
         angle=angle,
@@ -191,4 +194,5 @@ def delete_item_image(
         raise HTTPException(status_code=404, detail="Ảnh không tồn tại")
 
     chroma.delete_embedding(item_id, angle)
+    get_item_content_service().delete_all_variants(db)
     return ImageDeleteResponse(item_id=item_id, angle=angle, message="success")

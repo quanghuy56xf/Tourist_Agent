@@ -31,7 +31,7 @@ def test_manual_content_hash_ignores_group_knowledge_version():
     assert first == second
 
 
-def test_create_document_invalidates_only_related_item_content_variants(
+def test_create_document_invalidates_all_item_content_variants(
     client,
     db_session,
     monkeypatch,
@@ -95,4 +95,60 @@ def test_create_document_invalidates_only_related_item_content_variants(
         "Tiếng Việt",
     )
     assert related_variant is None
-    assert unrelated_variant is not None
+    assert unrelated_variant is None
+
+
+def test_title_only_document_update_invalidates_all_content_variants(
+    client,
+    db_session,
+    monkeypatch,
+):
+    from app.models.content_variant import ItemContentVariant
+
+    group = Group(name="Title update group", knowledge_version=1)
+    db_session.add(group)
+    db_session.flush()
+    first = Item(name="First", description="Description", group_id=group.id)
+    second = Item(name="Second", description="Description", group_id=group.id)
+    db_session.add_all([first, second])
+    db_session.commit()
+
+    retriever = Mock()
+    retriever.upsert_group_document = Mock()
+    retriever.retrieve = Mock(return_value=[])
+    monkeypatch.setattr(
+        "app.modules.rag.group_documents.try_get_rag_retriever",
+        lambda: retriever,
+    )
+    monkeypatch.setattr(
+        "app.modules.rag.group_documents_router.regenerate_related_items_task",
+        lambda *args, **kwargs: None,
+    )
+
+    created = client.post(
+        f"/api/groups/{group.id}/documents",
+        data={"title": "Original", "text": "Reference content."},
+    )
+    assert created.status_code == 201
+
+    for item in (first, second):
+        db_session.add(
+            ItemContentVariant(
+                item_id=item.id,
+                persona="Mặc định",
+                language="Tiếng Việt",
+                text_content="Cached.",
+                content_hash=compute_content_hash(item.description),
+                status="ready",
+                source="generated",
+            )
+        )
+    db_session.commit()
+
+    response = client.put(
+        f"/api/groups/{group.id}/documents/{created.json()['id']}",
+        data={"title": "Renamed"},
+    )
+
+    assert response.status_code == 200
+    assert db_session.query(ItemContentVariant).count() == 0

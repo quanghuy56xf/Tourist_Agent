@@ -113,6 +113,7 @@ class GroupDocumentService:
         if text is None and upload is None:
             db.commit()
             db.refresh(document)
+            invalidate_item_content_for_group(db, group_id, document_ids=[document.id])
             return document
 
         group = get_group_or_404(db, group_id)

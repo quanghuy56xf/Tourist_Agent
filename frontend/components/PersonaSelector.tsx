@@ -52,7 +52,7 @@ export default function PersonaSelector({
               key={option.value}
               type="button"
               onClick={() => setPersona(option.value)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 px-1 text-xs sm:text-sm font-semibold transition-all duration-300 ${
+              className={`flex flex-1 items-center justify-center gap-1 sm:gap-1.5 rounded-full py-1.5 px-0.5 sm:px-1 text-[10px] sm:text-sm font-semibold transition-all duration-300 ${
                 isSelected
                   ? "bg-artifact-gold text-artifact-bg shadow-[0_0_12px_rgba(201,168,76,0.5)] scale-100 z-10"
                   : "text-artifact-gold/60 hover:text-artifact-gold hover:bg-artifact-gold/10 scale-95"
@@ -60,8 +60,7 @@ export default function PersonaSelector({
               aria-pressed={isSelected}
             >
               {option.icon}
-              <span className="truncate hidden sm:inline-block">{option.label}</span>
-              <span className="truncate sm:hidden max-w-[60px]">{option.label.split(" ")[0]}</span>
+              <span className="truncate max-w-[90px] sm:max-w-none">{option.label}</span>
             </button>
           );
         })}

@@ -251,5 +251,30 @@ def test_chat_context_includes_query_aligned_docs_without_item_name():
         query="còn thông tin nào thú vị nữa",
         top_k=8,
     )
-    assert len(verified_docs) == 3
-    assert "Quốc Tử Giám từng là trường đại học" in verified_docs[2].page_content
+    assert len(verified_docs) == 2
+    assert verified_docs[1].metadata["page"] == "kb-1"
+
+
+def test_verified_context_excludes_unrelated_group_docs_with_substantive_description():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Đại Thành Môn dẫn vào khu thờ Khổng Tử.",
+            metadata={"source": "group_doc", "page": "kb-dai-thanh"},
+        ),
+        Document(
+            page_content="Khuê Văn Các là biểu tượng của Hà Nội.",
+            metadata={"source": "group_doc", "page": "kb-khue-van"},
+        ),
+    ]
+
+    docs, has_verified = build_verified_item_context(
+        item_id=13,
+        item_name="Đại Thành Môn",
+        item_description="Đại Thành Môn là cổng dẫn vào khu vực thờ Khổng Tử và các bậc hiền triết.",
+        retriever=retriever,
+        group_id=2,
+    )
+
+    assert has_verified is True
+    assert [doc.metadata["page"] for doc in docs] == ["item-13", "kb-dai-thanh"]

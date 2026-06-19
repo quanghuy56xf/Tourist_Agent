@@ -42,7 +42,7 @@ export default function GroupRouteGuard({ children }: { children: React.ReactNod
 
   if (!ready) {
     return (
-      <div className="artifact-shell flex min-h-screen items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}

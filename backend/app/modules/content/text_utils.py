@@ -1,6 +1,6 @@
 import re
 
-GENERATION_RULES_VERSION = "llm-output-limit-v2"
+GENERATION_RULES_VERSION = "llm-complete-rag-filter-v3"
 
 # [Trang 5], [Page 12], [Mục Giới thiệu]
 _CITATION_PATTERN = re.compile(

@@ -134,7 +134,7 @@ export default function TourMatchLobbyPage() {
   };
 
   return (
-    <div className="artifact-shell min-h-screen pb-8">
+    <main className="flex flex-1 flex-col w-full pb-8">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
@@ -378,6 +378,6 @@ export default function TourMatchLobbyPage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

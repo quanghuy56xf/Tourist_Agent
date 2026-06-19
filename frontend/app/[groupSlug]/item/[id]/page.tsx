@@ -181,7 +181,7 @@ export default function ItemDetailPage() {
 
   if (loadingItem) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
@@ -192,7 +192,7 @@ export default function ItemDetailPage() {
 
   if (error || !item) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-6">
+      <div className="flex flex-1 min-h-[100dvh] flex-col items-center justify-center p-6">
         <p className="mb-4" style={{ color: "var(--primary)" }}>
           {error || t.item.notFound}
         </p>
@@ -205,7 +205,7 @@ export default function ItemDetailPage() {
   const slideshowImages = getItemImageUrls(item);
 
   return (
-    <div className="artifact-shell flex min-h-screen flex-col overflow-hidden pb-24">
+    <main className="flex flex-1 flex-col w-full overflow-hidden pb-24">
       <div className="relative h-44 shrink-0 overflow-hidden">
         <ItemHeroSlideshow
           images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
@@ -380,6 +380,6 @@ export default function ItemDetailPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

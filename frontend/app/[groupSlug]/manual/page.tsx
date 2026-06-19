@@ -32,7 +32,7 @@ export default function ManualSelectionPage() {
   }, []);
 
   return (
-    <div className="artifact-shell min-h-screen">
+    <main className="flex flex-1 flex-col w-full">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
@@ -88,6 +88,6 @@ export default function ManualSelectionPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

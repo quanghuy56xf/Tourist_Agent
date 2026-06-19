@@ -147,7 +147,7 @@ export default function TourPlayPage() {
 
   if (loading || !tour || !currentStop) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
@@ -161,7 +161,7 @@ export default function TourPlayPage() {
     .replace("{total}", String(tour.stops.length));
 
   return (
-    <div className="artifact-shell min-h-screen">
+    <main className="flex flex-1 flex-col w-full">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -226,6 +226,6 @@ export default function TourPlayPage() {
           )}
         </button>
       </div>
-    </div>
+    </main>
   );
 }

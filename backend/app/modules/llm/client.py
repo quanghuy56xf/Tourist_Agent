@@ -80,3 +80,21 @@ def extract_text_content(content: Any) -> str:
     if not text:
         raise ValueError("LLM returned empty text content")
     return text
+
+
+def extract_complete_text(response: Any) -> str:
+    """Extract text and reject provider- or syntax-truncated generations."""
+    metadata = getattr(response, "response_metadata", None) or {}
+    finish_reason = str(
+        metadata.get("finish_reason")
+        or metadata.get("finishReason")
+        or ""
+    ).upper()
+    if finish_reason in {"MAX_TOKENS", "LENGTH", "TOKEN_LIMIT"}:
+        raise ValueError("LLM returned incomplete text content")
+
+    text = extract_text_content(getattr(response, "content", None))
+    terminal_text = text.rstrip("\"')]} ")
+    if terminal_text and terminal_text[-1] not in ".?!":
+        raise ValueError("LLM returned incomplete text content")
+    return text

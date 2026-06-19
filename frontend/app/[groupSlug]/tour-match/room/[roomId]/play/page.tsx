@@ -316,7 +316,7 @@ export default function TourMatchPlayPage() {
 
   if (errorMsg && !room) {
     return (
-      <div className="artifact-shell min-h-screen flex flex-col justify-center items-center p-6 text-center">
+      <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-xs">
           <span className="text-4xl">⚠️</span>
           <h2 className="text-md font-bold text-red-400">Không thể kết nối</h2>
@@ -333,7 +333,7 @@ export default function TourMatchPlayPage() {
 
   if (loading || !tour || !room) {
     return (
-      <div className="artifact-shell min-h-screen flex items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center w-full">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
@@ -360,7 +360,7 @@ export default function TourMatchPlayPage() {
   });
 
   return (
-    <div className="artifact-shell min-h-screen flex flex-col relative overflow-hidden">
+    <main className="flex flex-1 flex-col w-full relative overflow-hidden">
       
       {/* Background grain aesthetic */}
       <div className="artifact-grain" />
@@ -707,6 +707,6 @@ export default function TourMatchPlayPage() {
           animation: scaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
       `}</style>
-    </div>
+    </main>
   );
 }

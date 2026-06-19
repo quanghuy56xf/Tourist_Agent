@@ -7,13 +7,14 @@ from app.core import storage
 from app.core.database import get_db
 from app.modules.auth.dependencies import require_admin_if_enabled
 from app.modules.auth.service import ensure_group_access
+from app.models.content_variant import ItemContentVariant
 from app.models.group import Group
 from app.models.item import Item
 from app.modules.objects.item_images import ingest_image
 from app.modules.content.prewarm import prewarm_item_content
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.modules.vision import chroma
-from app.schemas.register import RegisterResponse
+from app.schemas.register import BulkRegisterResponse, RegisterResponse
 
 router = APIRouter(prefix="/api/objects", tags=["objects"])
 logger = logging.getLogger(__name__)
@@ -41,6 +42,105 @@ def _resolve_group_id(
 
     return None
 
+@router.post("/bulk-register-item", response_model=BulkRegisterResponse)
+async def bulk_register_item(
+    background_tasks: BackgroundTasks,
+    name: str = Form(...),
+    description: str = Form(...),
+    group_id: int = Form(...),
+    images: list[UploadFile] = File(...),
+    skip_existing: bool = Form(False),
+    dry_run: bool = Form(False),
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    normalized_name = name.strip()
+    normalized_description = description.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="Tên hiện vật không được để trống")
+    if not normalized_description:
+        raise HTTPException(status_code=400, detail="Mô tả không được để trống")
+    if not images or not any(image.filename for image in images):
+        raise HTTPException(status_code=400, detail="Cần ít nhất một ảnh")
+
+    resolved_group_id = _resolve_group_id(db, group_id, None)
+    ensure_group_access(staff, resolved_group_id)
+
+    if skip_existing:
+        existing = (
+            db.query(Item)
+            .filter(
+                Item.group_id == resolved_group_id,
+                Item.name == normalized_name,
+            )
+            .first()
+        )
+        if existing is not None:
+            return BulkRegisterResponse(
+                status="skipped",
+                item_id=existing.id,
+                message="already_exists",
+            )
+
+    if dry_run:
+        return BulkRegisterResponse(status="success", message="dry_run")
+
+    item = Item(
+        name=normalized_name,
+        description=normalized_description,
+        group_id=resolved_group_id,
+    )
+    valid_images = [image for image in images if image.filename]
+
+    try:
+        db.add(item)
+        db.flush()
+
+        storage.delete_item_dir(item.id)
+        chroma.delete_embeddings_for_item(item.id)
+        db.query(ItemContentVariant).filter(
+            ItemContentVariant.item_id == item.id
+        ).delete(synchronize_session=False)
+
+        stored_angles = ("front", "side", "back")
+        for index, upload_file in enumerate(valid_images):
+            save_to_db = index < len(stored_angles)
+            angle = (
+                stored_angles[index]
+                if save_to_db
+                else f"extra_{index - len(stored_angles) + 1}"
+            )
+            image_url = await ingest_image(
+                item.id,
+                angle,
+                upload_file,
+                save_to_db=save_to_db,
+            )
+            if angle == "front":
+                item.main_image_url = image_url
+
+        db.commit()
+        db.refresh(item)
+    except Exception:
+        db.rollback()
+        if item.id is not None:
+            storage.delete_item_dir(item.id)
+            chroma.delete_embeddings_for_item(item.id)
+        raise
+
+    try:
+        retriever = try_get_rag_retriever()
+        if retriever is not None:
+            retriever.upsert_item_document(item.id, item.description)
+    except Exception as exc:
+        logger.warning("Failed to sync bulk registered item to RAG: %s", exc)
+
+    background_tasks.add_task(prewarm_item_content, item.id)
+    return BulkRegisterResponse(
+        status="success",
+        item_id=item.id,
+        message="success",
+    )
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_object(
@@ -92,6 +192,9 @@ async def register_object(
         # Remove artifacts left behind if SQLite reuses an item ID.
         storage.delete_item_dir(item.id)
         chroma.delete_embeddings_for_item(item.id)
+        db.query(ItemContentVariant).filter(
+            ItemContentVariant.item_id == item.id
+        ).delete(synchronize_session=False)
 
         image_pairs: list[tuple[UploadFile, str]] = [(main_image, "front")]
         if side_image and side_image.filename:

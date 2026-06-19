@@ -32,6 +32,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-lato), Lato, system-ui, sans-serif;
+  scrollbar-gutter: stable;
 }
 
 .font-display {
@@ -48,7 +49,7 @@ html[lang="en"] .font-display {
 
 @layer components {
   .artifact-shell {
-    @apply mx-auto box-border flex min-h-screen w-full max-w-phone flex-col overflow-x-hidden;
+    @apply mx-auto box-border flex min-h-[100dvh] w-full max-w-phone flex-col overflow-x-hidden;
   }
 
   .artifact-shell-pad {

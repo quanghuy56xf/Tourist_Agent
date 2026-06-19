@@ -13,7 +13,7 @@ from app.core.config import (
     LLM_PROVIDER,
     LLM_TIMEOUT_SECONDS,
 )
-from app.modules.llm.client import extract_text_content, invoke_llm
+from app.modules.llm.client import extract_complete_text, invoke_llm
 
 
 def _build_llm(model_name: str | None, temperature: float):
@@ -102,7 +102,7 @@ Câu hỏi về hiện vật cần tìm hiểu:
 Câu trả lời:"""
 
         response = invoke_llm(self.llm, prompt)
-        return extract_text_content(response.content)
+        return extract_complete_text(response)
 
     def adapt_content(
         self,
@@ -147,7 +147,7 @@ Nội dung gốc:
 Mô tả đã viết lại:"""
 
         response = invoke_llm(self.llm, prompt)
-        return extract_text_content(response.content)
+        return extract_complete_text(response)
 
     def generate_chat(self, message: str, history: List[dict], retrieved_docs: List[Document], persona: str = "Mặc định", language: str = "Tiếng Việt") -> str:
         context = self._format_context(retrieved_docs) if retrieved_docs else "Không có ngữ cảnh bổ sung."
@@ -195,7 +195,7 @@ Tài liệu được cung cấp (Context):
         messages.append(HumanMessage(content=message))
 
         response = invoke_llm(self.llm, messages)
-        return extract_text_content(response.content)
+        return extract_complete_text(response)
 
 
 # Singleton instance
