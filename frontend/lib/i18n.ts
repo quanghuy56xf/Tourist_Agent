@@ -64,8 +64,8 @@ const vi = {
     itemCount: "hiện vật",
   },
   method: {
-    titleLine1: "Bạn muốn tìm hiểu",
-    titleLine2: "bằng cách nào?",
+    titleLine1: "Chọn cách bắt đầu",
+    titleLine2: "khám phá",
     subtitle:
       "Hãy chọn một phương thức bên dưới để bắt đầu khám phá di tích.",
     cameraTitle: "Chụp ảnh trực tiếp",
