@@ -11,13 +11,13 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "@/components/admin/ui";
-import { ActiveGroup, getActiveGroup } from "@/lib/activeGroup";
+import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 import { getAdminSession } from "@/lib/adminAuth";
 import { GroupSummary, listGroups, updateGroupVisibility } from "@/lib/api";
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
-  const [activeGroup, setActiveGroupState] = useState<ActiveGroup | null>(null);
+  const { activeGroup, setActiveGroup } = useAdminGroup();
   const [refreshToken, setRefreshToken] = useState(0);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
@@ -29,32 +29,26 @@ export default function GroupsPage() {
     try {
       const data = await listGroups();
       setGroups(data);
-      const stored = getActiveGroup();
+      const stored = activeGroup;
       if (!stored) {
-        setActiveGroupState(null);
+        setActiveGroup(null);
         return;
       }
       const found = data.find((g) => g.id === stored.id);
-      setActiveGroupState(found ? { id: found.id, name: found.name } : null);
+      if (found && (found.id !== stored.id || found.name !== stored.name)) {
+        setActiveGroup({ id: found.id, name: found.name });
+      }
     } catch {
       /* header handles errors */
     }
-  }, []);
+  }, [activeGroup, setActiveGroup]);
 
   useEffect(() => {
-    setActiveGroupState(getActiveGroup());
     loadGroups();
 
-    const onActiveChanged = () => {
-      setActiveGroupState(getActiveGroup());
-      setRefreshToken((v) => v + 1);
-    };
     const onGroupsChanged = () => loadGroups();
-
-    window.addEventListener("active-group-changed", onActiveChanged);
     window.addEventListener("groups-changed", onGroupsChanged);
     return () => {
-      window.removeEventListener("active-group-changed", onActiveChanged);
       window.removeEventListener("groups-changed", onGroupsChanged);
     };
   }, [loadGroups]);

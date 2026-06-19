@@ -18,10 +18,12 @@ import {
   isEditableContentVariant,
   resolveImageUrl,
   updateItem,
-  updateItemContent,
   updateItemImage,
+  getGroupSyncStatus,
+  forceSyncGroup,
+  GroupSyncStatusResponse,
 } from "@/lib/api";
-import { getActiveGroup, setActiveGroup } from "@/lib/activeGroup";
+import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 import { compressImage } from "@/lib/imageCompress";
 
 type BrowseFilter = number | "ungrouped" | null;
@@ -43,6 +45,7 @@ export default function ItemsManagementPanel({
   fixedGroupId,
   hideGroupSelector = false,
 }: ItemsManagementPanelProps) {
+  const { activeGroup, setActiveGroup } = useAdminGroup();
   const [browseFilter, setBrowseFilter] = useState<BrowseFilter>(null);
   const [items, setItems] = useState<GroupItem[]>([]);
   const [browseLabel, setBrowseLabel] = useState("");
@@ -70,6 +73,8 @@ export default function ItemsManagementPanel({
   const [selectedLanguage, setSelectedLanguage] = useState<string>(EDITABLE_CONTENT_LANGUAGE);
   const [regenNotice, setRegenNotice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [syncStatus, setSyncStatus] = useState<GroupSyncStatusResponse | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const canEditStory = isEditableContentVariant(selectedPersona, selectedLanguage);
 
@@ -120,21 +125,12 @@ export default function ItemsManagementPanel({
 
   useEffect(() => {
     if (hideGroupSelector) return;
-    const active = getActiveGroup();
-    if (active?.id) {
-      setBrowseFilter(active.id);
+    if (activeGroup?.id) {
+      setBrowseFilter(activeGroup.id);
+    } else {
+      setBrowseFilter(null);
     }
-  }, [hideGroupSelector]);
-
-  useEffect(() => {
-    if (hideGroupSelector) return;
-    const onActiveChanged = () => {
-      const active = getActiveGroup();
-      setBrowseFilter(active?.id ?? null);
-    };
-    window.addEventListener("active-group-changed", onActiveChanged);
-    return () => window.removeEventListener("active-group-changed", onActiveChanged);
-  }, [hideGroupSelector]);
+  }, [hideGroupSelector, activeGroup]);
 
   const cancelEdit = useCallback(() => {
     setEditingId(null);
@@ -223,6 +219,46 @@ export default function ItemsManagementPanel({
       setAssignGroupId(groups[0].id);
     }
   }, [groups, assignGroupId]);
+
+  useEffect(() => {
+    let active = true;
+    if (typeof resolvedFilter !== "number") {
+      setSyncStatus(null);
+      return;
+    }
+
+    const fetchStatus = async () => {
+      try {
+        const res = await getGroupSyncStatus(resolvedFilter);
+        if (active) setSyncStatus(res);
+      } catch (err) {
+        console.error("Failed to fetch sync status", err);
+      }
+    };
+
+    void fetchStatus();
+    const interval = setInterval(() => {
+      void fetchStatus();
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [resolvedFilter]);
+
+  const handleForceSync = async () => {
+    if (typeof resolvedFilter !== "number") return;
+    setSyncing(true);
+    setError(null);
+    try {
+      await forceSyncGroup(resolvedFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Đồng bộ thất bại");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const startEditStory = () => {
     setIsEditingStory(true);
@@ -563,11 +599,38 @@ export default function ItemsManagementPanel({
           </p>
         ) : (
           <>
-            <p className="admin-muted text-sm">
-              <span className="font-medium" style={{ color: "var(--foreground)" }}>{browseLabel}</span>
-              {" · "}
-              {items.length} hiện vật — bấm thẻ để mở rộng
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
+              <p className="admin-muted text-sm">
+                <span className="font-medium" style={{ color: "var(--foreground)" }}>{browseLabel}</span>
+                {" · "}
+                {items.length} hiện vật — bấm thẻ để mở rộng
+              </p>
+              
+              {typeof resolvedFilter === "number" && syncStatus && (
+                <div className="flex items-center gap-3">
+                  {syncStatus.is_fully_synced ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                      Đã đồng bộ LLM & Audio ({syncStatus.synced_items}/{syncStatus.total_items})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Đang xử lý đồng bộ ({syncStatus.synced_items}/{syncStatus.total_items})
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    title="Force refresh all items LLM & Audio"
+                    disabled={syncing}
+                    onClick={handleForceSync}
+                    className="p-1.5 rounded-full hover:bg-[var(--border)] transition-colors disabled:opacity-50 text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus:outline-none"
+                  >
+                    <svg className={`w-4 h-4 ${syncing || (syncStatus && !syncStatus.is_fully_synced) ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="space-y-3">
               {items.map((item) => (
                 <ItemCard

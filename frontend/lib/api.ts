@@ -141,6 +141,13 @@ export interface GroupItemsResponse {
   items: GroupItem[];
 }
 
+export interface GroupSyncStatusResponse {
+  total_items: int;
+  synced_items: int;
+  is_fully_synced: boolean;
+}
+
+
 export interface SearchMatch {
   item_id: number;
   name: string;
@@ -299,6 +306,32 @@ export async function getGroupItems(
   }
   return res.json();
 }
+
+export async function getGroupSyncStatus(
+  groupId: number
+): Promise<GroupSyncStatusResponse> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/sync-status`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không lấy được trạng thái đồng bộ"));
+  }
+  return res.json();
+}
+
+export async function forceSyncGroup(
+  groupId: number
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/sync`, {
+    method: "POST",
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không thể bắt đầu đồng bộ"));
+  }
+  return res.json();
+}
+
 
 export async function getUngroupedItems(): Promise<UngroupedItemsResponse> {
   const res = await fetch(`${API_URL}/api/objects/ungrouped`, {
@@ -518,6 +551,7 @@ export interface ItemContentResponse {
   content: string;
   has_audio: boolean;
   audio_url: string | null;
+  audio_status: "pending" | "ready" | "failed";
   stored: boolean;
   source: string;
 }

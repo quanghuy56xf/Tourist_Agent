@@ -28,8 +28,10 @@ router = APIRouter(prefix="/api/objects", tags=["objects"])
 logger = logging.getLogger(__name__)
 
 
+from sqlalchemy.orm import joinedload
+
 def _get_item_or_404(db: Session, item_id: int) -> Item:
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).options(joinedload(Item.group)).filter(Item.id == item_id).first()
     if item is None:
         raise HTTPException(status_code=404, detail="Vật thể không tồn tại")
     return item
