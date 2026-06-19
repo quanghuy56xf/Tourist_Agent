@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
-import HomeButton from "@/components/visitor/HomeButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ResultModal from "@/components/ResultModal";
 import type { SearchResponse } from "@/lib/api/search";
@@ -62,12 +61,11 @@ export default function MethodSelectionPage() {
   };
 
   return (
-    <div className="artifact-shell">
+    <main className="flex flex-1 flex-col w-full">
       <header className="artifact-page-head">
         <div className="mb-6 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <HomeButton />
               <BackButton onClick={() => router.push("/")} label={t.common.back} />
             </div>
             <div className="flex items-center gap-2">
@@ -141,6 +139,6 @@ export default function MethodSelectionPage() {
           onClose={() => setSearchResult(null)}
         />
       )}
-    </div>
+    </main>
   );
 }

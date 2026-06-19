@@ -166,3 +166,23 @@ Xác nhận:
   - `test_chat_uses_item_description_when_rag_is_unavailable`
   - `test_chat_uses_user_message_as_rag_query`
   - Kết quả: `2 passed`.
+
+## 2026-06-19 - Sửa lỗi giao diện nhảy trên mobile bằng Wrapper toàn cục (Global Wrapper)
+
+Bối cảnh:
+- Khi mở trên điện thoại, giao diện bị xê dịch (layout shift) và mất một phần hiển thị (ví dụ: mất chữ ở phần persona) do cách trình duyệt mobile xử lý thanh địa chỉ và chiều cao `100vh`.
+- Từng trang sử dụng các lớp CSS `.artifact-shell` và `min-h-screen` lặp lại, không có sự nhất quán và gây ra lỗi nhảy trang khi chuyển đổi.
+
+Các thay đổi (Phương án 1):
+- Cập nhật `globals.css`:
+  - Thay `min-h-[100vh]` thành `min-h-[100dvh]` cho `.artifact-shell` để thích ứng chính xác với chiều cao thực tế của trình duyệt di động (kể cả khi hiện/ẩn thanh địa chỉ).
+  - Thêm `scrollbar-gutter: stable` vào body để tránh xê dịch giao diện khi thanh cuộn xuất hiện.
+- Thêm Wrapper toàn cục (Global Wrapper) trong `app/[groupSlug]/layout.tsx` sử dụng `.artifact-shell` để bọc mọi trang bên trong nhóm, đảm bảo background và cấu trúc được duy trì nhất quán.
+- Dọn dẹp lại cấu trúc các trang (Refactoring):
+  - Xóa bỏ việc bọc thủ công bằng lớp `artifact-shell` và `min-h-screen` tại các trang con: `scan/page.tsx`, `method/page.tsx`, `manual/page.tsx`, `tour/page.tsx`, `tour/[id]/page.tsx`, `tour/[id]/play/page.tsx`, `tour/[id]/complete/page.tsx`, `tour-match/page.tsx`, `tour-match/room/[roomId]/page.tsx`, `tour-match/room/[roomId]/play/page.tsx`, `item/[id]/page.tsx`.
+  - Thay thế chúng bằng thẻ `<main className="flex flex-1 flex-col w-full">` (hoặc tương tự) để tận dụng cấu trúc Flexbox toàn cục.
+  - Sửa lỗi chiều cao màn hình tải và lỗi (`min-h-screen` thành `min-h-[100dvh]`) ở các màn hình `loading` hoặc `not found` bên trong các trang.
+
+Xác nhận:
+- Giao diện đã cố định chuẩn hơn trên mobile, không còn hiện tượng xê dịch khi chuyển trang hoặc hiển thị camera/persona.
+- Đồng nhất logic layout, giảm sự trùng lặp code trong các page.

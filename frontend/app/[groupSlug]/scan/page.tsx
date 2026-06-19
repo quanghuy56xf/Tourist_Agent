@@ -120,31 +120,21 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="artifact-shell min-h-screen">
-      <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="mb-4 flex items-center justify-between gap-2">
+    <main className="flex flex-1 flex-col w-full">
+      <header className="artifact-page-head pb-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <HomeButton />
             <BackButton onClick={() => router.push(methodPath)} label={t.common.back} variant="dark" />
           </div>
           <LanguageSelector compact />
         </div>
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg"
-            style={{ background: "var(--primary)" }}
-          >
-            <span style={{ color: "var(--primary-foreground)" }}>✦</span>
-          </div>
-          <span className="artifact-section-label">{t.scan.brand}</span>
-        </div>
-        <h1 className="font-display mt-3 text-xl">{t.scan.headline}</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
-          {t.scan.instruction}
+        <p className="text-center text-sm font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>
+          Hướng Camera vào hiện vật và bấm nút chụp
         </p>
       </header>
 
-      <div className="artifact-page-body flex flex-1 flex-col items-center justify-center gap-6">
+      <div className="artifact-page-body flex flex-1 flex-col items-center justify-center pb-24 sm:pb-32 gap-6">
         <ScanViewfinderFrame
           scanning={scanPhase === "scanning"}
           scanProgress={scanProgress}
@@ -195,6 +185,6 @@ export default function SearchPage() {
           onClose={closeResults}
         />
       )}
-    </div>
+    </main>
   );
 }

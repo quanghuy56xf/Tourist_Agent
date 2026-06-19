@@ -173,11 +173,23 @@ class ItemContentService:
         db.refresh(variant)
         return variant
 
-    def delete_variants_for_item(self, db: Session, item_id: int) -> None:
+    def delete_variants_for_item(
+        self,
+        db: Session,
+        item_id: int,
+        *,
+        commit: bool = True,
+    ) -> None:
         db.query(ItemContentVariant).filter(
             ItemContentVariant.item_id == item_id
-        ).delete()
-        db.commit()
+        ).delete(synchronize_session=False)
+        if commit:
+            db.commit()
+
+    def delete_all_variants(self, db: Session, *, commit: bool = True) -> None:
+        db.query(ItemContentVariant).delete(synchronize_session=False)
+        if commit:
+            db.commit()
 
     def generate_text(
         self,

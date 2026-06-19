@@ -7,8 +7,13 @@ from app.core import storage
 VALID_ANGLES = {"front", "side", "back"}
 
 
-async def ingest_image(item_id: int, angle: str, upload_file: UploadFile) -> str:
-    if angle not in VALID_ANGLES:
+async def ingest_image(
+    item_id: int,
+    angle: str,
+    upload_file: UploadFile,
+    save_to_db: bool = True,
+) -> str:
+    if save_to_db and angle not in VALID_ANGLES:
         raise HTTPException(status_code=400, detail="Góc ảnh không hợp lệ")
 
     content = await upload_file.read()
@@ -17,7 +22,9 @@ async def ingest_image(item_id: int, angle: str, upload_file: UploadFile) -> str
 
     vectors = embedding.extract_vectors_augmented(content, augment=USE_AUGMENTATION)
 
-    image_url = storage.save_image_bytes(content, angle, item_id)
+    image_url = (
+        storage.save_image_bytes(content, angle, item_id) if save_to_db else ""
+    )
     chroma.delete_embedding(item_id, angle)
     chroma.add_embedding(item_id, angle, vectors[0])
     for i, vec in enumerate(vectors[1:], start=1):

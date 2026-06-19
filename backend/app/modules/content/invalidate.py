@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 
+from app.models.item import Item
 from app.modules.content.bulk_update import (
-    invalidate_related_item_variants,
     regenerate_items_task,
     regenerate_related_items_task,
 )
+from app.modules.content.service import get_item_content_service
 
 
 def invalidate_item_content_for_group(
@@ -12,7 +13,10 @@ def invalidate_item_content_for_group(
     group_id: int,
     document_ids: list[int] | None = None,
 ) -> list[int]:
-    return invalidate_related_item_variants(db, group_id, document_ids)
+    """Any RAG document change invalidates every cached text/audio variant."""
+    item_ids = [item_id for (item_id,) in db.query(Item.id).all()]
+    get_item_content_service().delete_all_variants(db)
+    return item_ids
 
 
 def invalidate_and_regenerate_related_item_content(

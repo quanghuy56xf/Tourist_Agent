@@ -57,3 +57,5 @@ cloudflared/*.json
 
 data/
 raw/
+.superpowers/
+draft/

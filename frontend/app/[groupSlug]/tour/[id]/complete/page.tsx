@@ -24,7 +24,7 @@ export default function TourCompletePage() {
   const summary = t.tour.completeSummary.replace("{count}", String(count));
 
   return (
-    <div className="artifact-shell artifact-shell-pad relative flex min-h-screen flex-col items-center justify-center text-center">
+    <main className="artifact-shell-pad relative flex flex-1 flex-col items-center justify-center text-center w-full">
       <div className="absolute left-4 top-4">
         <HomeButton />
       </div>
@@ -68,6 +68,6 @@ export default function TourCompletePage() {
           {t.tour.backToMethod}
         </button>
       </div>
-    </div>
+    </main>
   );
 }

@@ -211,7 +211,7 @@ export default function TourMatchWaitingRoomPage() {
 
   if (errorMsg) {
     return (
-      <div className="artifact-shell min-h-screen flex flex-col justify-center items-center p-6 text-center">
+      <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-xs">
           <span className="text-4xl">⚠️</span>
           <h2 className="text-md font-bold text-red-400">Không thể kết nối</h2>
@@ -228,7 +228,7 @@ export default function TourMatchWaitingRoomPage() {
 
   if (!room) {
     return (
-      <div className="artifact-shell min-h-screen flex items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center w-full">
         <div className="flex flex-col items-center gap-3">
           <div
             className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
@@ -256,7 +256,7 @@ export default function TourMatchWaitingRoomPage() {
   // Guest Wait Screen if Guest Status is Pending
   if (myState?.status === "pending") {
     return (
-      <div className="artifact-shell min-h-screen flex flex-col justify-center items-center p-6 text-center">
+      <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-sm">
           <span className="text-4xl animate-pulse block">⏳</span>
           <h2 className="text-md font-bold text-primary">Đang Chờ Phê Duyệt</h2>
@@ -278,7 +278,7 @@ export default function TourMatchWaitingRoomPage() {
   }
 
   return (
-    <div className="artifact-shell min-h-screen pb-8">
+    <main className="flex flex-1 flex-col w-full pb-8">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
@@ -512,6 +512,6 @@ export default function TourMatchWaitingRoomPage() {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -18,8 +18,8 @@ function CornerBracket({ position }: { position: string }) {
     <div
       className={`scan-bracket z-10 ${isTop ? "top-3" : "bottom-3"} ${isLeft ? "left-3" : "right-3"}`}
     >
-      <div className={`scan-bracket-h ${isLeft ? "left-0" : "right-0"}`} />
-      <div className={`scan-bracket-v ${isLeft ? "left-0" : "right-0"}`} />
+      <div className={`scan-bracket-h ${isLeft ? "left-0" : "right-0"} ${isTop ? "top-0" : "bottom-0"}`} />
+      <div className={`scan-bracket-v ${isLeft ? "left-0" : "right-0"} ${isTop ? "top-0" : "bottom-0"}`} />
     </div>
   );
 }
@@ -33,7 +33,7 @@ export default function ScanViewfinderFrame({
   const { t } = useVisitorLocale();
 
   return (
-    <div className="relative aspect-square w-full max-w-xs">
+    <div className="relative aspect-square w-full max-w-sm">
       <div
         className="absolute inset-0 overflow-hidden rounded-2xl"
         style={{ border: "1px solid var(--border)", background: "var(--card)" }}

@@ -40,7 +40,7 @@ export default function TourDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex flex-1 min-h-[100dvh] items-center justify-center">
         <div
           className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
           style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
@@ -51,7 +51,7 @@ export default function TourDetailPage() {
 
   if (!tour) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-6">
+      <div className="flex flex-1 min-h-[100dvh] flex-col items-center justify-center p-6">
         <p className="mb-4" style={{ color: "var(--primary)" }}>
           {t.tour.empty}
         </p>
@@ -71,7 +71,7 @@ export default function TourDetailPage() {
   };
 
   return (
-    <div className="artifact-shell min-h-screen pb-8">
+    <main className="flex flex-1 flex-col w-full pb-8">
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
@@ -136,6 +136,6 @@ export default function TourDetailPage() {
           ⚔ Thi Đấu Tour Này (Tạo Room)
         </button>
       </div>
-    </div>
+    </main>
   );
 }
