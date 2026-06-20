@@ -189,6 +189,21 @@ class ItemContentService:
         if commit:
             db.commit()
 
+    def delete_variants_for_items(
+        self,
+        db: Session,
+        item_ids: list[int],
+        *,
+        commit: bool = True,
+    ) -> None:
+        if not item_ids:
+            return
+        db.query(ItemContentVariant).filter(
+            ItemContentVariant.item_id.in_(item_ids)
+        ).delete(synchronize_session=False)
+        if commit:
+            db.commit()
+
     def delete_all_variants(self, db: Session, *, commit: bool = True) -> None:
         db.query(ItemContentVariant).delete(synchronize_session=False)
         if commit:

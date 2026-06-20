@@ -18,6 +18,7 @@ import {
   isEditableContentVariant,
   resolveImageUrl,
   updateItem,
+  updateItemContent,
   updateItemImage,
   getGroupSyncStatus,
   forceSyncGroup,
@@ -536,41 +537,41 @@ export default function ItemsManagementPanel({
         </div>
 
         {!hideGroupSelector && (
-        <div>
-          <label className="admin-label mb-1.5">
-            Chọn khu di tích để xem &amp; đăng ký hiện vật
-          </label>
-          <select
-            value={browseFilter === null ? "" : String(browseFilter)}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) {
-                setBrowseFilter(null);
-              } else if (v === "ungrouped") {
-                setBrowseFilter("ungrouped");
-              } else {
-                const groupId = Number(v);
-                const group = groups.find((g) => g.id === groupId);
-                setBrowseFilter(groupId);
-                if (group) {
-                  setActiveGroup({ id: group.id, name: group.name });
-                  onActiveGroupChange?.(group.id);
+          <div>
+            <label className="admin-label mb-1.5">
+              Chọn khu di tích để xem &amp; đăng ký hiện vật
+            </label>
+            <select
+              value={browseFilter === null ? "" : String(browseFilter)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) {
+                  setBrowseFilter(null);
+                } else if (v === "ungrouped") {
+                  setBrowseFilter("ungrouped");
+                } else {
+                  const groupId = Number(v);
+                  const group = groups.find((g) => g.id === groupId);
+                  setBrowseFilter(groupId);
+                  if (group) {
+                    setActiveGroup({ id: group.id, name: group.name });
+                    onActiveGroupChange?.(group.id);
+                  }
                 }
-              }
-            }}
-            className="admin-select w-full text-sm"
-          >
-            <option value="">— Chọn khu di tích để xem hiện vật —</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name} ({group.item_count} hiện vật)
+              }}
+              className="admin-select w-full text-sm"
+            >
+              <option value="">— Chọn khu di tích để xem hiện vật —</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name} ({group.item_count} hiện vật)
+                </option>
+              ))}
+              <option value="ungrouped">
+                Chưa có khu di tích ({ungroupedCount} hiện vật)
               </option>
-            ))}
-            <option value="ungrouped">
-              Chưa có khu di tích ({ungroupedCount} hiện vật)
-            </option>
-          </select>
-        </div>
+            </select>
+          </div>
         )}
       </div>
 
@@ -605,7 +606,7 @@ export default function ItemsManagementPanel({
                 {" · "}
                 {items.length} hiện vật — bấm thẻ để mở rộng
               </p>
-              
+
               {typeof resolvedFilter === "number" && syncStatus && (
                 <div className="flex items-center gap-3">
                   {syncStatus.is_fully_synced ? (
