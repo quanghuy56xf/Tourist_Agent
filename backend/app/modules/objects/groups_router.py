@@ -11,17 +11,37 @@ from app.schemas.group import (
     GroupCreate,
     GroupItemsResponse,
     GroupResponse,
+    MinimapConfigPayload,
+    MinimapVisitorConfig,
+    MinimapVisitorZone,
     GroupVisibilityUpdate,
     GroupSyncStatusResponse,
 )
 from app.core.database import get_db
 from app.modules.content.personas import all_variants
-from app.modules.auth.dependencies import require_admin_role_if_enabled, resolve_current_user
+from app.modules.auth.dependencies import (
+    require_admin_if_enabled,
+    require_admin_role_if_enabled,
+    resolve_current_user,
+)
 from app.modules.auth.service import ensure_group_access
-from app.modules.objects.groups import get_group_or_404
+from app.modules.objects.groups import ensure_visitor_can_access_group, get_group_or_404
 from app.modules.objects.items import item_to_response
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
+
+DEFAULT_MINIMAP_TEMPLATE = {
+    "imageSrc": "/images/van-mieu-minimap.png",
+    "zones": [
+        {
+            "zoneId": "cong-chinh",
+            "zoneName": "Cổng chính",
+            "x": 50,
+            "y": 94,
+            "itemNames": ["Cổng chính"],
+        }
+    ],
+}
 
 
 def _group_rows_query(db: Session):
@@ -144,6 +164,75 @@ def update_group_visibility(
         item_count=item_count,
         is_public=group.is_public,
         created_at=group.created_at,
+    )
+
+
+@router.get("/{group_id}/minimap", response_model=MinimapVisitorConfig)
+def get_group_minimap(
+    group_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    group = get_group_or_404(db, group_id)
+    ensure_visitor_can_access_group(group, user)
+    if group.minimap_config is None:
+        raise HTTPException(status_code=404, detail="Bản đồ chưa được cấu hình")
+
+    items = (
+        db.query(Item.id, Item.name)
+        .filter(Item.group_id == group_id)
+        .order_by(Item.id.asc())
+        .all()
+    )
+    ids_by_name: dict[str, list[int]] = {}
+    for item in items:
+        ids_by_name.setdefault(item.name, []).append(item.id)
+
+    payload = MinimapConfigPayload.model_validate(group.minimap_config)
+    return MinimapVisitorConfig(
+        imageSrc=payload.imageSrc,
+        zones=[
+            MinimapVisitorZone(
+                zoneId=zone.zoneId,
+                zoneName=zone.zoneName,
+                x=zone.x,
+                y=zone.y,
+                itemIds=[
+                    item_id
+                    for item_name in zone.itemNames
+                    for item_id in ids_by_name.get(item_name, [])
+                ],
+            )
+            for zone in payload.zones
+        ],
+    )
+
+
+@router.put("/{group_id}/minimap", response_model=MinimapConfigPayload)
+def update_group_minimap(
+    group_id: int,
+    payload: MinimapConfigPayload,
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    group = get_group_or_404(db, group_id)
+    ensure_group_access(staff, group_id)
+    group.minimap_config = payload.model_dump(mode="json")
+    db.commit()
+    db.refresh(group)
+    return MinimapConfigPayload.model_validate(group.minimap_config)
+
+
+@router.get("/{group_id}/minimap/template", response_model=MinimapConfigPayload)
+def get_group_minimap_template(
+    group_id: int,
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    group = get_group_or_404(db, group_id)
+    ensure_group_access(staff, group_id)
+    return MinimapConfigPayload.model_validate(
+        group.minimap_config or DEFAULT_MINIMAP_TEMPLATE
     )
 
 

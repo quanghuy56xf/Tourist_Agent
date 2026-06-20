@@ -18,7 +18,7 @@ import {
   ChatMessage,
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
-import { rememberMinimapItem } from "@/lib/minimapConfig";
+import { rememberMinimapItem } from "@/lib/minimapState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {

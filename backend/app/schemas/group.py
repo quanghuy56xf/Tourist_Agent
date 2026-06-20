@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class GroupCreate(BaseModel):
@@ -17,6 +17,32 @@ class GroupResponse(BaseModel):
 
 class GroupVisibilityUpdate(BaseModel):
     is_public: bool
+
+
+class MinimapZoneConfig(BaseModel):
+    zoneId: str = Field(min_length=1)
+    zoneName: str = Field(min_length=1)
+    x: float = Field(ge=0, le=100)
+    y: float = Field(ge=0, le=100)
+    itemNames: list[str]
+
+
+class MinimapConfigPayload(BaseModel):
+    imageSrc: str = Field(min_length=1)
+    zones: list[MinimapZoneConfig]
+
+
+class MinimapVisitorZone(BaseModel):
+    zoneId: str
+    zoneName: str
+    x: float
+    y: float
+    itemIds: list[int]
+
+
+class MinimapVisitorConfig(BaseModel):
+    imageSrc: str
+    zones: list[MinimapVisitorZone]
 
 
 class ItemImageResponse(BaseModel):

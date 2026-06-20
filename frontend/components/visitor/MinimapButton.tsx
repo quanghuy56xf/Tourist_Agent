@@ -1,18 +1,43 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getDynamicMinimapConfig } from "@/lib/api";
+import type { MinimapConfig } from "@/lib/api";
+import { VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import {
   hasUnreadMinimap,
   markMinimapSeen,
   MINIMAP_UPDATED_EVENT,
-} from "@/lib/minimapConfig";
+} from "@/lib/minimapState";
 import MinimapModal from "./MinimapModal";
 
 export default function MinimapButton() {
   const groupSlug = useGroupSlug();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(false);
+  const [config, setConfig] = useState<MinimapConfig | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const groupId = Number(window.localStorage.getItem(VISITOR_GROUP_ID_KEY));
+    if (!Number.isInteger(groupId) || groupId <= 0) {
+      setConfig(null);
+      return;
+    }
+
+    void getDynamicMinimapConfig(groupId)
+      .then((nextConfig) => {
+        if (!cancelled) setConfig(nextConfig);
+      })
+      .catch(() => {
+        if (!cancelled) setConfig(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [groupSlug]);
 
   useEffect(() => {
     setUnread(hasUnreadMinimap(groupSlug));
@@ -64,7 +89,12 @@ export default function MinimapButton() {
           )}
         </button>
       </div>
-      <MinimapModal open={open} onClose={() => setOpen(false)} groupSlug={groupSlug} />
+      <MinimapModal
+        open={open}
+        onClose={() => setOpen(false)}
+        groupSlug={groupSlug}
+        config={config}
+      />
     </>
   );
 }
