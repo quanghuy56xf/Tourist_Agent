@@ -32,6 +32,7 @@ class GroupItemResponse(BaseModel):
     group_id: int | None = None
     images: list[ItemImageResponse]
     created_at: datetime
+    sync_state: str | None = None
 
 
 class GroupItemsResponse(BaseModel):

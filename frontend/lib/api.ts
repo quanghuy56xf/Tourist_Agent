@@ -129,6 +129,7 @@ export interface GroupItem {
   group_id?: number | null;
   images: ItemImage[];
   created_at: string;
+  sync_state?: "synced" | "missing" | "outdated" | null;
 }
 
 export interface UngroupedItemsResponse {
@@ -328,6 +329,19 @@ export async function forceSyncGroup(
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Không thể bắt đầu đồng bộ"));
+  }
+  return res.json();
+}
+
+export async function forceSyncItem(
+  itemId: number
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/api/objects/${itemId}/sync`, {
+    method: "POST",
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không thể bắt đầu đồng bộ hiện vật"));
   }
   return res.json();
 }

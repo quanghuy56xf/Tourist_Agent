@@ -90,43 +90,82 @@ export default function ItemCard({
   onLanguageChange,
   canEditStory,
   regenNotice,
-}: ItemCardProps) {
+  onForceSyncItem,
+  syncingItem,
+}: ItemCardProps & {
+  onForceSyncItem?: () => void;
+  syncingItem?: boolean;
+}) {
   return (
     <div className="admin-item-card">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-[rgba(201,168,76,0.06)]"
-      >
-        <span
-          className={`admin-muted text-xs transition-transform ${expanded ? "rotate-90" : ""}`}
-          aria-hidden
+      <div className="flex w-full items-center gap-3 p-4 transition-colors hover:bg-[rgba(201,168,76,0.06)] relative group">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 flex items-center gap-3 text-left focus:outline-none"
         >
-          ▶
-        </span>
-        {(item.images.find((i) => i.angle === "front")?.url ||
-          item.main_image_url) && (
-          <img
-            src={
-              resolveImageUrl(
-                item.images.find((i) => i.angle === "front")?.url ??
-                  item.main_image_url
-              ) ?? ""
-            }
-            alt=""
-            className="w-10 h-10 object-cover rounded-md border admin-divider shrink-0"
-          />
+          <span
+            className={`admin-muted text-xs transition-transform ${expanded ? "rotate-90" : ""}`}
+            aria-hidden
+          >
+            ▶
+          </span>
+          {(item.images.find((i) => i.angle === "front")?.url ||
+            item.main_image_url) && (
+            <img
+              src={
+                resolveImageUrl(
+                  item.images.find((i) => i.angle === "front")?.url ??
+                    item.main_image_url
+                ) ?? ""
+              }
+              alt=""
+              className="w-10 h-10 object-cover rounded-md border admin-divider shrink-0"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate flex items-center gap-2">
+              {item.name}
+              {item.sync_state === "synced" && (
+                <span title="Đã đồng bộ đủ" className="flex items-center justify-center text-emerald-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                </span>
+              )}
+              {item.sync_state === "missing" && (
+                <span title="Đang thiếu nội dung/audio" className="flex items-center justify-center text-red-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                </span>
+              )}
+              {item.sync_state === "outdated" && (
+                <span title="Cần đồng bộ lại" className="flex items-center justify-center text-amber-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </span>
+              )}
+            </p>
+            <p className="text-xs admin-muted truncate">
+              {item.images.length} ảnh · ID {item.id}
+            </p>
+          </div>
+          <span className="text-xs admin-muted shrink-0 mr-8">
+            {expanded ? "Thu gọn" : "Xem chi tiết"}
+          </span>
+        </button>
+
+        {onForceSyncItem && item.sync_state && (
+          <button
+            type="button"
+            title="Đồng bộ lại hiện vật này"
+            disabled={syncingItem || isBusy}
+            onClick={(e) => {
+              e.stopPropagation();
+              onForceSyncItem();
+            }}
+            className="absolute right-4 p-2 rounded-full hover:bg-[var(--border)] transition-colors disabled:opacity-50 text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus:outline-none"
+          >
+            <svg className={`w-4 h-4 ${syncingItem ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </button>
         )}
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{item.name}</p>
-          <p className="text-xs admin-muted truncate">
-            {item.images.length} ảnh · ID {item.id}
-          </p>
-        </div>
-        <span className="text-xs admin-muted shrink-0">
-          {expanded ? "Thu gọn" : "Xem chi tiết"}
-        </span>
-      </button>
+      </div>
 
       {expanded && (
         <div className="px-4 pb-4 pt-0 space-y-4 border-t admin-divider">

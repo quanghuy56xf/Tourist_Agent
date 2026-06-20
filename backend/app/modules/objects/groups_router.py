@@ -15,7 +15,7 @@ from app.schemas.group import (
     GroupSyncStatusResponse,
 )
 from app.core.database import get_db
-from app.modules.content.personas import DEFAULT_PERSONA, DEFAULT_LANGUAGE
+from app.modules.content.personas import all_variants
 from app.modules.auth.dependencies import require_admin_role_if_enabled, resolve_current_user
 from app.modules.auth.service import ensure_group_access
 from app.modules.objects.groups import get_group_or_404
@@ -163,10 +163,60 @@ def list_group_items(
         .all()
     )
 
+    if not items:
+        return GroupItemsResponse(
+            group_id=group.id,
+            group_name=group.name,
+            items=[],
+        )
+
+    item_ids = [item.id for item in items]
+    variants = (
+        db.query(
+            ItemContentVariant.item_id,
+            ItemContentVariant.persona,
+            ItemContentVariant.language,
+            ItemContentVariant.text_content,
+            ItemContentVariant.status,
+            ItemContentVariant.source,
+            ItemContentVariant.content_hash,
+            ItemContentVariant.audio_data.isnot(None).label("has_audio"),
+        )
+        .filter(ItemContentVariant.item_id.in_(item_ids))
+        .all()
+    )
+
+    variant_map = {
+        (v.item_id, v.persona, v.language): v
+        for v in variants
+    }
+    required_variants = all_variants()
+
+    response_items = []
+    for item in items:
+        state = "synced"
+        for persona, language in required_variants:
+            variant = variant_map.get((item.id, persona, language))
+            if variant is None:
+                state = "missing"
+                break
+            if not variant.has_audio or not variant.text_content.strip() or variant.status != "ready":
+                state = "missing"
+                break
+            expected_hash = compute_content_hash(
+                item.description,
+                group_knowledge_version=group.knowledge_version,
+                source=variant.source,
+            )
+            if variant.content_hash != expected_hash:
+                state = "outdated"
+        
+        response_items.append(item_to_response(item, sync_state=state))
+
     return GroupItemsResponse(
         group_id=group.id,
         group_name=group.name,
-        items=[item_to_response(item) for item in items],
+        items=response_items,
     )
 
 
@@ -186,24 +236,48 @@ def get_group_sync_status(
 
     item_ids = [item.id for item in items]
     variants = (
-        db.query(ItemContentVariant)
-        .filter(
-            ItemContentVariant.item_id.in_(item_ids),
-            ItemContentVariant.persona == DEFAULT_PERSONA,
-            ItemContentVariant.language == DEFAULT_LANGUAGE,
+        db.query(
+            ItemContentVariant.item_id,
+            ItemContentVariant.persona,
+            ItemContentVariant.language,
+            ItemContentVariant.text_content,
+            ItemContentVariant.status,
+            ItemContentVariant.source,
+            ItemContentVariant.content_hash,
+            ItemContentVariant.audio_data.isnot(None).label("has_audio"),
         )
+        .filter(ItemContentVariant.item_id.in_(item_ids))
         .all()
     )
 
-    variant_map = {v.item_id: v for v in variants}
+    variant_map = {
+        (variant.item_id, variant.persona, variant.language): variant
+        for variant in variants
+    }
+    required_variants = all_variants()
     synced_count = 0
 
     for item in items:
-        v = variant_map.get(item.id)
-        if not v:
-            continue
-        expected_hash = compute_content_hash(item.description, group_knowledge_version=group.knowledge_version, source=v.source)
-        if v.content_hash == expected_hash and v.status == "ready" and v.audio_data is not None:
+        item_is_synced = True
+        for persona, language in required_variants:
+            variant = variant_map.get((item.id, persona, language))
+            if variant is None:
+                item_is_synced = False
+                break
+            expected_hash = compute_content_hash(
+                item.description,
+                group_knowledge_version=group.knowledge_version,
+                source=variant.source,
+            )
+            if not (
+                variant.content_hash == expected_hash
+                and variant.status == "ready"
+                and variant.text_content.strip()
+                and variant.has_audio
+            ):
+                item_is_synced = False
+                break
+        if item_is_synced:
             synced_count += 1
 
     return GroupSyncStatusResponse(

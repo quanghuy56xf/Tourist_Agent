@@ -11,6 +11,7 @@ from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA, LANG
 from app.modules.content.service import build_audio_url, get_item_content_service
 from app.modules.content.tts import is_current_audio_mime, response_audio_mime
 from app.modules.llm.client import LLMServiceUnavailableError
+from app.modules.content.bulk_update import regenerate_items_task
 from app.modules.auth.dependencies import require_admin_if_enabled
 from app.modules.auth.service import ensure_group_access
 from app.schemas.content import (
@@ -240,3 +241,16 @@ def get_item_content_audio(
         media_type=response_audio_mime(variant.audio_mime),
         headers={"Cache-Control": "private, no-cache"},
     )
+
+
+@router.post("/{item_id}/sync", status_code=202)
+def force_sync_item(
+    item_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    item = _get_item_or_404(db, item_id)
+    ensure_group_access(staff, item.group_id)
+    background_tasks.add_task(regenerate_items_task, [item.id])
+    return {"message": "Queued item for sync"}
