@@ -18,6 +18,7 @@ import {
   ChatMessage,
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
+import { rememberMinimapItem } from "@/lib/minimapConfig";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
@@ -94,6 +95,7 @@ export default function ItemDetailPage() {
         setLoadingContent(true);
         const data = await getItem(itemId);
         if (cancelled) return;
+        rememberMinimapItem(groupSlug, itemId);
         setItem(data);
         setLoadingItem(false);
         try {
@@ -128,7 +130,7 @@ export default function ItemDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
+  }, [groupSlug, itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
 
   useEffect(() => {
     if (!itemId || !personaReady || !localeReady) return;

@@ -29,6 +29,11 @@
   - Tăng độ chính xác RAG (chấp nhận khớp từ khóa chính).
   - Khắc phục tình trạng gọi Audio TTS bị trùng lặp, tối ưu payload chat history (giới hạn 10 messages gần nhất).
   - Cập nhật luồng Khám phá (Discoverable) nhóm triển lãm dành cho Visitor (API `/api/groups/discover`).
+- **[ĐÃ HOÀN THÀNH]** Khôi phục Minimap MVP cho Visitor:
+  - Bản đồ tĩnh theo `groupSlug`, cấu hình zone và tọa độ tại `frontend/lib/minimapConfig.ts`.
+  - Ghi nhớ hiện vật gần nhất bằng `localStorage`; icon Minimap hiện chấm đỏ sau khi mở/quét hiện vật và tắt khi khách mở bản đồ.
+  - Modal có marker vị trí, fallback khi chưa xác định/group chưa có bản đồ và hỗ trợ Escape/click backdrop.
+  - Hiện chỉ có SVG minh họa cho Văn Miếu - Quốc Tử Giám. Chưa có zoom/pan, Admin config hoặc lưu cấu hình ở Backend.
 
 ## 4. 🚧 CÁC VẤN ĐỀ ĐANG TỒN ĐỌNG & NEXT STEPS (TODO)
 Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau để tiếp tục tối ưu:
