@@ -1,22 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  findMinimapZone,
-  getMinimapConfig,
-  readRememberedMinimapItem,
-} from "@/lib/minimapConfig";
+import type { MinimapConfig } from "@/lib/api";
+import { readRememberedMinimapItem } from "@/lib/minimapState";
 
 interface MinimapModalProps {
   open: boolean;
   onClose: () => void;
   groupSlug: string;
+  config: MinimapConfig | null;
 }
 
-export default function MinimapModal({ open, onClose, groupSlug }: MinimapModalProps) {
+export default function MinimapModal({
+  open,
+  onClose,
+  groupSlug,
+  config,
+}: MinimapModalProps) {
   const [lastItemId, setLastItemId] = useState<number | null>(null);
-  const config = getMinimapConfig(groupSlug);
-  const currentZone = config ? findMinimapZone(config, lastItemId) : null;
+  const currentZone =
+    lastItemId === null
+      ? null
+      : config?.zones.find((zone) => zone.itemIds.includes(lastItemId)) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -44,9 +49,11 @@ export default function MinimapModal({ open, onClose, groupSlug }: MinimapModalP
       <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl border border-amber-400/30 bg-[#17130d] p-4 text-amber-50 shadow-2xl">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-amber-400">Hành trình tham quan</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-amber-400">
+              Hành trình tham quan
+            </p>
             <h2 className="mt-1 font-serif text-xl font-semibold">
-              {config?.title ?? "Bản đồ khu tham quan"}
+              Bản đồ khu tham quan
             </h2>
           </div>
           <button
@@ -62,7 +69,11 @@ export default function MinimapModal({ open, onClose, groupSlug }: MinimapModalP
         {config ? (
           <>
             <div className="relative overflow-hidden rounded-xl border border-amber-300/20 bg-[#211b12]">
-              <img src={config.imageSrc} alt={config.title} className="block h-auto w-full" />
+              <img
+                src={config.imageSrc}
+                alt="Bản đồ khu tham quan"
+                className="block h-auto w-full"
+              />
               {currentZone && (
                 <div
                   className="absolute -translate-x-1/2 -translate-y-1/2"
@@ -75,7 +86,9 @@ export default function MinimapModal({ open, onClose, groupSlug }: MinimapModalP
               )}
             </div>
             <div className="mt-3 rounded-xl bg-white/[0.04] px-4 py-3">
-              <p className="text-xs text-amber-200/65">Vị trí gần nhất dựa trên hiện vật vừa quét</p>
+              <p className="text-xs text-amber-200/65">
+                Vị trí gần nhất dựa trên hiện vật vừa quét
+              </p>
               <p className="mt-1 font-medium text-amber-50">
                 {currentZone?.zoneName ?? "Chưa xác định vị trí"}
               </p>

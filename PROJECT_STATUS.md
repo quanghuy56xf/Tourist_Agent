@@ -49,3 +49,10 @@ Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau 
 - File ghi chép công việc chi tiết (hàng ngày) là `WORKLOG.md`.
 - Các file backup dữ liệu RAG, CSDL SQLite được hệ thống tự lưu tại `backend/data/backups/`. Đừng xóa chúng.
 - Trước khi thực hiện lệnh bash, sử dụng các công cụ chuyên biệt của IDE (như `grep_search`, `read_file`, v.v.) thay vì chạy `grep`, `cat` trực tiếp trên terminal. Mọi thay đổi liên quan đến cấu trúc cần update lại file `PROJECT_STATUS.md` này.
+
+## 6. Dynamic Minimap Update (2026-06-21)
+- Minimap configuration is now stored per Group in `groups.minimap_config`.
+- Admin can download/edit/upload JSON using stable `itemNames`.
+- Visitor API resolves `itemNames` to environment-local `itemIds` within the selected Group.
+- Visitor UI prefetches the configuration before opening the modal.
+- Static `frontend/lib/minimapConfig.ts` has been replaced by API configuration plus `frontend/lib/minimapState.ts`.

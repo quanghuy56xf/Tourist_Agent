@@ -1,47 +1,4 @@
-export interface MinimapZone {
-  zoneId: string;
-  zoneName: string;
-  x: number;
-  y: number;
-  itemIds: number[];
-}
-
-export interface MinimapConfig {
-  groupSlug: string;
-  title: string;
-  imageSrc: string;
-  zones: MinimapZone[];
-}
-
 export const MINIMAP_UPDATED_EVENT = "hera-minimap-updated";
-
-const MINIMAP_CONFIGS: Record<string, MinimapConfig> = {
-  "quoc-tu-giam": {
-    groupSlug: "quoc-tu-giam",
-    title: "Bản đồ Văn Miếu - Quốc Tử Giám",
-    imageSrc: "/images/van-mieu-minimap.png",
-    zones: [
-      { zoneId: "cong-chinh", zoneName: "Cổng chính", x: 50, y: 94, itemIds: [7] },
-      { zoneId: "dai-trung-mon", zoneName: "Đại Trung Môn", x: 50, y: 79, itemIds: [12] },
-      { zoneId: "khue-van-cac", zoneName: "Khuê Văn Các", x: 50, y: 59, itemIds: [9] },
-      { zoneId: "vuon-bia", zoneName: "Vườn bia Tiến sĩ", x: 39, y: 46, itemIds: [11] },
-      { zoneId: "khu-dai-thanh", zoneName: "Khu Đại Thành", x: 50, y: 35, itemIds: [6, 10, 13] },
-      { zoneId: "den-khai-thanh", zoneName: "Đền Khải Thánh", x: 50, y: 11, itemIds: [8] },
-    ],
-  },
-};
-
-export function getMinimapConfig(groupSlug: string): MinimapConfig | null {
-  return MINIMAP_CONFIGS[groupSlug] ?? null;
-}
-
-export function findMinimapZone(
-  config: MinimapConfig,
-  itemId: number | null
-): MinimapZone | null {
-  if (itemId === null) return null;
-  return config.zones.find((zone) => zone.itemIds.includes(itemId)) ?? null;
-}
 
 export function minimapStorageKey(groupSlug: string): string {
   return `hera_last_item_${groupSlug}`;

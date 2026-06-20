@@ -148,6 +148,40 @@ export interface GroupSyncStatusResponse {
   is_fully_synced: boolean;
 }
 
+export interface MinimapZone {
+  zoneId: string;
+  zoneName: string;
+  x: number;
+  y: number;
+  itemIds: number[];
+}
+
+export interface MinimapConfig {
+  imageSrc: string;
+  zones: MinimapZone[];
+}
+
+export interface MinimapTemplateZone {
+  zoneId: string;
+  zoneName: string;
+  x: number;
+  y: number;
+  itemNames: string[];
+}
+
+export interface MinimapTemplateConfig {
+  imageSrc: string;
+  zones: MinimapTemplateZone[];
+}
+
+export async function getDynamicMinimapConfig(groupId: number): Promise<MinimapConfig> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/minimap`, {
+    headers: { ...NGROK_HEADERS },
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Bản đồ chưa khả dụng"));
+  return res.json();
+}
+
 
 export interface SearchMatch {
   item_id: number;
@@ -342,6 +376,33 @@ export async function forceSyncItem(
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Không thể bắt đầu đồng bộ hiện vật"));
+  }
+  return res.json();
+}
+
+export async function uploadMinimapConfig(
+  groupId: number,
+  payload: MinimapTemplateConfig
+): Promise<MinimapTemplateConfig> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/minimap`, {
+    method: "PUT",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không cập nhật được cấu hình Minimap"));
+  }
+  return res.json();
+}
+
+export async function downloadMinimapTemplate(
+  groupId: number
+): Promise<MinimapTemplateConfig> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/minimap/template`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được JSON mẫu"));
   }
   return res.json();
 }

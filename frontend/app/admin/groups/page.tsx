@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import GroupDocumentsPanel from "@/components/GroupDocumentsPanel";
+import MinimapConfigPanel from "@/components/admin/MinimapConfigPanel";
 import ItemsManagementPanel from "@/components/ItemsManagementPanel";
 import {
   AdminAlert,
@@ -144,6 +145,8 @@ export default function GroupsPage() {
       )}
 
       <GroupDocumentsPanel groupId={activeGroup.id} groupName={activeGroup.name} />
+
+      <MinimapConfigPanel groupId={activeGroup.id} groupName={activeGroup.name} />
 
       <ItemsManagementPanel
         groups={groups}

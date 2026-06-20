@@ -50,6 +50,9 @@ def _migrate_schema() -> None:
                         "ALTER TABLE groups ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 1"
                     )
                 )
+        if "minimap_config" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE groups ADD COLUMN minimap_config JSON"))
 
 
 def _seed_admin_user() -> None:
