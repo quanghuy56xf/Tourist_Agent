@@ -169,13 +169,17 @@ def regenerate_related_items_task(
     document_ids: list[int] | None = None,
     item_ids: list[int] | None = None,
 ) -> None:
-    db = SessionLocal()
-    try:
-        items = db.query(Item).filter(Item.group_id == group_id).all()
-        target_item_ids = [item.id for item in items]
-    finally:
-        db.close()
-    regenerate_items_task(target_item_ids)
+    if item_ids is not None:
+        target_item_ids = item_ids
+    else:
+        db = SessionLocal()
+        try:
+            target_item_ids = items_affected_by_documents(db, group_id, document_ids)
+        finally:
+            db.close()
+            
+    if target_item_ids:
+        regenerate_items_task(target_item_ids)
 
 
 def invalidate_related_item_variants(

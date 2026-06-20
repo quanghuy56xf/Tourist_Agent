@@ -142,8 +142,8 @@ export interface GroupItemsResponse {
 }
 
 export interface GroupSyncStatusResponse {
-  total_items: int;
-  synced_items: int;
+  total_items: number;
+  synced_items: number;
   is_fully_synced: boolean;
 }
 
