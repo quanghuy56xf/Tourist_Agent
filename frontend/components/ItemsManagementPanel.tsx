@@ -22,10 +22,13 @@ import {
   updateItemImage,
   getGroupSyncStatus,
   forceSyncGroup,
+  forceSyncItem,
   GroupSyncStatusResponse,
 } from "@/lib/api";
 import { useAdminGroup } from "@/components/admin/AdminGroupProvider";
 import { compressImage } from "@/lib/imageCompress";
+
+const SYNC_STATUS_POLL_MS = 60_000;
 
 type BrowseFilter = number | "ungrouped" | null;
 
@@ -76,6 +79,9 @@ export default function ItemsManagementPanel({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [syncStatus, setSyncStatus] = useState<GroupSyncStatusResponse | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncingItemId, setSyncingItemId] = useState<number | null>(null);
+  const [syncPollRun, setSyncPollRun] = useState(0);
+  const forceNextSyncPollRef = useRef(false);
 
   const canEditStory = isEditableContentVariant(selectedPersona, selectedLanguage);
 
@@ -223,30 +229,43 @@ export default function ItemsManagementPanel({
 
   useEffect(() => {
     let active = true;
+    let timeoutId: number | null = null;
     if (typeof resolvedFilter !== "number") {
       setSyncStatus(null);
       return;
     }
 
-    const fetchStatus = async () => {
+    const fetchStatus = async (forceNextPoll = false) => {
       try {
         const res = await getGroupSyncStatus(resolvedFilter);
-        if (active) setSyncStatus(res);
+        if (!active) return;
+        setSyncStatus(res);
+        if (forceNextPoll || !res.is_fully_synced) {
+          timeoutId = window.setTimeout(
+            () => void fetchStatus(),
+            SYNC_STATUS_POLL_MS
+          );
+        }
       } catch (err) {
         console.error("Failed to fetch sync status", err);
+        if (active) {
+          timeoutId = window.setTimeout(
+            () => void fetchStatus(),
+            SYNC_STATUS_POLL_MS
+          );
+        }
       }
     };
 
-    void fetchStatus();
-    const interval = setInterval(() => {
-      void fetchStatus();
-    }, 5000);
+    const forceNextPoll = forceNextSyncPollRef.current;
+    forceNextSyncPollRef.current = false;
+    void fetchStatus(forceNextPoll);
 
     return () => {
       active = false;
-      clearInterval(interval);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
     };
-  }, [resolvedFilter]);
+  }, [resolvedFilter, syncPollRun]);
 
   const handleForceSync = async () => {
     if (typeof resolvedFilter !== "number") return;
@@ -254,10 +273,26 @@ export default function ItemsManagementPanel({
     setError(null);
     try {
       await forceSyncGroup(resolvedFilter);
+      forceNextSyncPollRef.current = true;
+      setSyncPollRun((current) => current + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đồng bộ thất bại");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleForceSyncItem = async (itemId: number) => {
+    setSyncingItemId(itemId);
+    setError(null);
+    try {
+      await forceSyncItem(itemId);
+      forceNextSyncPollRef.current = true;
+      setSyncPollRun((current) => current + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Đồng bộ hiện vật thất bại");
+    } finally {
+      setSyncingItemId(null);
     }
   };
 
@@ -677,6 +712,8 @@ export default function ItemsManagementPanel({
                   onLanguageChange={setSelectedLanguage}
                   canEditStory={canEditStory}
                   regenNotice={expandedId === item.id ? regenNotice : null}
+                  onForceSyncItem={() => handleForceSyncItem(item.id)}
+                  syncingItem={syncingItemId === item.id}
                 />
               ))}
             </div>

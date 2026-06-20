@@ -15,14 +15,13 @@ def test_extract_complete_text_rejects_token_limited_response():
         extract_complete_text(response)
 
 
-def test_extract_complete_text_rejects_text_cut_mid_sentence():
+def test_extract_complete_text_accepts_non_punctuated_text():
     response = SimpleNamespace(
-        content="Công trình này đánh dấu không",
+        content="Fun fact: công trình này là biểu tượng nổi bật ✨",
         response_metadata={"finish_reason": "STOP"},
     )
 
-    with pytest.raises(ValueError, match="incomplete"):
-        extract_complete_text(response)
+    assert extract_complete_text(response).endswith("✨")
 
 
 def test_extract_complete_text_accepts_complete_sentence():

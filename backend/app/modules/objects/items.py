@@ -3,7 +3,7 @@ from app.schemas.group import GroupItemResponse, ItemImageResponse
 from app.core import storage
 
 
-def item_to_response(item: Item) -> GroupItemResponse:
+def item_to_response(item: Item, sync_state: str | None = None) -> GroupItemResponse:
     images = storage.list_item_images(item.id)
     main_image_url = item.main_image_url
     front = next((img for img in images if img["angle"] == "front"), None)
@@ -21,4 +21,5 @@ def item_to_response(item: Item) -> GroupItemResponse:
             for img in images
         ],
         created_at=item.created_at,
+        sync_state=sync_state,
     )

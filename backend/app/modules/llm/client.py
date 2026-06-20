@@ -93,8 +93,4 @@ def extract_complete_text(response: Any) -> str:
     if finish_reason in {"MAX_TOKENS", "LENGTH", "TOKEN_LIMIT"}:
         raise ValueError("LLM returned incomplete text content")
 
-    text = extract_text_content(getattr(response, "content", None))
-    terminal_text = text.rstrip("\"')]} ")
-    if terminal_text and terminal_text[-1] not in ".?!":
-        raise ValueError("LLM returned incomplete text content")
-    return text
+    return extract_text_content(getattr(response, "content", None))
