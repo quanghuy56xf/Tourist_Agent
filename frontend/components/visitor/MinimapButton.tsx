@@ -8,6 +8,7 @@ import { useGroupSlug } from "@/lib/useGroupPath";
 import {
   hasUnreadMinimap,
   markMinimapSeen,
+  readMinimapSuggestion,
   MINIMAP_UPDATED_EVENT,
 } from "@/lib/minimapState";
 import MinimapModal from "./MinimapModal";
@@ -17,6 +18,7 @@ export default function MinimapButton() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(false);
   const [config, setConfig] = useState<MinimapConfig | null>(null);
+  const [suggestedItemId, setSuggestedItemId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,10 +43,14 @@ export default function MinimapButton() {
 
   useEffect(() => {
     setUnread(hasUnreadMinimap(groupSlug));
+    setSuggestedItemId(readMinimapSuggestion(groupSlug));
 
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ groupSlug?: string }>).detail;
-      if (detail?.groupSlug === groupSlug) setUnread(true);
+      if (detail?.groupSlug === groupSlug) {
+        setUnread(true);
+        setSuggestedItemId(readMinimapSuggestion(groupSlug));
+      }
     };
 
     window.addEventListener(MINIMAP_UPDATED_EVENT, handleUpdate);
@@ -94,6 +100,7 @@ export default function MinimapButton() {
         onClose={() => setOpen(false)}
         groupSlug={groupSlug}
         config={config}
+        suggestedItemId={suggestedItemId}
       />
     </>
   );

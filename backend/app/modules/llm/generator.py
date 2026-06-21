@@ -79,6 +79,12 @@ class RAGGenerator:
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
 - Đưa các sự thật bất ngờ (Fact/Fun Fact) lên đầu.
 - Sử dụng emoji một cách hợp lý."""
+        elif persona == "Companion":
+            persona_instructions = """Phong cách trả lời (Lê Quý Đôn 18 tuổi):
+- Xưng "ta", gọi du khách là "bạn".
+- Hào hứng, thông minh, kể chuyện sinh động nhưng không kiêu ngạo.
+- Chỉ sử dụng dữ kiện trong tài liệu, tuyệt đối không bịa.
+- Khi thiếu thông tin, thành thật nói rằng ta chưa đọc đến."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách trả lời (Persona: Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
@@ -122,6 +128,12 @@ Câu trả lời:"""
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
 - Đưa các sự thật bất ngờ lên đầu nếu phù hợp.
 - Có thể dùng emoji hợp lý."""
+        elif persona == "Companion":
+            persona_instructions = """Phong cách (Lê Quý Đôn 18 tuổi):
+- Xưng "ta", gọi người nghe là "bạn".
+- Giọng trẻ trung, uyên bác, hào hứng và sinh động.
+- Có thể tự trêu nhẹ: "À ta lại nói nhiều quá rồi..."
+- Giữ nguyên toàn bộ dữ kiện gốc, tuyệt đối không thêm thông tin."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách (Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
@@ -197,6 +209,50 @@ Tài liệu được cung cấp (Context):
         response = invoke_llm(self.llm, messages)
         return extract_complete_text(response)
 
+
+    def generate_companion_chat(
+        self,
+        message: str,
+        history: List[dict],
+        retrieved_docs: List[Document],
+        current_item: str,
+        visited_items: List[str],
+    ) -> str:
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+        context = (
+            self._format_context(retrieved_docs)
+            if retrieved_docs
+            else "Không có ngữ cảnh xác thực bổ sung."
+        )
+        journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
+        system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
+đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
+
+Phong cách giao tiếp:
+- Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
+- Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
+- Kể chuyện sinh động và liên hệ những nơi khách đã ghé khi phù hợp.
+- Khi tài liệu không đủ, nói: "Cái này ta chưa đọc đến, để tra lại sau!"
+- KHÔNG bịa; chỉ dùng kiến thức từ Context được cung cấp.
+- Trả lời bằng tiếng Việt, tự nhiên, không quá 300 từ.
+
+Hiện vật đang xem: {current_item}
+Du khách đã tham quan: {journey}
+
+Context xác thực:
+{context}
+"""
+        messages = [SystemMessage(content=system_prompt)]
+        for entry in history[-10:]:
+            if entry["role"] == "user":
+                messages.append(HumanMessage(content=entry["content"]))
+            elif entry["role"] == "assistant":
+                messages.append(AIMessage(content=entry["content"]))
+        messages.append(HumanMessage(content=message))
+
+        response = invoke_llm(self.llm, messages)
+        return extract_complete_text(response)
 
 # Singleton instance
 _generator_instance = None

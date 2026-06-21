@@ -6,6 +6,7 @@ import BackButton from "@/components/visitor/BackButton";
 import HomeButton from "@/components/visitor/HomeButton";
 import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
+import CompanionChat from "@/components/visitor/CompanionChat";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
 import { playChatTts, stopChatTts } from "@/lib/chatTts";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
 import { rememberMinimapItem } from "@/lib/minimapState";
+import { addVisitedItem, isCompanionMode } from "@/lib/companionState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
@@ -65,6 +67,7 @@ export default function ItemDetailPage() {
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [introActive, setIntroActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [companionMode, setCompanionMode] = useState(false);
 
   const stopGuidePlayback = () => {
     heraPanelRef.current?.stopPlayback();
@@ -77,6 +80,12 @@ export default function ItemDetailPage() {
       setAutoSpeak(localStorage.getItem("chat_auto_speak") === "true");
     }
   }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCompanionMode(isCompanionMode(window.sessionStorage));
+    }
+  }, []);
+
 
   useEffect(() => {
     return () => {
@@ -96,10 +105,11 @@ export default function ItemDetailPage() {
         const data = await getItem(itemId);
         if (cancelled) return;
         rememberMinimapItem(groupSlug, itemId);
+        addVisitedItem(window.localStorage, itemId);
         setItem(data);
         setLoadingItem(false);
         try {
-          const itemContent = await getItemContent(itemId, persona, language);
+          const itemContent = await getItemContent(itemId, companionMode ? "Companion" : persona, language);
           if (!cancelled) {
             setContent(itemContent.content);
             setAudioUrl(
@@ -130,7 +140,7 @@ export default function ItemDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [groupSlug, itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
+  }, [companionMode, groupSlug, itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
 
   useEffect(() => {
     if (!itemId || !personaReady || !localeReady) return;
@@ -254,29 +264,33 @@ export default function ItemDetailPage() {
             <div className="h-px flex-1" style={{ background: "var(--border)" }} />
           </div>
 
-          <HeraGuidePanel
-            ref={heraPanelRef}
-            content={content}
-            audioUrl={audioUrl}
-            audioReady={audioReady}
-            loading={loadingContent}
-            language={language}
-            overlay={introActive}
-            slideshowImages={
-              slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []
-            }
-            slideshowAlt={item.name}
-            onIntroActiveChange={setIntroActive}
-          />
+          {companionMode ? (
+            <CompanionChat itemId={itemId} initialNarration={content} compact />
+          ) : (
+            <HeraGuidePanel
+              ref={heraPanelRef}
+              content={content}
+              audioUrl={audioUrl}
+              audioReady={audioReady}
+              loading={loadingContent}
+              language={language}
+              overlay={introActive}
+              slideshowImages={
+                slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []
+              }
+              slideshowAlt={item.name}
+              onIntroActiveChange={setIntroActive}
+            />
+          )}
         </div>
 
-        <div className="mb-3 flex items-center gap-2">
+        <div className={`${companionMode ? "hidden" : "mb-3 flex items-center gap-2"}`}>
           <div className="h-px flex-1" style={{ background: "var(--border)" }} />
           <span className="artifact-section-label px-2">{t.item.qaSection}</span>
           <div className="h-px flex-1" style={{ background: "var(--border)" }} />
         </div>
 
-        <div className="space-y-3">
+        <div className={companionMode ? "hidden" : "space-y-3"}>
           {chatHistory.map((msg, idx) => (
             <div
               key={idx}
@@ -317,7 +331,7 @@ export default function ItemDetailPage() {
       </section>
 
       <div
-        className="artifact-fixed-bar"
+        className={companionMode ? "hidden" : "artifact-fixed-bar"}
         style={{ background: "rgba(14,11,7,0.95)", borderTop: "1px solid var(--border)" }}
       >
         <div className="space-y-2">

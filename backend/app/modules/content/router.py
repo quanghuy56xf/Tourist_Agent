@@ -230,7 +230,7 @@ def get_item_content_audio(
     if (
         variant.audio_data is None
         or variant.audio_mime is None
-        or not is_current_audio_mime(variant.audio_mime)
+        or not is_current_audio_mime(variant.audio_mime, persona=persona)
     ):
         variant = service.ensure_audio(db, item, persona, language)
     if variant is None or variant.audio_data is None or variant.audio_mime is None:

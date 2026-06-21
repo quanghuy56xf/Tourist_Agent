@@ -56,3 +56,23 @@ Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau 
 - Visitor API resolves `itemNames` to environment-local `itemIds` within the selected Group.
 - Visitor UI prefetches the configuration before opening the modal.
 - Static `frontend/lib/minimapConfig.ts` has been replaced by API configuration plus `frontend/lib/minimapState.ts`.
+
+## 7. AI Historical Companion (2026-06-21)
+- Added the independent `/{groupSlug}/companion` journey for Lê Quý Đôn at age 18.
+- Companion mode persists for the current browser session and records visited item IDs locally.
+- Item detail uses the dedicated Companion narration and chat interface while this mode is active.
+- Added `POST /api/companion/chat`, with verified item context and visited-item names scoped to the current Group.
+- Companion speech uses Edge TTS voice `vi-VN-NamMinhNeural`; microphone input uses the browser Web Speech API when available.
+- **UI/UX Tweaks**:
+  - Implemented Gradient Fade Mask (`mask-image: linear-gradient`) to blend the square avatar/video naturally into the dark UI background without harsh borders.
+  - Replaced the initial "Close" button with a standard `<HomeButton />` and a "📸 Quét" (Scan) button in the Companion header.
+  - Added a large glowing Voice Assistant microphone button (CompanionMic pattern) above the chat input with pulsing CSS animations (`animate-ping`, `animate-pulse`, `animate-spin`) to encourage voice interaction.
+  - The chat input box is now always visible. If the user talks without scanning an item, the companion responds locally with a canned prompt requesting them to scan first.
+- **Mobile Speech Recognition Fixes**:
+  - Added error catching for `aborted` and `not-allowed` errors on mobile browsers, showing specific error codes.
+  - Handled iOS Safari `aborted` errors by explicitly calling `stopChatTts()` before `startListening()` to avoid audio session conflicts.
+  - Warns users if they open the link via in-app browsers (Zalo/Facebook) which block microphone access.
+- Avatar images are loaded from `frontend/public/images/companion/` (updated to `companion-bg.png` generated via `generate_image`); missing assets have an in-app fallback.
+- Intro video is expected at `frontend/public/videos/companion-intro.mp4`; a welcome screen is used until the video is supplied.
+- One-time narration generation script: `backend/scripts/generate_companion_narration.py`.
+- Companion proactively requests a short next-stop suggestion and notifies the Minimap after narration.

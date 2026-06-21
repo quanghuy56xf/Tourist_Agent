@@ -31,6 +31,20 @@ class ChatRequest(BaseModel):
     search_session_id: str | None = Field(default=None, max_length=64)
 
 
+class CompanionChatRequest(BaseModel):
+    item_id: int
+    suggest_next: bool = False
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
+    message: str = Field(min_length=1, max_length=2000)
+    visited_item_ids: list[int] = Field(default_factory=list, max_length=100)
+    session_id: str | None = Field(default=None, max_length=64)
+
+
+
+class CompanionChatResponse(BaseModel):
+    content: str
+    next_item_id: int | None = None
+
 class ChatResponse(BaseModel):
     content: str
 
@@ -38,3 +52,4 @@ class ChatResponse(BaseModel):
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
     language: Literal["vi", "en"] = "vi"
+    persona: Literal["Companion"] | None = None

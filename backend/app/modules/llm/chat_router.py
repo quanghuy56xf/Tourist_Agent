@@ -12,7 +12,12 @@ from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
 from app.modules.rag.retriever import try_get_rag_retriever
-from app.schemas.generate import ChatRequest, ChatResponse
+from app.schemas.generate import (
+    ChatRequest,
+    ChatResponse,
+    CompanionChatRequest,
+    CompanionChatResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,3 +136,79 @@ def chat_with_ai(
         success=True,
     )
     return ChatResponse(content=content)
+
+
+@router.post("/companion/chat", response_model=CompanionChatResponse)
+def chat_with_companion(
+    request: CompanionChatRequest,
+    db: Session = Depends(get_db),
+):
+    item = db.query(Item).filter(Item.id == request.item_id).first()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
+
+    docs, has_verified = build_chat_item_context(
+        item_id=item.id,
+        item_name=item.name,
+        item_description=item.description,
+        group_id=item.group_id,
+        retriever=try_get_rag_retriever(),
+        top_k=RAG_CHAT_TOP_K,
+        query=request.message,
+    )
+    if not has_verified:
+        return CompanionChatResponse(
+            content="Cái này ta chưa đọc đến, để tra lại sau!"
+        )
+
+    visited_rows = (
+        db.query(Item.id, Item.name)
+        .filter(
+            Item.id.in_(request.visited_item_ids),
+            Item.group_id == item.group_id,
+        )
+        .all()
+        if request.visited_item_ids
+        else []
+    )
+    names_by_id = {row.id: row.name for row in visited_rows}
+    visited_names = [
+        names_by_id[visited_id]
+        for visited_id in request.visited_item_ids
+        if visited_id in names_by_id
+    ]
+    history = [
+        {"role": entry.role, "content": entry.content}
+        for entry in request.history
+    ]
+
+    next_item_id = None
+    if request.suggest_next:
+        excluded_ids = set(request.visited_item_ids)
+        excluded_ids.add(item.id)
+        next_item = (
+            db.query(Item.id)
+            .filter(
+                Item.group_id == item.group_id,
+                Item.id.notin_(excluded_ids),
+            )
+            .order_by(Item.id.asc())
+            .first()
+        )
+        if next_item is not None:
+            next_item_id = next_item.id
+
+    try:
+        content = get_rag_generator().generate_companion_chat(
+            message=request.message,
+            history=history,
+            retrieved_docs=docs,
+            current_item=item.name,
+            visited_items=visited_names,
+        )
+    except LLMServiceUnavailableError:
+        raise HTTPException(status_code=503, detail="Dịch vụ AI tạm thời không khả dụng") from None
+    except Exception:
+        logger.exception("Companion chat generation failed for item %s", item.id)
+        raise HTTPException(status_code=502, detail="Không thể trò chuyện với nhân vật lúc này") from None
+    return CompanionChatResponse(content=content, next_item_id=next_item_id)

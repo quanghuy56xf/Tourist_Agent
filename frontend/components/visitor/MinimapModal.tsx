@@ -9,6 +9,7 @@ interface MinimapModalProps {
   onClose: () => void;
   groupSlug: string;
   config: MinimapConfig | null;
+  suggestedItemId: number | null;
 }
 
 export default function MinimapModal({
@@ -16,12 +17,17 @@ export default function MinimapModal({
   onClose,
   groupSlug,
   config,
+  suggestedItemId,
 }: MinimapModalProps) {
   const [lastItemId, setLastItemId] = useState<number | null>(null);
   const currentZone =
     lastItemId === null
       ? null
       : config?.zones.find((zone) => zone.itemIds.includes(lastItemId)) ?? null;
+  const suggestedZone =
+    suggestedItemId === null
+      ? null
+      : config?.zones.find((zone) => zone.itemIds.includes(suggestedItemId)) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -84,6 +90,16 @@ export default function MinimapModal({
                   <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]" />
                 </div>
               )}
+              {suggestedZone && suggestedZone.zoneId !== currentZone?.zoneId && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${suggestedZone.x}%`, top: `${suggestedZone.y}%` }}
+                  aria-label={`Điểm được gợi ý: ${suggestedZone.zoneName}`}
+                >
+                  <span className="absolute -inset-3 animate-ping rounded-full bg-amber-300/60" />
+                  <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
+                </div>
+              )}
             </div>
             <div className="mt-3 rounded-xl bg-white/[0.04] px-4 py-3">
               <p className="text-xs text-amber-200/65">
@@ -92,6 +108,11 @@ export default function MinimapModal({
               <p className="mt-1 font-medium text-amber-50">
                 {currentZone?.zoneName ?? "Chưa xác định vị trí"}
               </p>
+              {suggestedZone && (
+                <p className="mt-2 text-sm text-amber-300">
+                  Đôn gợi ý tiếp theo: {suggestedZone.zoneName}
+                </p>
+              )}
             </div>
           </>
         ) : (

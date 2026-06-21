@@ -24,6 +24,7 @@ export default function MethodSelectionPage() {
   const groupSlug = useGroupSlug();
   const scanPath = useGroupPath("/scan");
   const tourPath = useGroupPath("/tour");
+  const companionPath = useGroupPath("/companion");
   const { t } = useVisitorLocale();
   const { searchImage } = useObjectSearch();
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ export default function MethodSelectionPage() {
   const handleClick = (id: string) => {
     if (id === "camera") router.push(scanPath);
     else if (id === "upload") document.getElementById("file-upload")?.click();
+    else if (id === "companion") router.push(companionPath);
     else if (id === "tour") router.push(tourPath);
   };
 
@@ -73,7 +75,7 @@ export default function MethodSelectionPage() {
             </div>
           </div>
           <div className="w-full pt-1">
-            <PersonaSelector />
+            <PersonaSelector compact />
           </div>
         </div>
 
@@ -105,6 +107,23 @@ export default function MethodSelectionPage() {
             {errorMsg}
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => handleClick("companion")}
+          className="artifact-card flex w-full items-center gap-4 border-amber-400/35 p-5 text-left transition-transform active:scale-[0.98]"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/15 text-xl">
+            📜
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-amber-200">
+              Bắt đầu hành trình với Lê Quý Đôn
+            </h3>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              Trò chuyện bằng giọng nói cùng người bạn đồng hành 18 tuổi
+            </p>
+          </div>
+        </button>
 
         {methods.map((m) => (
           <button

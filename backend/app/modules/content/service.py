@@ -380,11 +380,15 @@ class ItemContentService:
         if (
             variant.audio_data is not None
             and variant.audio_mime is not None
-            and is_current_audio_mime(variant.audio_mime)
+            and is_current_audio_mime(variant.audio_mime, persona=persona)
         ):
             return variant
 
-        audio_result = synthesize_speech(variant.text_content, language)
+        audio_result = (
+            synthesize_speech(variant.text_content, language, persona=persona)
+            if persona == "Companion"
+            else synthesize_speech(variant.text_content, language)
+        )
         if audio_result is None or not audio_result[0]:
             return variant
 
@@ -395,7 +399,7 @@ class ItemContentService:
             language=language,
             text_content=variant.text_content,
             audio_data=audio_result[0],
-            audio_mime=build_audio_mime(),
+            audio_mime=build_audio_mime(persona=persona),
             source=variant.source,
         )
 

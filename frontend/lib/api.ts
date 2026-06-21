@@ -756,6 +756,10 @@ export interface ChatResponse {
   content: string;
 }
 
+export interface CompanionChatResponse extends ChatResponse {
+  next_item_id: number | null;
+}
+
 export async function chatWithAI(
   itemId: number,
   message: string,
@@ -782,6 +786,35 @@ export async function chatWithAI(
   }
   return res.json();
 }
+export async function chatWithCompanion(
+  itemId: number,
+  message: string,
+  history: ChatMessage[],
+  visitedItemIds: number[],
+  sessionId?: string,
+  suggestNext = false
+): Promise<CompanionChatResponse> {
+  const res = await fetch(`${API_URL}/api/companion/chat`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: itemId,
+      message,
+      history,
+      visited_item_ids: visitedItemIds,
+      session_id: sessionId,
+      suggest_next: suggestNext,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      await parseApiError(res, "Không thể trò chuyện với Lê Quý Đôn lúc này")
+    );
+  }
+  return res.json();
+}
+
+
 
 export function toTtsLanguageCode(language: string): "vi" | "en" {
   const normalized = language.trim().toLowerCase();
@@ -794,12 +827,17 @@ export function toTtsLanguageCode(language: string): "vi" | "en" {
 export async function fetchTTSAudio(
   text: string,
   language: string = "vi",
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  persona?: "Companion"
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/tts`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, language: toTtsLanguageCode(language) }),
+    body: JSON.stringify({
+      text,
+      language: toTtsLanguageCode(language),
+      persona,
+    }),
     signal,
   });
   if (!res.ok) {
