@@ -787,7 +787,7 @@ export async function chatWithAI(
   return res.json();
 }
 export async function chatWithCompanion(
-  itemId: number,
+  itemId: number | null,
   message: string,
   history: ChatMessage[],
   visitedItemIds: number[],
@@ -812,6 +812,31 @@ export async function chatWithCompanion(
     );
   }
   return res.json();
+}
+
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  const extension = audioBlob.type.includes("mp4")
+    ? "m4a"
+    : audioBlob.type.includes("ogg")
+      ? "ogg"
+      : "webm";
+  formData.append("audio", audioBlob, `speech.${extension}`);
+
+  const res = await fetch(`${API_URL}/api/stt`, {
+    method: "POST",
+    headers: apiHeaders(),
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(
+      await parseApiError(res, "Không thể nhận diện giọng nói lúc này")
+    );
+  }
+  const data = (await res.json()) as { transcript?: string };
+  const transcript = data.transcript?.trim();
+  if (!transcript) throw new Error("Không nhận diện được nội dung giọng nói");
+  return transcript;
 }
 
 

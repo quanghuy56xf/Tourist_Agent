@@ -42,11 +42,11 @@ stateModule.exports.enableCompanionMode(fakeStorage);
 assert.equal(stateModule.exports.isCompanionMode(fakeStorage), true);
 
 const voiceSource = read("lib/voiceInput.ts");
-assert.match(voiceSource, /SpeechRecognition/);
-assert.match(voiceSource, /webkitSpeechRecognition/);
+assert.match(voiceSource, /MediaRecorder/);
+assert.match(voiceSource, /getUserMedia/);
 assert.match(voiceSource, /isVoiceInputSupported/);
-assert.match(voiceSource, /startListening/);
-assert.match(voiceSource, /stopListening/);
+assert.match(voiceSource, /startRecording/);
+assert.match(voiceSource, /stopRecording/);
 
 const apiSource = read("lib/api.ts");
 assert.match(apiSource, /chatWithCompanion/);
@@ -65,7 +65,9 @@ assert.match(introSource, /Bỏ qua/);
 assert.match(introSource, /onError/);
 
 const chatSource = read("components/visitor/CompanionChat.tsx");
-assert.match(chatSource, /isVoiceInputSupported/);
+assert.match(chatSource, /startRecording/);
+assert.match(chatSource, /stopRecording/);
+assert.match(chatSource, /transcribeAudio/);
 assert.match(chatSource, /chatWithCompanion/);
 assert.match(chatSource, /playChatTts\([\s\S]*"Companion"/);
 assert.match(chatSource, /CompanionAvatar/);

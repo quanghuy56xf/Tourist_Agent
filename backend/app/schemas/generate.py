@@ -32,7 +32,7 @@ class ChatRequest(BaseModel):
 
 
 class CompanionChatRequest(BaseModel):
-    item_id: int
+    item_id: int | None = None
     suggest_next: bool = False
     history: list[ChatMessage] = Field(default_factory=list, max_length=20)
     message: str = Field(min_length=1, max_length=2000)

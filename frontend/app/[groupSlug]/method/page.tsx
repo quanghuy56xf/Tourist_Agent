@@ -74,7 +74,7 @@ export default function MethodSelectionPage() {
               <LanguageSelector compact />
             </div>
           </div>
-          <div className="w-full pt-1">
+          <div className="w-full pt-1 flex justify-center">
             <PersonaSelector compact />
           </div>
         </div>

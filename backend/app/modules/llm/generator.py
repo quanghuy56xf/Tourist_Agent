@@ -215,7 +215,7 @@ Tài liệu được cung cấp (Context):
         message: str,
         history: List[dict],
         retrieved_docs: List[Document],
-        current_item: str,
+        current_item: str | None,
         visited_items: List[str],
     ) -> str:
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -226,6 +226,7 @@ Tài liệu được cung cấp (Context):
             else "Không có ngữ cảnh xác thực bổ sung."
         )
         journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
+        current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
         system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
 đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
 
@@ -237,7 +238,7 @@ Phong cách giao tiếp:
 - KHÔNG bịa; chỉ dùng kiến thức từ Context được cung cấp.
 - Trả lời bằng tiếng Việt, tự nhiên, không quá 300 từ.
 
-Hiện vật đang xem: {current_item}
+Hiện vật đang xem: {current_item_str}
 Du khách đã tham quan: {journey}
 
 Context xác thực:

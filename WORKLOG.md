@@ -1,4 +1,4 @@
-## 2026-06-17 - Khám phá nhóm triển lãm cho Khách tham quan
+﻿## 2026-06-17 - Khám phá nhóm triển lãm cho Khách tham quan
 
 Bối cảnh:
 - Trang đích của khách tham quan có thể hiển thị "Không tải được danh sách khu di tích" hoặc chỉ hiển thị các nhóm public vì nó phụ thuộc vào API `/api/groups/public`.
@@ -186,3 +186,40 @@ Các thay đổi (Phương án 1):
 Xác nhận:
 - Giao diện đã cố định chuẩn hơn trên mobile, không còn hiện tượng xê dịch khi chuyển trang hoặc hiển thị camera/persona.
 - Đồng nhất logic layout, giảm sự trùng lặp code trong các page.
+
+## 2026-06-21 - Triển khai AI Historical Companion
+
+Bối cảnh:
+- Bổ sung một hành trình tham quan riêng với nhân vật Lê Quý Đôn ở tuổi 18.
+- Nhân vật cần kể chuyện theo ngữ cảnh hiện vật, ghi nhớ các điểm khách đã ghé và gợi ý điểm tiếp theo.
+
+Các thay đổi:
+- Thêm hành trình `/{groupSlug}/companion` và lưu Companion mode trong `sessionStorage`.
+- Thêm giao diện avatar, intro video, chat và giọng đọc riêng cho Companion.
+- Tích hợp Companion vào trang chi tiết hiện vật; lưu các hiện vật đã ghé trong trình duyệt.
+- Thêm `POST /api/companion/chat`; backend xác minh hiện vật, giới hạn lịch sử chat và chỉ sử dụng dữ liệu RAG thuộc Group hiện tại.
+- Thêm giọng Edge TTS `vi-VN-NamMinhNeural` cho nhân vật.
+- Companion có thể chủ động gợi ý điểm chưa ghé tiếp theo và gửi gợi ý sang Minimap.
+- Bổ sung fallback khi chưa quét hiện vật và hỗ trợ nhập câu hỏi bằng văn bản.
+
+## 2026-06-21 - Thay Web Speech API bằng MediaRecorder và Gemini STT
+
+Bối cảnh:
+- `webkitSpeechRecognition` thường trả lỗi `aborted` trên Safari iPhone khi nhận dạng tiếng Việt.
+- Quyền microphone, HTTPS và Cloudflare Tunnel vẫn hoạt động; vấn đề nằm ở khả năng nhận dạng tiếng Việt của Web Speech API/iOS.
+
+Các thay đổi:
+- Loại bỏ hoàn toàn `SpeechRecognition` và `webkitSpeechRecognition` khỏi Voice Input.
+- Frontend dùng `getUserMedia` và `MediaRecorder` để ghi âm; ưu tiên `audio/mp4` trên Safari và dùng WebM/Ogg khi được hỗ trợ.
+- Nút microphone chuyển qua hai trạng thái: `Đang ghi âm...` và `Đang xử lý...`.
+- Thêm `transcribeAudio()` gửi Blob bằng `multipart/form-data` đến `POST /api/stt`.
+- Thêm module backend `app/modules/stt/` dùng `gemini-2.5-flash-lite` để chép audio thành tiếng Việt.
+- API kiểm tra MIME type, file rỗng và giới hạn dung lượng 5 MB.
+- Transcript được đưa trở lại luồng Companion chat hiện có; không thay đổi logic RAG hoặc sinh câu trả lời.
+
+Xác nhận:
+- Backend STT và Companion: `9 passed`.
+- Frontend Companion và MediaRecorder contract tests: thành công.
+- `npm.cmd run build`: build production thành công.
+- `git diff --check`: không có lỗi whitespace.
+- Cần kiểm thử thủ công microphone trên Safari iPhone qua Cloudflare Tunnel.

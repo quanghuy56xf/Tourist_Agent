@@ -217,7 +217,7 @@ export default function ItemDetailPage() {
   const slideshowImages = getItemImageUrls(item);
 
   return (
-    <main className="flex flex-1 flex-col w-full overflow-hidden pb-24">
+    <main className={`flex flex-1 flex-col w-full overflow-hidden ${companionMode ? "pb-4" : "pb-24"}`}>
       <div className="relative h-44 shrink-0 overflow-hidden">
         <ItemHeroSlideshow
           images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
@@ -231,14 +231,26 @@ export default function ItemDetailPage() {
           <BackButton
             onClick={() =>
               router.push(
-                inTour
+                companionMode
+                  ? groupPath(groupSlug, "/companion")
+                  : inTour
                   ? groupPath(groupSlug, `/tour/${tourId}/play`)
-                  : scanPath
+                  : groupPath(groupSlug, "/method")
               )
             }
             label={t.common.back}
             variant="dark"
           />
+          {!companionMode && !inTour && (
+            <button
+              type="button"
+              onClick={() => router.push(scanPath)}
+              className="artifact-btn-secondary"
+            >
+              <span aria-hidden="true" className="text-sm">📸</span>
+              <span className="text-xs font-medium">Chụp tiếp</span>
+            </button>
+          )}
         </div>
         {confidence && (
           <span
@@ -256,8 +268,8 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-4">
-        <div className="hera-guide-sticky-wrap">
+      <section className={`flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 ${companionMode ? "" : "overflow-y-auto"}`}>
+        <div className={`flex flex-col ${companionMode ? "flex-1 min-h-0" : "hera-guide-sticky-wrap"}`}>
           <div className="mb-2 flex items-center gap-2">
             <div className="h-px flex-1" style={{ background: "var(--border)" }} />
             <span className="artifact-section-label px-2">{t.item.guideSection}</span>

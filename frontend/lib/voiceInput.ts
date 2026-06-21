@@ -1,98 +1,168 @@
-type SpeechRecognitionEventLike = {
-  results: ArrayLike<{ 0: { transcript: string } }>;
-  error?: string;
-  message?: string;
+type RecordingSession = {
+  recorder: MediaRecorder;
+  stream: MediaStream;
+  chunks: BlobPart[];
 };
 
-type SpeechRecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: SpeechRecognitionEventLike) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
+let activeSession: RecordingSession | null = null;
+let audioContext: AudioContext | null = null;
+let silenceTimerId: number | null = null;
 
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+const MIME_CANDIDATES = [
+  "audio/mp4",
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+];
 
-let recognitionInstance: SpeechRecognitionLike | null = null;
-let isRecognizing = false;
+function selectMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  return MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
+}
 
-function getRecognition(): SpeechRecognitionLike | null {
-  if (typeof window === "undefined") return null;
-  if (recognitionInstance) return recognitionInstance;
+function stopTracks(stream: MediaStream): void {
+  stream.getTracks().forEach((track) => track.stop());
+}
 
-  const speechWindow = window as typeof window & {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  };
-  
-  const Constructor = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-  if (!Constructor) return null;
-
-  recognitionInstance = new Constructor();
-  recognitionInstance.lang = "vi-VN";
-  recognitionInstance.interimResults = false;
-  recognitionInstance.continuous = false;
-  return recognitionInstance;
+function cleanupSilenceDetection(): void {
+  if (silenceTimerId !== null) {
+    cancelAnimationFrame(silenceTimerId);
+    silenceTimerId = null;
+  }
+  if (audioContext) {
+    audioContext.close().catch(() => {});
+    audioContext = null;
+  }
 }
 
 export function isVoiceInputSupported(): boolean {
-  return getRecognition() !== null;
+  return (
+    typeof window !== "undefined" &&
+    typeof MediaRecorder !== "undefined" &&
+    Boolean(navigator.mediaDevices?.getUserMedia)
+  );
 }
 
-export function startListening(
-  onResult: (text: string) => void,
-  onError: (errorEvent?: any) => void,
-  onEnd?: () => void
-): void {
-  const recognition = getRecognition();
-  if (!recognition) {
-    onError(new Error("Trình duyệt không hỗ trợ nhận diện giọng nói."));
-    return;
+export async function startRecording(onSilenceDetected?: () => void): Promise<void> {
+  if (!isVoiceInputSupported()) {
+    throw new Error("Trình duyệt không hỗ trợ ghi âm.");
+  }
+  if (activeSession) {
+    throw new Error("Micro đang ghi âm.");
   }
 
-  if (isRecognizing) {
-    recognition.stop();
-  }
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0]?.[0]?.transcript?.trim();
-    if (transcript) onResult(transcript);
-  };
-
-  recognition.onerror = (event) => {
-    isRecognizing = false;
-    // Bỏ qua lỗi 'no-speech' (người dùng không nói gì) hoặc báo lỗi rõ ràng hơn
-    if (event.error === 'no-speech') {
-       onEnd?.();
-       return;
+  // Khởi tạo AudioContext đồng bộ ngay lập tức để tránh iOS/Mobile Safari block sau khi await
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (AudioContextClass && onSilenceDetected) {
+    audioContext = new AudioContextClass();
+    // Đảm bảo audioContext chạy nếu đang bị suspended trên mobile
+    if (audioContext.state === "suspended") {
+      audioContext.resume().catch(() => {});
     }
-    // Gửi lỗi lên UI
-    onError(event);
-  };
+  }
 
-  recognition.onend = () => {
-    isRecognizing = false;
-    onEnd?.();
-  };
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false, // Tắt Auto Gain để điện thoại không tự khuếch đại tiếng ồn nền
+    },
+  });
 
   try {
-    recognition.start();
-    isRecognizing = true;
-  } catch (e) {
-    // Nếu gọi start() khi đang chạy, catch lỗi và bỏ qua
-    console.error("Speech recognition start error:", e);
-    onError(e);
+    const mimeType = selectMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+
+    if (audioContext && onSilenceDetected) {
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      let hasSpoken = false;
+      let lastSpokeTime = Date.now();
+      const startTime = Date.now();
+      const SILENCE_THRESHOLD = 80;
+      const MAX_SILENCE_MS = 1500;
+      const MAX_WAIT_MS = 5000;
+
+      const checkSilence = () => {
+        if (!activeSession) return;
+        analyser.getByteFrequencyData(dataArray);
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const avg = sum / bufferLength;
+
+        const now = Date.now();
+        if (avg > SILENCE_THRESHOLD) {
+          hasSpoken = true;
+          lastSpokeTime = now;
+        } else {
+          if (hasSpoken && now - lastSpokeTime > MAX_SILENCE_MS) {
+            onSilenceDetected();
+            return;
+          } else if (!hasSpoken && now - startTime > MAX_WAIT_MS) {
+            onSilenceDetected();
+            return;
+          }
+        }
+        silenceTimerId = requestAnimationFrame(checkSilence);
+      };
+      silenceTimerId = requestAnimationFrame(checkSilence);
+    }
+
+    recorder.start();
+    activeSession = { recorder, stream, chunks };
+  } catch (error) {
+    cleanupSilenceDetection();
+    stopTracks(stream);
+    throw error;
   }
 }
 
-export function stopListening(): void {
-  if (isRecognizing && recognitionInstance) {
-    recognitionInstance.stop();
-    isRecognizing = false;
+export function stopRecording(): Promise<Blob> {
+  const session = activeSession;
+  if (!session) {
+    return Promise.reject(new Error("Micro chưa bắt đầu ghi âm."));
   }
+  activeSession = null;
+  cleanupSilenceDetection();
+
+  return new Promise<Blob>((resolve, reject) => {
+    session.recorder.onstop = () => {
+      stopTracks(session.stream);
+      const blob = new Blob(session.chunks, {
+        type: session.recorder.mimeType || "audio/webm",
+      });
+      if (blob.size === 0) {
+        reject(new Error("Không ghi nhận được âm thanh."));
+        return;
+      }
+      resolve(blob);
+    };
+    session.recorder.onerror = () => {
+      stopTracks(session.stream);
+      reject(new Error("Ghi âm thất bại."));
+    };
+    session.recorder.stop();
+  });
+}
+
+export function cancelRecording(): void {
+  const session = activeSession;
+  activeSession = null;
+  cleanupSilenceDetection();
+  if (!session) return;
+  if (session.recorder.state !== "inactive") {
+    session.recorder.stop();
+  }
+  stopTracks(session.stream);
 }
