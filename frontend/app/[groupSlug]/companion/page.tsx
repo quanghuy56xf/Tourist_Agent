@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CompanionChat from "@/components/visitor/CompanionChat";
 import HomeButton from "@/components/visitor/HomeButton";
+import MinimapModal from "@/components/visitor/MinimapModal";
 import {
   enableCompanionMode,
   hasSeenCompanionIntro,
   markCompanionIntroSeen,
 } from "@/lib/companionState";
-import { useGroupPath } from "@/lib/useGroupPath";
+import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 
 export default function CompanionPage() {
   const router = useRouter();
+  const groupSlug = useGroupSlug();
   const scanPath = useGroupPath("/scan");
   const [showIntro, setShowIntro] = useState(false);
   const [ready, setReady] = useState(false);
+  const [minimapSuggestedId, setMinimapSuggestedId] = useState<number | null>(null);
 
   useEffect(() => {
     enableCompanionMode(window.sessionStorage);
@@ -52,7 +55,18 @@ export default function CompanionPage() {
           </button>
         </div>
       </header>
-      <CompanionChat showIntro={showIntro} onCompleteIntro={completeIntro} />
+      <CompanionChat 
+        showIntro={showIntro} 
+        onCompleteIntro={completeIntro} 
+        onSuggestNextPoint={(id) => setMinimapSuggestedId(id)}
+      />
+
+      <MinimapModal
+        isOpen={minimapSuggestedId !== null}
+        onClose={() => setMinimapSuggestedId(null)}
+        groupSlug={groupSlug}
+        suggestedItemId={minimapSuggestedId || undefined}
+      />
     </main>
   );
 }

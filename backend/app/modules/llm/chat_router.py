@@ -186,14 +186,21 @@ def chat_with_companion(
         for entry in request.history
     ]
 
+    if group_id is None and visited_rows:
+        first_item = db.query(Item.group_id).filter(Item.id == request.visited_item_ids[0]).first()
+        if first_item:
+            group_id = first_item.group_id
+
     next_item_id = None
-    if request.suggest_next and item is not None:
+    next_item_name = None
+    if request.suggest_next and group_id is not None:
         excluded_ids = set(request.visited_item_ids)
-        excluded_ids.add(item.id)
+        if item is not None:
+            excluded_ids.add(item.id)
         next_item = (
-            db.query(Item.id)
+            db.query(Item)
             .filter(
-                Item.group_id == item.group_id,
+                Item.group_id == group_id,
                 Item.id.notin_(excluded_ids),
             )
             .order_by(Item.id.asc())
@@ -201,6 +208,7 @@ def chat_with_companion(
         )
         if next_item is not None:
             next_item_id = next_item.id
+            next_item_name = next_item.name
 
     try:
         content = get_rag_generator().generate_companion_chat(
@@ -209,10 +217,11 @@ def chat_with_companion(
             retrieved_docs=docs,
             current_item=current_item_name,
             visited_items=visited_names,
+            next_item_name=next_item_name,
         )
     except LLMServiceUnavailableError:
         raise HTTPException(status_code=503, detail="Dịch vụ AI tạm thời không khả dụng") from None
     except Exception:
         logger.exception("Companion chat generation failed for item %s", item.id if item else None)
         raise HTTPException(status_code=502, detail="Không thể trò chuyện với nhân vật lúc này") from None
-    return CompanionChatResponse(content=content, next_item_id=next_item_id)
+    return CompanionChatResponse(content=content, next_item_id=next_item_id, next_item_name=next_item_name)

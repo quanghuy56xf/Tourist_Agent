@@ -758,6 +758,7 @@ export interface ChatResponse {
 
 export interface CompanionChatResponse extends ChatResponse {
   next_item_id: number | null;
+  next_item_name?: string | null;
 }
 
 export async function chatWithAI(

@@ -44,6 +44,7 @@ class CompanionChatRequest(BaseModel):
 class CompanionChatResponse(BaseModel):
     content: str
     next_item_id: int | None = None
+    next_item_name: str | None = None
 
 class ChatResponse(BaseModel):
     content: str

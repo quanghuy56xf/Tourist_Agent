@@ -14,6 +14,10 @@ import {
   stopRecording,
 } from "@/lib/voiceInput";
 import CompanionAvatar from "./CompanionAvatar";
+import CameraCapture from "@/components/CameraCapture";
+import ScanViewfinderFrame from "./ScanViewfinderFrame";
+import { useObjectSearch } from "@/lib/useObjectSearch";
+import type { SearchMatch } from "@/lib/api/search";
 
 interface CompanionChatProps {
   itemId?: number;
@@ -21,6 +25,7 @@ interface CompanionChatProps {
   compact?: boolean;
   showIntro?: boolean;
   onCompleteIntro?: () => void;
+  onSuggestNextPoint?: (itemId: number) => void;
 }
 
 function useStreamingText(text: string): string {
@@ -85,6 +90,37 @@ export default function CompanionChat({
   const [isLoading, setIsLoading] = useState(false);
   const [suggestionRequested, setSuggestionRequested] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
+  const { searchImage } = useObjectSearch();
+  const [showInlineCamera, setShowInlineCamera] = useState(false);
+  const [frozen, setFrozen] = useState(false);
+  const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "found">("idle");
+  const [scanProgress, setScanProgress] = useState(0);
+  const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
+  const [scanErrorMsg, setScanErrorMsg] = useState<string | null>(null);
+  const [fallbackSuggestions, setFallbackSuggestions] = useState<SearchMatch[] | null>(null);
+  const [suggestedNextPoint, setSuggestedNextPoint] = useState<{ id: number; name: string } | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopProgress = () => {
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current);
+      progressTimer.current = null;
+    }
+  };
+
+  const startProgress = () => {
+    stopProgress();
+    setScanProgress(0);
+    progressTimer.current = setInterval(() => {
+      setScanProgress((prev) => {
+        if (prev >= 95) return prev;
+        return prev + Math.random() * 8 + 4;
+      });
+    }, 80);
+  };
+
+  useEffect(() => () => stopProgress(), []);
+
   const endRef = useRef<HTMLDivElement>(null);
   const latestAssistant = useMemo(
     () => [...history].reverse().find((entry) => entry.role === "assistant")?.content ?? "",
@@ -155,14 +191,22 @@ export default function CompanionChat({
     }
   };
 
-  const send = async (message = input) => {
+  const send = async (message = input, isSystemEvent = false, requestSuggestNext = false) => {
     const cleaned = message.trim();
     if (!cleaned || isLoading) return;
     stopChatTts();
+    
+    // Clear previous suggestion when sending a new message
+    if (!isSystemEvent) {
+      setSuggestedNextPoint(null);
+    }
+    
     const userMessage: ChatMessage = { role: "user", content: cleaned };
     const previous = history.slice(-10);
     setHistory((current) => [...current, userMessage]);
-    setInput("");
+    if (!isSystemEvent) {
+      setInput("");
+    }
     setIsLoading(true);
 
     try {
@@ -171,11 +215,29 @@ export default function CompanionChat({
         cleaned,
         previous,
         getVisitedItemIds(window.localStorage),
-        getVisitorSessionId()
+        getVisitorSessionId(),
+        requestSuggestNext
       );
       const answer = { role: "assistant", content: response.content } as const;
       setHistory((current) => [...current, answer]);
-      void speak(response.content);
+      
+      const lowerResp = response.content.toLowerCase();
+      const shouldOpenCamera = (cleaned === "[SYSTEM_EVENT]: APP_OPENED" && getVisitedItemIds(window.localStorage).length === 0) ||
+        lowerResp.includes("chụp ảnh") ||
+        lowerResp.includes("hướng camera");
+
+      // Set suggested next point for UI buttons instead of auto-opening minimap
+      if (response.next_item_id !== null && response.next_item_name && onSuggestNextPoint) {
+        setSuggestedNextPoint({ id: response.next_item_id, name: response.next_item_name });
+      } else {
+        setSuggestedNextPoint(null);
+      }
+      
+      speak(response.content).then(() => {
+        if (shouldOpenCamera) {
+          setShowInlineCamera(true);
+        }
+      });
     } catch {
       setHistory((current) => [
         ...current,
@@ -212,6 +274,100 @@ export default function CompanionChat({
     };
   });
 
+  const handleCapture = async (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    setCapturedUrl(url);
+    setFrozen(true);
+    setScanPhase("scanning");
+    setScanErrorMsg(null);
+    startProgress();
+
+    try {
+      const response = await searchImage(blob);
+      stopProgress();
+      setScanProgress(100);
+
+      if (response.found && response.results.length > 0) {
+        setScanPhase("found");
+        const bestMatch = response.results[0];
+        
+        // Add to visited items
+        const currentVisited = getVisitedItemIds(window.localStorage);
+        if (!currentVisited.includes(bestMatch.item_id)) {
+          currentVisited.push(bestMatch.item_id);
+          window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
+        }
+        
+        setTimeout(() => {
+          setShowInlineCamera(false);
+          // Let AI know about the scanned item and request next suggestion
+          const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${bestMatch.item_id}`;
+          void send(scanMessage, true, true);
+        }, 900);
+        return;
+      }
+
+      if (!response.found && response.results && response.results.length > 0) {
+        const topMatches = response.results.slice(0, 3);
+        setFallbackSuggestions(topMatches);
+        setScanPhase("idle");
+        
+        const name1 = topMatches[0]?.name;
+        const name2 = topMatches[1]?.name;
+        let text = "Ây da, góc nhìn này hơi khó đoán quá. Đôn này đang phân vân, có phải bạn đang đứng trước ";
+        if (topMatches.length >= 2) {
+          text += `**${name1}** hay **${name2}** không? `;
+        } else {
+          text += `**${name1}** không? `;
+        }
+        text += "Chọn giúp ta một cái để ta kể chuyện tiếp nhé!";
+        
+        setHistory((current) => [...current, { role: "assistant", content: text }]);
+        void speak(text);
+        
+        stopProgress();
+        setScanProgress(0);
+        return;
+      }
+
+      setScanErrorMsg(response.message || "Không tìm thấy hiện vật nào.");
+      setFrozen(false);
+      setScanPhase("idle");
+      stopProgress();
+      setScanProgress(0);
+    } catch {
+      setScanErrorMsg("Có lỗi xảy ra khi quét ảnh.");
+      setFrozen(false);
+      setScanPhase("idle");
+      stopProgress();
+      setScanProgress(0);
+    }
+  };
+
+  const handleSuggestionSelect = (match: SearchMatch) => {
+    setFallbackSuggestions(null);
+    setScanPhase("found");
+    
+    const currentVisited = getVisitedItemIds(window.localStorage);
+    if (!currentVisited.includes(match.item_id)) {
+      currentVisited.push(match.item_id);
+      window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
+    }
+    
+    setTimeout(() => {
+      setShowInlineCamera(false);
+      const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${match.item_id}`;
+      void send(scanMessage, true, true);
+    }, 900);
+  };
+
+  const handleAppOpened = () => {
+    if (onCompleteIntro) onCompleteIntro();
+    if (history.length === 0) {
+      void send("[SYSTEM_EVENT]: APP_OPENED", true);
+    }
+  };
+
   const toggleMic = async () => {
     if (isTranscribing) return;
 
@@ -237,9 +393,9 @@ export default function CompanionChat({
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col">
+    <section className="flex min-h-0 flex-1 flex-col relative">
       <div className={`w-full shrink-0 flex justify-center ${compact ? "mt-2 mb-2" : ""}`}>
-        <CompanionAvatar isSpeaking={isSpeaking} size={compact ? "sm" : "lg"} introMode={showIntro} onIntroComplete={onCompleteIntro} />
+        <CompanionAvatar isSpeaking={isSpeaking} size={compact ? "sm" : "lg"} introMode={showIntro} onIntroComplete={handleAppOpened} />
       </div>
 
       <div className="relative min-h-0 flex-1 flex flex-col">
@@ -252,49 +408,103 @@ export default function CompanionChat({
           </p>
           <button
             type="button"
-            onClick={onCompleteIntro}
-            className="mt-8 text-sm uppercase tracking-widest text-amber-300/60 underline decoration-amber-300/30 underline-offset-4 transition-transform hover:scale-105"
+            onClick={handleAppOpened}
+            className="mt-8 px-6 py-3 rounded-full bg-amber-500 text-black font-bold uppercase tracking-widest transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
           >
-            Bỏ qua Intro
+            Bắt đầu hành trình
           </button>
         </div>
 
         {/* Chat UI */}
         <div className={`absolute inset-0 flex flex-col transition-opacity duration-1000 ${showIntro ? "opacity-0 pointer-events-none" : "opacity-100 delay-500"}`}>
-          <div className="min-h-0 flex-1 flex flex-col px-4 pb-4 pt-2">
-            <div className="flex-1 overflow-y-auto space-y-3 companion-chat-scroll">
+          <div className="min-h-0 flex-1 flex flex-col px-4 pb-4 pt-2 relative">
+            <div className="flex-1 overflow-y-auto space-y-3 companion-chat-scroll relative z-10">
               {history.map((message, index) => {
+                if (message.content.startsWith("[SYSTEM_EVENT]")) return null;
                 const isLatestAssistant =
                   message.role === "assistant" &&
                   message.content === latestAssistant &&
                   index === history.map((entry) => entry.content).lastIndexOf(latestAssistant);
-                return (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${message.role === "user"
-                          ? "bg-amber-500 text-black"
-                          : "border border-amber-200/15 bg-white/[0.06] text-amber-50"
-                        }`}
-                    >
-                      {isLatestAssistant ? streamedAssistant : message.content}
-                      {message.role === "assistant" && (
-                        <button
-                          type="button"
-                          onClick={() => void speak(message.content)}
-                          className="ml-2 text-amber-300"
-                          aria-label="Nghe Lê Quý Đôn đọc"
-                        >
-                          🔊
-                        </button>
-                      )}
+
+                if (message.role === "user") {
+                  return (
+                    <div key={`${message.role}-${index}`} className="flex justify-end">
+                      <div className="max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 bg-amber-500 text-black">
+                        {message.content}
+                      </div>
                     </div>
+                  );
+                }
+
+                // Assistant messages: split by \n\n to create separate bubbles
+                const parts = message.content.split(/\n\n+/).filter(Boolean);
+                const streamedContent = isLatestAssistant ? streamedAssistant : message.content;
+                // We must use the full streamed content so far and split it
+                const streamedParts = streamedContent.split(/\n\n+/).filter(Boolean);
+
+                return (
+                  <div key={`${message.role}-${index}`} className="flex flex-col gap-3">
+                    {streamedParts.map((partText, partIndex) => (
+                      <div key={partIndex} className="flex justify-start">
+                        <div className="max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 border border-amber-200/15 bg-white/[0.06] text-amber-50">
+                          {/* Parse markdown bold **text** for simplicity, or just plain text since React doesn't auto-parse md without a library. The previous code just rendered {content} directly. Let's keep it direct. */}
+                          {partText}
+                          {/* Show speaker icon only on the last part of the completed message */}
+                          {!isLatestAssistant && partIndex === parts.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => void speak(message.content)}
+                              className="ml-2 text-amber-300"
+                              aria-label="Nghe Lê Quý Đôn đọc"
+                            >
+                              🔊
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 );
               })}
+
+
+
               {isLoading && <p className="text-sm text-amber-200/60">Đôn đang suy nghĩ…</p>}
+              
+              {/* Proactive Action Buttons */}
+              {!isLoading && suggestedNextPoint && (
+                <div className="flex flex-col gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSuggestedNextPoint(null);
+                      void send("Kể thêm cho tôi chi tiết thú vị về hiện vật này nhé.");
+                    }}
+                    className="w-full text-left bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-4 py-3 rounded-xl transition-colors text-amber-100 text-sm flex items-center gap-3 shadow-sm"
+                  >
+                    <span className="text-amber-500 text-lg">❓</span>
+                    Hỏi thêm về hiện vật này
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onSuggestNextPoint) {
+                        onSuggestNextPoint(suggestedNextPoint.id);
+                      }
+                      setSuggestedNextPoint(null);
+                    }}
+                    className="w-full text-left bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-4 py-3 rounded-xl transition-colors text-blue-100 text-sm flex items-center gap-3 shadow-md relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/10 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                    <span className="text-blue-400 text-lg">🗺️</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-blue-50">Dẫn ta tới điểm tiếp theo</p>
+                      <p className="text-xs text-blue-200/70">{suggestedNextPoint.name}</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+
               {history.length === 0 && (
                 <p className="rounded-xl border border-amber-300/15 bg-white/[0.04] p-4 text-center text-sm text-amber-100/70">
                   Hãy hỏi Đôn một câu, hoặc quét một hiện vật để bắt đầu trò chuyện.
@@ -463,6 +673,97 @@ export default function CompanionChat({
           )}
         </div>
       </div>
+
+      {showInlineCamera && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+          {!fallbackSuggestions ? (
+            <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4">
+              📸 Hướng camera vào hiện vật và bấm nút chụp
+            </p>
+          ) : (
+            <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4 animate-pulse">
+              🤔 Đôn đang phân vân...
+            </p>
+          )}
+          <div className="w-full max-w-[320px] aspect-[3/4] max-h-[60vh] relative">
+            <ScanViewfinderFrame
+              scanning={scanPhase === "scanning"}
+              scanProgress={scanProgress}
+              found={scanPhase === "found"}
+            >
+              <CameraCapture
+                layout="inline"
+                onCapture={handleCapture}
+                frozen={frozen}
+                capturedUrl={capturedUrl}
+              />
+            </ScanViewfinderFrame>
+            
+            {fallbackSuggestions && (
+              <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-black/90 via-black/80 to-transparent p-4 flex flex-col justify-end z-20">
+                <div className="space-y-2 animate-in slide-in-from-bottom-8 duration-500">
+                  {fallbackSuggestions.map((match) => (
+                    <button
+                      key={match.item_id}
+                      type="button"
+                      onClick={() => handleSuggestionSelect(match)}
+                      className="w-full text-left bg-black/60 backdrop-blur-md border border-amber-500/50 hover:border-amber-400 hover:bg-black/80 p-3 rounded-xl flex items-center gap-3 transition-colors shadow-lg"
+                    >
+                      {match.image_url && (
+                        <img src={match.image_url} alt={match.name} className="w-12 h-12 object-cover rounded-md shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-amber-50 font-semibold truncate text-sm">{match.name}</p>
+                        <p className="text-amber-200/60 text-xs truncate">Chọn hiện vật này</p>
+                      </div>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFallbackSuggestions(null);
+                      setFrozen(false);
+                      setCapturedUrl(null);
+                    }}
+                    className="w-full py-3 mt-2 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-colors text-sm"
+                  >
+                    ↺ Chụp lại góc khác
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {scanErrorMsg && !fallbackSuggestions && (
+            <p className="text-red-400 mt-4 text-xs text-center px-4 bg-red-950/50 py-2 rounded-lg">{scanErrorMsg}</p>
+          )}
+          
+          {!fallbackSuggestions && (
+            <button
+              type="button"
+              onClick={() => document.getElementById("camera-capture-btn")?.click()}
+              disabled={scanPhase !== "idle"}
+              className="mt-8 w-full max-w-[240px] py-4 rounded-full bg-amber-500 text-black font-bold text-lg disabled:opacity-50 transition-transform active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+            >
+              {scanPhase === "scanning" ? "Đang quét..." : scanPhase === "found" ? "Đã nhận diện!" : "Chụp ngay"}
+            </button>
+          )}
+          
+          <button
+            type="button"
+            onClick={() => {
+              setShowInlineCamera(false);
+              setScanPhase("idle");
+              setFallbackSuggestions(null);
+              setFrozen(false);
+              setCapturedUrl(null);
+            }}
+            className="mt-6 text-amber-200/50 text-sm underline"
+          >
+            Đóng camera
+          </button>
+        </div>
+      )}
     </section>
   );
 }

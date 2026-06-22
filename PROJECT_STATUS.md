@@ -1,4 +1,4 @@
-﻿# 🚀 PROJECT STATUS: HERA - AI Heritage Guide V2
+# 🚀 PROJECT STATUS: HERA - AI Heritage Guide V2
 
 **Bản cập nhật gần nhất:** 2026-06-20
 
@@ -58,7 +58,7 @@ Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau 
 - Static `frontend/lib/minimapConfig.ts` has been replaced by API configuration plus `frontend/lib/minimapState.ts`.
 
 ## 7. AI Historical Companion (2026-06-21)
-- Added the independent `/{groupSlug}/companion` journey for Lê Quý Đôn at age 18.
+- Added the independent `/{groupSlug}/companion` journey for Lê Quý Đôn at age 18. **Persona:** Thần đồng 18 tuổi, chuẩn bị thi Đình. Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn". Phong cách nhiệt huyết, tự tự, thông minh (tuyệt đối không xưng "lão phu", "tiên sinh").
 - Companion mode persists for the current browser session and records visited item IDs locally.
 - Item detail uses the dedicated Companion narration and chat interface while this mode is active.
 - Added `POST /api/companion/chat`, with verified item context and visited-item names scoped to the current Group.
@@ -75,3 +75,10 @@ Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau 
 - Intro video is expected at `frontend/public/videos/companion-intro.mp4`; a welcome screen is used until the video is supplied.
 - One-time narration generation script: `backend/scripts/generate_companion_narration.py`.
 - Companion proactively requests a short next-stop suggestion and notifies the Minimap after narration.
+
+## 8. Proactive Companion Journey (2026-06-22)
+- **Luồng Onboarding Chủ Động:** AI Lê Quý Đôn tự động chào hỏi khi du khách mở ứng dụng và chủ động yêu cầu khách quét hiện vật.
+- **Inline Camera thông minh:** Nhúng giao diện Camera trực tiếp đè lên giao diện Chat (toàn màn hình), tự động bật ra khi AI có câu lệnh yêu cầu "chụp ảnh" hoặc "hướng camera".
+- **Chia bong bóng chat (Bubble splitting):** Các câu thoại của AI được tách ra thành những bong bóng chat riêng biệt dựa trên ngắt đoạn (`\n\n`), làm nổi bật câu hướng dẫn "chụp ảnh".
+- **Tối ưu Audio (Zero-delay TTS):** Mặc dù bong bóng chat được chia nhỏ, hệ thống vẫn gọi API tạo âm thanh (TTS) gộp chung một lần duy nhất.
+- **Auto-Minimap:** Khi AI gợi ý điểm đến tiếp theo, một Popup Bản Đồ sẽ tự động mở lên sau 2 giây và chớp nháy vị trí điểm tiếp theo.

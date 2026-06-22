@@ -217,6 +217,7 @@ Tài liệu được cung cấp (Context):
         retrieved_docs: List[Document],
         current_item: str | None,
         visited_items: List[str],
+        next_item_name: str | None = None,
     ) -> str:
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -227,6 +228,8 @@ Tài liệu được cung cấp (Context):
         )
         journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
         current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
+        next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
+        suggestion_prompt = f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'" if next_item_name else "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không."
         system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
 đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
 
@@ -238,8 +241,15 @@ Phong cách giao tiếp:
 - KHÔNG bịa; chỉ dùng kiến thức từ Context được cung cấp.
 - Trả lời bằng tiếng Việt, tự nhiên, không quá 300 từ.
 
+Các chỉ thị hệ thống đặc biệt (du khách không gõ những dòng này):
+- Nếu tin nhắn là "[SYSTEM_EVENT]: APP_OPENED": Du khách vừa mở ứng dụng. 
+  + Nếu "Du khách đã tham quan" là "Chưa có điểm nào": Hãy chào mừng. Sau đó, XUỐNG DÒNG (bằng 2 dấu enter) và YÊU CẦU họ: "Để bắt đầu hành trình, hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta nhé!".
+  + Nếu họ đã tham quan vài điểm: Hãy tóm tắt lại và gợi ý họ đi tiếp. {next_item_str}. Cuối cùng, XUỐNG DÒNG (bằng 2 dấu enter) và thêm câu: "Hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta để ta biết bạn đang ở đâu nhé!".
+- Nếu tin nhắn là "[SYSTEM_EVENT]: SCANNED_ITEM_ID=...": Khách vừa chụp ảnh hiện vật. Hãy bắt đầu kể chuyện về hiện vật đó. {suggestion_prompt}
+
 Hiện vật đang xem: {current_item_str}
 Du khách đã tham quan: {journey}
+{next_item_str}
 
 Context xác thực:
 {context}
