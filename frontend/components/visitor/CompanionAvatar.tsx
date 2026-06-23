@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 interface CompanionAvatarProps {
   isSpeaking: boolean;
   size?: "sm" | "lg";
+  collapsed?: boolean;
 }
 
 type AvatarState = "idle" | "talk" | "blink";
@@ -18,6 +19,7 @@ const SOURCES: Record<AvatarState, string> = {
 export default function CompanionAvatar({
   isSpeaking,
   size = "lg",
+  collapsed = false,
   introMode = false,
   onIntroComplete,
 }: CompanionAvatarProps & { introMode?: boolean; onIntroComplete?: () => void }) {
@@ -71,11 +73,21 @@ export default function CompanionAvatar({
 
   return (
     <div
-      className="relative w-full aspect-[4/3] shrink-0 pointer-events-none"
-      style={{
-        maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-      }}
+      className={`relative shrink-0 pointer-events-none transition-all duration-500 ease-in-out overflow-hidden ${
+        collapsed
+          ? "w-16 h-16 rounded-full shadow-lg"
+          : introMode
+            ? "w-full aspect-square"
+            : "w-full aspect-[4/3]"
+      }`}
+      style={
+        introMode && !collapsed
+          ? {
+              maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+            }
+          : {}
+      }
       aria-label="Lê Quý Đôn thời trẻ"
     >
       <img
@@ -87,7 +99,9 @@ export default function CompanionAvatar({
         <img
           src={SOURCES[state]}
           alt="Minh họa Lê Quý Đôn 18 tuổi"
-          className="absolute inset-0 h-full w-full object-cover object-top"
+          className={`absolute top-0 left-0 w-full aspect-square object-cover object-top transition-transform duration-500 ease-in-out ${
+            !introMode && !collapsed ? "scale-[0.6] origin-top" : "scale-100 origin-top"
+          }`}
           onError={() => setAssetAvailable(false)}
         />
       ) : (

@@ -69,11 +69,11 @@ export default function CompanionChat({
         const style = document.createElement("style");
         style.id = styleId;
         style.innerHTML = `
-          @keyframes sound-wave-1 { 0%, 100% { height: 12px; opacity: 0.5; } 50% { height: 24px; opacity: 1; } }
-          @keyframes sound-wave-2 { 0%, 100% { height: 16px; opacity: 0.6; } 50% { height: 36px; opacity: 1; } }
-          @keyframes sound-wave-3 { 0%, 100% { height: 20px; opacity: 0.7; } 50% { height: 48px; opacity: 1; } }
-          @keyframes sound-wave-4 { 0%, 100% { height: 18px; opacity: 0.6; } 50% { height: 32px; opacity: 1; } }
-          @keyframes sound-wave-5 { 0%, 100% { height: 14px; opacity: 0.5; } 50% { height: 20px; opacity: 1; } }
+          @keyframes sound-wave-1 { 0%, 100% { height: 8px; opacity: 0.5; } 50% { height: 16px; opacity: 1; } }
+          @keyframes sound-wave-2 { 0%, 100% { height: 10px; opacity: 0.6; } 50% { height: 24px; opacity: 1; } }
+          @keyframes sound-wave-3 { 0%, 100% { height: 13px; opacity: 0.7; } 50% { height: 32px; opacity: 1; } }
+          @keyframes sound-wave-4 { 0%, 100% { height: 12px; opacity: 0.6; } 50% { height: 21px; opacity: 1; } }
+          @keyframes sound-wave-5 { 0%, 100% { height: 9px; opacity: 0.5; } 50% { height: 13px; opacity: 1; } }
           .companion-chat-scroll::-webkit-scrollbar { width: 6px; }
           .companion-chat-scroll::-webkit-scrollbar-track { background: transparent; }
           .companion-chat-scroll::-webkit-scrollbar-thumb { background: rgba(251, 191, 36, 0.2); border-radius: 10px; }
@@ -90,8 +90,10 @@ export default function CompanionChat({
   const [isLoading, setIsLoading] = useState(false);
   const [suggestionRequested, setSuggestionRequested] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
+  const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const { searchImage } = useObjectSearch();
   const [showInlineCamera, setShowInlineCamera] = useState(false);
+  const [showCameraButton, setShowCameraButton] = useState(false);
   const [frozen, setFrozen] = useState(false);
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "found">("idle");
   const [scanProgress, setScanProgress] = useState(0);
@@ -199,6 +201,7 @@ export default function CompanionChat({
     // Clear previous suggestion when sending a new message
     if (!isSystemEvent) {
       setSuggestedNextPoint(null);
+      setShowCameraButton(false);
     }
     
     const userMessage: ChatMessage = { role: "user", content: cleaned };
@@ -234,9 +237,9 @@ export default function CompanionChat({
       }
       
       speak(response.content).then(() => {
-        if (shouldOpenCamera) {
-          setShowInlineCamera(true);
-        }
+        setShowCameraButton(shouldOpenCamera);
+      }).catch(() => {
+        setShowCameraButton(shouldOpenCamera);
       });
     } catch {
       setHistory((current) => [
@@ -392,24 +395,47 @@ export default function CompanionChat({
     }
   };
 
+  const avatarCollapsed = !compact && !isSpeaking && !isLoading && history.length > 0 && !isManuallyExpanded;
+
+  useEffect(() => {
+    if (avatarCollapsed) {
+      const timer = setTimeout(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [avatarCollapsed]);
+
+  // Calculate the exact gap created by the clip-path so the chat UI can sit perfectly below the curve
+  const gapMargin = (!compact && !showIntro && !avatarCollapsed) ? "max(-13.5%, -54px)" : "0px";
+
   return (
     <section className="flex min-h-0 flex-1 flex-col relative">
-      <div className={`w-full shrink-0 flex justify-center ${compact ? "mt-2 mb-2" : ""}`}>
-        <CompanionAvatar isSpeaking={isSpeaking} size={compact ? "sm" : "lg"} introMode={showIntro} onIntroComplete={handleAppOpened} />
+      <div 
+        className={`w-full shrink-0 flex ${compact ? "justify-center mt-2 mb-2" : "justify-center"} ${compact || showIntro ? "" : "companion-avatar-wrapper"} ${!compact && !showIntro && !avatarCollapsed ? "companion-avatar-wrapper--curved companion-avatar-wrapper--expanded" : ""} ${!compact && !showIntro && avatarCollapsed ? "companion-avatar-wrapper--collapsed" : ""}`}
+        onClick={() => {
+          if (!compact && !showIntro) {
+            if (avatarCollapsed) setIsManuallyExpanded(true);
+            else if (isManuallyExpanded) setIsManuallyExpanded(false);
+          }
+        }}
+        style={{ cursor: (!compact && !showIntro && (avatarCollapsed || isManuallyExpanded)) ? 'pointer' : 'default' }}
+      >
+        <CompanionAvatar isSpeaking={isSpeaking} size={compact ? "sm" : "lg"} collapsed={avatarCollapsed} introMode={showIntro} onIntroComplete={handleAppOpened} />
       </div>
 
-      <div className="relative min-h-0 flex-1 flex flex-col">
+      <div className="relative min-h-0 flex-1 flex flex-col z-10" style={{ marginTop: gapMargin }}>
         {/* Intro Text Overlay */}
-        <div className={`absolute inset-0 flex flex-col items-center justify-start p-6 text-center transition-opacity duration-1000 z-20 ${showIntro ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-          <h1 className="mt-2 font-serif text-3xl text-amber-100">Chào mừng đến với Quốc Tử Giám</h1>
-          <p className="mt-4 text-sm leading-7 text-amber-100/75 max-w-sm">
+        <div className={`absolute left-0 right-0 flex flex-col items-center justify-start px-6 text-center transition-opacity duration-1000 z-20 ${showIntro ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ top: "-90px" }}>
+          <h1 className="font-serif text-[28px] sm:text-3xl text-amber-100 drop-shadow-md">Chào mừng đến với Quốc Tử Giám</h1>
+          <p className="mt-3 text-sm leading-relaxed text-amber-100/80 max-w-[280px] sm:max-w-sm drop-shadow">
             Năm nay ta vừa tròn 18, đang chuẩn bị vào thi Đình. Trước khi thi,
             để ta cùng bạn khám phá Quốc Tử Giám nhé!
           </p>
           <button
             type="button"
             onClick={handleAppOpened}
-            className="mt-8 px-6 py-3 rounded-full bg-amber-500 text-black font-bold uppercase tracking-widest transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+            className="mt-6 px-6 py-3 rounded-full bg-amber-500 text-black font-bold uppercase tracking-widest transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
           >
             Bắt đầu hành trình
           </button>
@@ -418,7 +444,14 @@ export default function CompanionChat({
         {/* Chat UI */}
         <div className={`absolute inset-0 flex flex-col transition-opacity duration-1000 ${showIntro ? "opacity-0 pointer-events-none" : "opacity-100 delay-500"}`}>
           <div className="min-h-0 flex-1 flex flex-col px-4 pb-4 pt-2 relative">
-            <div className="flex-1 overflow-y-auto space-y-3 companion-chat-scroll relative z-10">
+            <div 
+              className="flex-1 overflow-y-auto space-y-3 companion-chat-scroll relative z-10"
+              style={{
+                maskImage: "linear-gradient(to bottom, transparent 0%, black 40px)",
+                WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 40px)"
+              }}
+            >
+              <div className="pt-10" />
               {history.map((message, index) => {
                 if (message.content.startsWith("[SYSTEM_EVENT]")) return null;
                 const isLatestAssistant =
@@ -472,36 +505,51 @@ export default function CompanionChat({
               {isLoading && <p className="text-sm text-amber-200/60">Đôn đang suy nghĩ…</p>}
               
               {/* Proactive Action Buttons */}
-              {!isLoading && suggestedNextPoint && (
+              {!isLoading && (showCameraButton || suggestedNextPoint) && (
                 <div className="flex flex-col gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSuggestedNextPoint(null);
-                      void send("Kể thêm cho tôi chi tiết thú vị về hiện vật này nhé.");
-                    }}
-                    className="w-full text-left bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-4 py-3 rounded-xl transition-colors text-amber-100 text-sm flex items-center gap-3 shadow-sm"
-                  >
-                    <span className="text-amber-500 text-lg">❓</span>
-                    Hỏi thêm về hiện vật này
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onSuggestNextPoint) {
-                        onSuggestNextPoint(suggestedNextPoint.id);
-                      }
-                      setSuggestedNextPoint(null);
-                    }}
-                    className="w-full text-left bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-4 py-3 rounded-xl transition-colors text-blue-100 text-sm flex items-center gap-3 shadow-md relative overflow-hidden group"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/10 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                    <span className="text-blue-400 text-lg">🗺️</span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-blue-50">Dẫn ta tới điểm tiếp theo</p>
-                      <p className="text-xs text-blue-200/70">{suggestedNextPoint.name}</p>
-                    </div>
-                  </button>
+                  {showCameraButton && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCameraButton(false);
+                        setShowInlineCamera(true);
+                      }}
+                      className="self-start inline-flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-full text-sm font-medium transition-all shadow-sm"
+                    >
+                      <span className="text-base">📸</span>
+                      <span>Chụp ảnh</span>
+                    </button>
+                  )}
+                  {suggestedNextPoint && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSuggestedNextPoint(null);
+                          void send("Kể thêm cho tôi chi tiết thú vị về hiện vật này nhé.");
+                        }}
+                        className="w-full text-left bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-4 py-3 rounded-xl transition-colors text-amber-100 text-sm flex items-center gap-3 shadow-sm"
+                      >
+                        <span className="text-amber-500 text-lg">❓</span>
+                        Hỏi thêm về hiện vật này
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onSuggestNextPoint) {
+                            onSuggestNextPoint(suggestedNextPoint.id);
+                          }
+                          setSuggestedNextPoint(null);
+                        }}
+                        className="w-full text-left bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-4 py-3 rounded-xl transition-colors text-blue-100 text-sm flex items-center gap-3 shadow-md relative overflow-hidden group"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/10 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                        <span className="text-blue-400 text-xl relative z-10">🗺️</span>
+                        <span className="font-semibold tracking-wide relative z-10 drop-shadow-md">Khám phá {suggestedNextPoint.name}</span>
+                        <span className="ml-auto text-blue-400 opacity-60">→</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -515,18 +563,18 @@ export default function CompanionChat({
 
             {/* Large Glowing Mic Section */}
             {micSupported && !compact && (
-              <div className="mt-4 flex flex-col items-center justify-center py-2 shrink-0">
-                <div className="flex items-center justify-center gap-8">
+              <div className="mt-2 flex flex-col items-center justify-center py-2 shrink-0">
+                <div className="flex items-center justify-center gap-6">
                   {/* The Mic */}
-                  <div className="relative flex h-24 w-24 items-center justify-center">
+                  <div className="relative flex h-16 w-16 items-center justify-center">
                     {/* Outer dashed ring */}
-                    <div className={`absolute inset-0 m-auto h-24 w-24 rounded-full border-2 border-dashed border-blue-400/40 ${isRecording ? "animate-[spin_4s_linear_infinite]" : ""}`} />
+                    <div className={`absolute inset-0 m-auto h-16 w-16 rounded-full border-2 border-dashed border-blue-400/40 ${isRecording ? "animate-[spin_4s_linear_infinite]" : ""}`} />
 
                     {/* Pulsing rings when listening */}
                     {isRecording && (
                       <>
-                        <div className="absolute inset-0 m-auto h-20 w-20 animate-ping rounded-full bg-blue-500/40" />
-                        <div className="absolute inset-0 m-auto h-32 w-32 animate-pulse rounded-full bg-blue-400/20" />
+                        <div className="absolute inset-0 m-auto h-14 w-14 animate-ping rounded-full bg-blue-500/40" />
+                        <div className="absolute inset-0 m-auto h-20 w-20 animate-pulse rounded-full bg-blue-400/20" />
                       </>
                     )}
 
@@ -535,14 +583,14 @@ export default function CompanionChat({
                       type="button"
                       onClick={() => void toggleMic()}
                       disabled={isTranscribing}
-                      className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all duration-300 disabled:opacity-50 ${isRecording ? "scale-110 shadow-[0_0_40px_rgba(59,130,246,0.8)]" : "hover:scale-105"}`}
+                      className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300 disabled:opacity-50 ${isRecording ? "scale-110 shadow-[0_0_30px_rgba(59,130,246,0.8)]" : "hover:scale-105"}`}
                       aria-label={isRecording ? "Dừng ghi âm" : "Nói với Lê Quý Đôn"}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="currentColor"
-                        className="h-8 w-8 text-white"
+                        className="h-6 w-6 text-white"
                       >
                         <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 0 1-2 0 3 3 0 0 1-6 0 1 1 0 0 1-2 0 5 5 0 0 0 4 4.9V19H8a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2h-3v-3.1A5 5 0 0 0 17 11z" />
                       </svg>
@@ -551,7 +599,7 @@ export default function CompanionChat({
 
                   {/* The Waveform Effect (Right side) */}
                   {isRecording && (
-                    <div className="flex items-center justify-center gap-[3px] h-16 w-48 pl-2">
+                    <div className="flex items-center justify-center gap-[2px] h-12 w-32 pl-2">
                       {[...Array(30)].map((_, i) => {
                         const colors = ["bg-teal-400", "bg-cyan-400", "bg-blue-500", "bg-indigo-500", "bg-purple-500"];
                         const colorClass = colors[Math.floor((i / 30) * colors.length)];
@@ -574,7 +622,7 @@ export default function CompanionChat({
                   <span className="mt-6 text-sm font-medium text-blue-300 animate-pulse drop-shadow-md tracking-wide">Đang lắng nghe...</span>
                 )}
                 {isTranscribing && (
-                  <span className="mt-6 text-sm font-medium text-amber-300 animate-pulse drop-shadow-md tracking-wide">Đang xử lý âm thanh...</span>
+                  <span className="mt-6 text-sm font-medium text-blue-200/50 tracking-wide">Đang xử lý âm thanh...</span>
                 )}
               </div>
             )}

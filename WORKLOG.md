@@ -1,4 +1,4 @@
-﻿## 2026-06-17 - Khám phá nhóm triển lãm cho Khách tham quan
+## 2026-06-17 - Khám phá nhóm triển lãm cho Khách tham quan
 
 Bối cảnh:
 - Trang đích của khách tham quan có thể hiển thị "Không tải được danh sách khu di tích" hoặc chỉ hiển thị các nhóm public vì nó phụ thuộc vào API `/api/groups/public`.
@@ -223,3 +223,54 @@ Xác nhận:
 - `npm.cmd run build`: build production thành công.
 - `git diff --check`: không có lỗi whitespace.
 - Cần kiểm thử thủ công microphone trên Safari iPhone qua Cloudflare Tunnel.
+
+## 2026-06-21 - Chuyển Minimap sang cấu hình động theo Group
+
+Bối cảnh:
+- Minimap trước đây dựa trên cấu hình tĩnh trong frontend, khó tái sử dụng giữa nhiều Group và nhiều môi trường có Item ID khác nhau.
+
+Các thay đổi:
+- Lưu cấu hình riêng cho từng Group trong `groups.minimap_config`.
+- Cho phép Admin tải xuống, chỉnh sửa và tải lên JSON dùng `itemNames` ổn định.
+- Visitor API chuyển `itemNames` thành `itemIds` thuộc đúng Group tại runtime.
+- Visitor UI tải trước cấu hình trước khi mở modal và giữ các trạng thái marker, hiện vật gần nhất và fallback.
+- Thay `frontend/lib/minimapConfig.ts` bằng cấu hình từ API kết hợp `frontend/lib/minimapState.ts`.
+
+## 2026-06-22 - Hoàn thiện hành trình Companion chủ động
+
+Bối cảnh:
+- Companion cần dẫn dắt khách tham quan chủ động hơn thay vì chờ khách tự tìm camera, quét hiện vật và mở bản đồ.
+
+Các thay đổi:
+- Tự động chào hỏi khi mở hành trình và yêu cầu khách quét hiện vật.
+- Nhúng camera toàn màn hình vào giao diện chat; có thể tự mở khi câu thoại yêu cầu chụp ảnh hoặc hướng camera.
+- Tách câu trả lời theo ngắt đoạn thành các bong bóng chat riêng để làm rõ lời hướng dẫn.
+- Giữ một lần gọi TTS cho toàn bộ câu trả lời dù giao diện hiển thị nhiều bong bóng.
+- Khi Companion gợi ý điểm tiếp theo, Minimap tự mở sau khoảng hai giây và làm nổi bật vị trí được đề xuất.
+
+## 2026-06-23 - Chọn avatar 2D thay cho MVP 3D
+
+Bối cảnh:
+- Logic đọc `emotion` và kích hoạt animation cho avatar 3D `.glb` đã được thử nghiệm.
+- Model web bị giới hạn dung lượng dẫn đến chất lượng low-poly, tăng nguy cơ uncanny valley và ảnh hưởng thời gian tải trên mobile.
+
+Quyết định:
+- Loại bỏ avatar 3D khỏi phạm vi MVP.
+- Tiếp tục sử dụng hình ảnh 2D chất lượng cao cho Lê Quý Đôn.
+- Định hướng tiếp theo là Dynamic Collapsible Avatar: hiển thị lớn ở phần mở đầu rồi thu gọn thành avatar tròn khi hội thoại dài, dành thêm không gian cho chat, camera và Minimap.
+
+## 2026-06-23 - Triển khai Dynamic Collapsible Avatar với đường phân cách lõm (Concave Curve)
+
+Bối cảnh:
+- Sau khi loại bỏ Avatar 3D, Avatar 2D cần được nâng cấp để tạo ấn tượng sống động khi AI nói nhưng lại phải tiết kiệm không gian màn hình thiết bị di động khi AI ngừng nói để hiển thị khung Chat.
+- Yêu cầu chuyển tiếp mượt mà từ diện tích ảnh Avatar xuống không gian Chat bằng đường cong tự nhiên và hiệu ứng fade.
+
+Các thay đổi:
+- Cập nhật `CompanionAvatar.tsx` thêm prop `collapsed`. Khi `isSpeaking=true`, Avatar lớn chiếm ~35-40% chiều cao màn hình. Khi `isSpeaking=false` và đã có chat history, Avatar thu nhỏ thành hình tròn ở góc trái, nhường chỗ cho khung Chat.
+- Cập nhật `CompanionChat.tsx` tính toán state `avatarCollapsed`, điều hướng CSS cho Wrapper và tự động kích hoạt `scrollIntoView` mượt mà với độ trễ `300ms` ngay sau khi Avatar thu gọn.
+- Thêm đường phân cách tạo từ SVG lõm (`Q200,50`) cùng Gradient mờ ảo trong suốt `40px` tạo hiệu ứng nối mạch tự nhiên giữa vùng Avatar và màn hình Chat. Cả hai layer này đều có animation mờ đi khi Avatar thu nhỏ.
+- Cập nhật `globals.css` để thêm `transition: max-height 300ms ease-out` cho lớp `.companion-avatar-wrapper`.
+- Tinh chỉnh đường cong ranh giới (clip-path) và mask-image để ảnh Avatar khớp hoàn hảo với khung Chat mà không bị lộ viền cắt.
+- Nâng cấp tốc độ chuyển đổi CSS/React (max-height, scale) sang 500ms `ease-in-out` để tạo cảm giác mượt mà, đậm chất điện ảnh.
+- Bổ sung khả năng toggle mở rộng/thu nhỏ Avatar thủ công thông qua click/touch, tiện lợi khi khách muốn nhìn rõ nhân vật.
+- Cải thiện không gian Chat bằng cách thu nhỏ cụm nút Micro/Waveform xuống 2/3 và căn chỉnh lại các lề (margin/padding) để phần Chat được đẩy sâu xuống phía dưới.

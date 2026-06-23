@@ -58,8 +58,7 @@ html[lang="en"] .font-display {
 
   .artifact-fixed-bar {
     @apply fixed bottom-0 left-1/2 z-20 w-full max-w-phone -translate-x-1/2;
-    padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
-      max(1rem, env(safe-area-inset-left));
+    padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   }
 
   .artifact-page-head {
@@ -434,6 +433,7 @@ html[lang="en"] .font-display {
 }
 
 @media (orientation: landscape) and (max-width: 767px) {
+
   .camera-fullscreen-video--rotated,
   .camera-fullscreen-video--normal {
     width: 100%;
@@ -451,10 +451,12 @@ html[lang="en"] .font-display {
 }
 
 @keyframes scan-line {
+
   0%,
   100% {
     top: 10%;
   }
+
   50% {
     top: 90%;
   }
@@ -512,12 +514,10 @@ html[lang="en"] .font-display {
 }
 
 .hera-guide-slide-scrim {
-  background: linear-gradient(
-    to bottom,
-    rgba(14, 11, 7, 0.18) 0%,
-    rgba(14, 11, 7, 0.42) 50%,
-    rgba(14, 11, 7, 0.72) 100%
-  );
+  background: linear-gradient(to bottom,
+      rgba(14, 11, 7, 0.18) 0%,
+      rgba(14, 11, 7, 0.42) 50%,
+      rgba(14, 11, 7, 0.72) 100%);
 }
 
 .hera-guide-spacer {
@@ -595,4 +595,31 @@ html[lang="en"] .font-display {
 .hera-text-scroll::-webkit-scrollbar-thumb {
   background: var(--primary);
   border-radius: 999px;
+}
+
+/* Dynamic Collapsible Avatar */
+.companion-avatar-wrapper {
+  transition: max-height 500ms ease-in-out, padding 500ms ease-in-out;
+  overflow: hidden;
+  position: relative;
+}
+
+.companion-avatar-wrapper--curved {
+  --curve-offset: -18%;
+  /* Lưu ý: Giá trị này đã hạ xuống khoảng 5mm. Nếu hạ quá thấp (số âm càng nhỏ) thì sẽ bị lộ đường viền mép áo bị cắt của avatar. */
+  clip-path: ellipse(100% 100% at 50% var(--curve-offset));
+}
+
+.companion-avatar-wrapper--expanded {
+  max-height: 300px;
+  /* ~35-40% của màn hình 667px (iPhone SE) */
+}
+
+.companion-avatar-wrapper--collapsed {
+  max-height: 104px;
+  /* 64px avatar + 16px top padding + 24px bottom padding */
+  padding-top: 16px;
+  /* Căn ngang với text header */
+  padding-bottom: 24px;
+  /* bỏ padding-left để avatar được center */
 }
