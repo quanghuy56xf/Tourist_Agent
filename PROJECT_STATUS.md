@@ -59,7 +59,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - `POST /api/companion/chat` xác minh hiện vật, lịch sử tham quan và phạm vi Group trước khi sinh câu trả lời.
 - Voice input dùng `getUserMedia` và `MediaRecorder`; audio được gửi tới `POST /api/stt` để Gemini chép thành tiếng Việt.
 - Companion chủ động chào hỏi, yêu cầu khách quét hiện vật, có thể mở camera ngay trong giao diện chat và đề xuất điểm đến tiếp theo.
-- Nội dung chat có thể tách thành nhiều bong bóng nhưng TTS vẫn được tạo một lần cho toàn bộ câu trả lời.
+- Nội dung chat được truyền trực tiếp (Streaming) qua kiến trúc Backend-Driven Pipeline: Backend xử lý song song Text Generation và TTS, đẩy trực tiếp audio Base64 qua một EventStream duy nhất giúp giảm thiểu độ trễ Time-to-First-Audio.
 - Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
 
 ### Định hướng giao diện Companion

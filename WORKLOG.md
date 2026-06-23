@@ -274,3 +274,13 @@ Các thay đổi:
 - Nâng cấp tốc độ chuyển đổi CSS/React (max-height, scale) sang 500ms `ease-in-out` để tạo cảm giác mượt mà, đậm chất điện ảnh.
 - Bổ sung khả năng toggle mở rộng/thu nhỏ Avatar thủ công thông qua click/touch, tiện lợi khi khách muốn nhìn rõ nhân vật.
 - Cải thiện không gian Chat bằng cách thu nhỏ cụm nút Micro/Waveform xuống 2/3 và căn chỉnh lại các lề (margin/padding) để phần Chat được đẩy sâu xuống phía dưới.
+
+## 2026-06-23 - Tối ưu hiệu năng âm thanh (Backend-Driven Pipeline Streaming)
+
+Bối cảnh:
+- Trước đây, Frontend phải đợi LLM stream chữ về, cắt thành bong bóng rồi mới gọi `fetch` HTTP (`POST /api/tts`) cho từng bong bóng. Việc này tạo ra nhiều request HTTP và tăng độ trễ (Time-To-First-Byte của audio bị chậm).
+
+Các thay đổi:
+- **Backend:** Nâng cấp Endpoint `POST /api/companion/chat/stream` để chạy song song LLM Streaming và TTS Synthesizing bằng `asyncio`. Ngay khi gom đủ một câu (dấu câu hoặc dòng mới), Backend tự động gọi Edge TTS và đẩy audio MP3 đã mã hóa Base64 qua SSE (`event: audio`).
+- **Frontend:** Cập nhật `chatWithCompanionStream` để xử lý event `audio`. Thay vì gọi API rời rạc, Frontend hiện chỉ cần giải mã Base64 sang Blob, tạo ObjectURL, và đưa vào một Audio Queue nhỏ gọn nội bộ để phát nhạc nối tiếp.
+- Giảm tổng số lượng kết nối mạng xuống còn đúng 1 request Server-Sent Events (SSE) duy nhất, kéo giảm độ trễ Time-to-First-Audio và loại bỏ hoàn toàn các HTTP Request thừa.

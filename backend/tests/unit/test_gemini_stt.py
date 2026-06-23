@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.modules.stt import gemini_stt
 from app.modules.stt.gemini_stt import transcribe_audio
 
 
@@ -34,3 +35,22 @@ def test_transcribe_audio_rejects_empty_model_output():
 
     with pytest.raises(ValueError, match="empty transcript"):
         transcribe_audio(b"audio-bytes", "audio/mp4", client=client)
+
+
+def test_build_client_configures_bounded_retry_for_transient_errors(monkeypatch):
+    captured = {}
+
+    def fake_client(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(gemini_stt, "GOOGLE_API_KEY", "test-key")
+    monkeypatch.setattr(gemini_stt.genai, "Client", fake_client)
+
+    gemini_stt._build_client()
+
+    retry = captured["http_options"].retry_options
+    assert retry.attempts == 3
+    assert retry.initial_delay == 0.5
+    assert retry.max_delay == 2.0
+    assert retry.http_status_codes == [408, 429, 500, 502, 503, 504]

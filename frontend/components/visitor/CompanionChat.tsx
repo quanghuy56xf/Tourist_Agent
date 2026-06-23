@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { chatWithCompanion, ChatMessage, transcribeAudio } from "@/lib/api";
-import { playChatTts, stopChatTts } from "@/lib/chatTts";
+import { chatWithCompanion, chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
 import { getVisitedItemIds } from "@/lib/companionState";
 import { rememberMinimapSuggestion } from "@/lib/minimapState";
 import { getVisitorSessionId } from "@/lib/visitorAnalytics";
@@ -174,31 +173,70 @@ export default function CompanionChat({
       });
   }, [groupSlug, initialNarration, itemId, suggestionRequested]);
 
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopAllAudio = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    audioQueue.current = [];
+    isPlayingAudio.current = false;
+  };
+
   useEffect(() => {
     return () => {
       cancelRecording();
-      stopChatTts();
+      stopAllAudio();
     };
   }, []);
 
-  const speak = async (content: string) => {
-    if (!content.trim()) return;
-    setIsSpeaking(true);
-    try {
-      await playChatTts(content, "Tiếng Việt", undefined, "Companion");
-    } catch {
-      // Text remains available when audio playback is blocked.
-    } finally {
-      setIsSpeaking(false);
+  const isPlayingAudio = useRef(false);
+  const audioQueue = useRef<string[]>([]);
+  
+  const processAudioQueue = async () => {
+    if (isPlayingAudio.current) return;
+    isPlayingAudio.current = true;
+    while (audioQueue.current.length > 0) {
+      const url = audioQueue.current.shift();
+      if (url) {
+        setIsSpeaking(true);
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const audio = new Audio(url);
+            currentAudioRef.current = audio;
+            audio.onended = () => {
+              URL.revokeObjectURL(url);
+              resolve();
+            };
+            audio.onerror = () => {
+              URL.revokeObjectURL(url);
+              resolve(); // Continue on error
+            };
+            audio.play().catch(() => resolve());
+          });
+        } finally {
+          currentAudioRef.current = null;
+          setIsSpeaking(false);
+        }
+      }
     }
+    isPlayingAudio.current = false;
+  };
+
+  const enqueueAudioBlob = (url: string) => {
+    audioQueue.current.push(url);
+    processAudioQueue();
   };
 
   const send = async (message = input, isSystemEvent = false, requestSuggestNext = false) => {
     const cleaned = message.trim();
     if (!cleaned || isLoading) return;
-    stopChatTts();
     
-    // Clear previous suggestion when sending a new message
+    audioQueue.current = [];
+    stopAllAudio();
+    
     if (!isSystemEvent) {
       setSuggestedNextPoint(null);
       setShowCameraButton(false);
@@ -207,13 +245,15 @@ export default function CompanionChat({
     const userMessage: ChatMessage = { role: "user", content: cleaned };
     const previous = history.slice(-10);
     setHistory((current) => [...current, userMessage]);
+    setHistory((current) => [...current, { role: "assistant", content: "" }]);
+
     if (!isSystemEvent) {
       setInput("");
     }
     setIsLoading(true);
 
     try {
-      const response = await chatWithCompanion(
+      const stream = chatWithCompanionStream(
         itemId || null,
         cleaned,
         previous,
@@ -221,34 +261,51 @@ export default function CompanionChat({
         getVisitorSessionId(),
         requestSuggestNext
       );
-      const answer = { role: "assistant", content: response.content } as const;
-      setHistory((current) => [...current, answer]);
       
-      const lowerResp = response.content.toLowerCase();
+      let fullContent = "";
+      let lastSpokenIndex = 0;
+      let nextItemId = null;
+      let nextItemName = null;
+
+      for await (const chunk of stream) {
+        if (chunk.type === "metadata") {
+          nextItemId = chunk.data.next_item_id;
+          nextItemName = chunk.data.next_item_name;
+        } else if (chunk.type === "chunk") {
+          fullContent += chunk.data.text;
+          setHistory((current) => {
+            const newHistory = [...current];
+            newHistory[newHistory.length - 1] = { role: "assistant", content: fullContent };
+            return newHistory;
+          });
+        } else if (chunk.type === "audio") {
+          const bytes = Uint8Array.from(atob(chunk.data.audio_base64), c => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: 'audio/mpeg' });
+          enqueueAudioBlob(URL.createObjectURL(blob));
+        }
+      }
+
+      const lowerResp = fullContent.toLowerCase();
       const shouldOpenCamera = (cleaned === "[SYSTEM_EVENT]: APP_OPENED" && getVisitedItemIds(window.localStorage).length === 0) ||
         lowerResp.includes("chụp ảnh") ||
         lowerResp.includes("hướng camera");
 
-      // Set suggested next point for UI buttons instead of auto-opening minimap
-      if (response.next_item_id !== null && response.next_item_name && onSuggestNextPoint) {
-        setSuggestedNextPoint({ id: response.next_item_id, name: response.next_item_name });
+      if (nextItemId !== null && nextItemName && onSuggestNextPoint) {
+        setSuggestedNextPoint({ id: nextItemId, name: nextItemName });
       } else {
         setSuggestedNextPoint(null);
       }
       
-      speak(response.content).then(() => {
-        setShowCameraButton(shouldOpenCamera);
-      }).catch(() => {
-        setShowCameraButton(shouldOpenCamera);
-      });
+      setShowCameraButton(shouldOpenCamera);
     } catch {
-      setHistory((current) => [
-        ...current,
-        {
+      setHistory((current) => {
+        const newHistory = [...current];
+        newHistory[newHistory.length - 1] = {
           role: "assistant",
           content: "Đường truyền hơi chập chờn, bạn hỏi lại ta một lần nữa nhé.",
-        },
-      ]);
+        };
+        return newHistory;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -379,7 +436,7 @@ export default function CompanionChat({
       return;
     }
 
-    stopChatTts();
+    stopAllAudio();
     setIsSpeaking(false);
     try {
       await startRecording(() => {

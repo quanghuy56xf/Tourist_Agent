@@ -53,7 +53,13 @@ async def transcribe_uploaded_audio(
             detail="Không nhận diện được nội dung giọng nói.",
         ) from exc
     except Exception as exc:
-        logger.exception("Gemini STT failed")
+        logger.exception(
+            "Gemini STT failed: type=%s code=%s status=%s message=%s",
+            type(exc).__name__,
+            getattr(exc, "code", None),
+            getattr(exc, "status", None),
+            getattr(exc, "message", None) or str(exc),
+        )
         raise HTTPException(
             status_code=502,
             detail="Dịch vụ nhận diện giọng nói tạm thời không khả dụng.",

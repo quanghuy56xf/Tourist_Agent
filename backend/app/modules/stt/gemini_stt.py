@@ -15,7 +15,19 @@ STT_PROMPT = (
 def _build_client() -> genai.Client:
     if not GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set.")
-    return genai.Client(api_key=GOOGLE_API_KEY)
+    return genai.Client(
+        api_key=GOOGLE_API_KEY,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(
+                attempts=3,
+                initial_delay=0.5,
+                max_delay=2.0,
+                exp_base=2.0,
+                jitter=0.2,
+                http_status_codes=[408, 429, 500, 502, 503, 504],
+            ),
+        ),
+    )
 
 
 def transcribe_audio(

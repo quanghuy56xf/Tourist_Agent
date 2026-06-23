@@ -815,6 +815,78 @@ export async function chatWithCompanion(
   return res.json();
 }
 
+export async function* chatWithCompanionStream(
+  itemId: number | null,
+  message: string,
+  history: ChatMessage[],
+  visitedItemIds: number[],
+  sessionId?: string,
+  suggestNext = false
+): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error', data: any }, void, unknown> {
+  const res = await fetch(`${API_URL}/api/companion/chat/stream`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: itemId,
+      message,
+      history,
+      visited_item_ids: visitedItemIds,
+      session_id: sessionId,
+      suggest_next: suggestNext,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không thể trò chuyện với Lê Quý Đôn lúc này"));
+  }
+
+  if (!res.body) {
+    throw new Error("Luồng dữ liệu rỗng");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEvent = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      if (buffer) {
+        const lines = buffer.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("event: ")) currentEvent = line.substring(7).trim();
+          else if (line.startsWith("data: ")) {
+            const dataStr = line.substring(6).trim();
+            if (dataStr) yield { type: currentEvent as any, data: JSON.parse(dataStr) };
+          }
+        }
+      }
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        currentEvent = line.substring(7).trim();
+      } else if (line.startsWith("data: ")) {
+        const dataStr = line.substring(6).trim();
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr);
+            yield { type: currentEvent as any, data };
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+  }
+}
+
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
   const formData = new FormData();
   const extension = audioBlob.type.includes("mp4")
