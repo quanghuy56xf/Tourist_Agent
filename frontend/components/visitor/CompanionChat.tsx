@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
+import { playChatTts } from "@/lib/chatTts";
 import { getVisitedItemIds } from "@/lib/companionState";
 import { rememberMinimapSuggestion, rememberMinimapItem } from "@/lib/minimapState";
 import { getVisitorSessionId } from "@/lib/visitorAnalytics";
@@ -17,6 +18,7 @@ import CameraCapture from "@/components/CameraCapture";
 import ScanViewfinderFrame from "./ScanViewfinderFrame";
 import { useObjectSearch } from "@/lib/useObjectSearch";
 import type { SearchMatch } from "@/lib/api/search";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface CompanionChatProps {
   itemId?: number;
@@ -66,6 +68,7 @@ export default function CompanionChat({
   onSuggestNextPoint,
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
+  const { t, language } = useVisitorLocale();
   const [history, setHistory] = useState<ChatMessage[]>(
     initialNarration
       ? [{ role: "assistant", content: initialNarration }]
@@ -98,6 +101,17 @@ export default function CompanionChat({
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speak = async (text: string) => {
+    setIsSpeaking(true);
+    try {
+      await playChatTts(text, language);
+    } catch {
+      // ignore
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
@@ -123,7 +137,7 @@ export default function CompanionChat({
     const timer = window.setTimeout(() => {
       setActionButtons(current => {
         if (current.length > 0) return current;
-        return [{ type: "open_camera", label: "📸 Quét tiếp" }];
+        return [{ type: "open_camera", label: language === "Tiếng Anh" ? "📸 Scan more" : "📸 Quét tiếp" }];
       });
     }, 30000);
     return () => window.clearTimeout(timer);
@@ -272,7 +286,8 @@ export default function CompanionChat({
         previous,
         getVisitedItemIds(window.localStorage),
         getVisitorSessionId(),
-        requestSuggestNext
+        requestSuggestNext,
+        language
       );
       
       let fullContent = "";
@@ -285,7 +300,7 @@ export default function CompanionChat({
           nextItemId = chunk.data.next_item_id;
           nextItemName = chunk.data.next_item_name;
         } else if (chunk.type === "actions") {
-          setActionButtons(chunk.data.buttons || []);
+          setActionButtons((prev) => [...prev, ...(chunk.data.buttons || [])]);
         } else if (chunk.type === "chunk") {
           fullContent += chunk.data.text;
           
@@ -311,7 +326,10 @@ export default function CompanionChat({
           });
 
           if (questions.length > 0) {
-            setActionButtons(questions);
+            setActionButtons((prev) => {
+              const nonTextButtons = prev.filter((b) => b.type !== "text");
+              return [...nonTextButtons, ...questions];
+            });
           }
         } else if (chunk.type === "audio") {
           const bytes = Uint8Array.from(atob(chunk.data.audio_base64), c => c.charCodeAt(0));
@@ -334,12 +352,12 @@ export default function CompanionChat({
           if (lastMsg.content.trim()) {
             newHistory[newHistory.length - 1] = {
               ...lastMsg,
-              content: lastMsg.content + `\n\n*(Lỗi: ${errMsg})*`,
+              content: lastMsg.content + `\n\n*(${t.companion.errorPrefix}${errMsg})*`,
             };
           } else {
             newHistory[newHistory.length - 1] = {
               ...lastMsg,
-              content: `Lỗi: ${errMsg}`,
+              content: `${t.companion.errorPrefix}${errMsg}`,
             };
           }
         }
@@ -365,7 +383,7 @@ export default function CompanionChat({
         const message =
           error instanceof Error
             ? error.message
-            : "Không thể nhận diện giọng nói lúc này.";
+            : language === "Tiếng Anh" ? "Cannot recognize voice at this time." : "Không thể nhận diện giọng nói lúc này.";
         alert(message);
       } finally {
         setIsTranscribing(false);
@@ -415,13 +433,13 @@ export default function CompanionChat({
         
         const name1 = topMatches[0]?.name;
         const name2 = topMatches[1]?.name;
-        let text = "Ây da, góc nhìn này hơi khó đoán quá. Đôn này đang phân vân, có phải bạn đang đứng trước ";
+        let text = t.companion.uncertainAngle;
         if (topMatches.length >= 2) {
-          text += `**${name1}** hay **${name2}** không? `;
+          text += `**${name1}**${t.companion.or}**${name2}**${t.companion.not}`;
         } else {
-          text += `**${name1}** không? `;
+          text += `**${name1}**${t.companion.not}`;
         }
-        text += "Chọn giúp ta một cái để ta kể chuyện tiếp nhé!";
+        text += t.companion.pickOne;
         
         setHistory((current) => [...current, { role: "assistant", content: text }]);
         void speak(text);
@@ -431,13 +449,13 @@ export default function CompanionChat({
         return;
       }
 
-      setScanErrorMsg(response.message || "Không tìm thấy hiện vật nào.");
+      setScanErrorMsg(response.message || t.companion.scanErrorNone);
       setFrozen(false);
       setScanPhase("idle");
       stopProgress();
       setScanProgress(0);
     } catch {
-      setScanErrorMsg("Có lỗi xảy ra khi quét ảnh.");
+      setScanErrorMsg(t.companion.scanErrorGeneral);
       setFrozen(false);
       setScanPhase("idle");
       stopProgress();
@@ -501,9 +519,9 @@ export default function CompanionChat({
       setIsRecording(true);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Không thể mở Micro.";
+        error instanceof Error ? error.message : t.companion.micErrorNone;
       alert(
-        `${message}\n\nVui lòng cấp quyền Micro cho trang web và không mở bằng trình duyệt trong Zalo/Facebook.`
+        `${message}\n\n${t.companion.micErrorPermission}`
       );
     }
   };
@@ -548,17 +566,16 @@ export default function CompanionChat({
       <div className="relative min-h-0 flex-1 flex flex-col z-10" style={{ marginTop: gapMargin }}>
         {/* Intro Text Overlay */}
         <div className={`absolute left-0 right-0 flex flex-col items-center justify-start px-6 text-center transition-opacity duration-1000 z-20 ${showIntro ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ top: "-90px" }}>
-          <h1 className="font-serif text-[28px] sm:text-3xl text-amber-100 drop-shadow-md">Chào mừng đến với Quốc Tử Giám</h1>
+          <h1 className="font-serif text-[28px] sm:text-3xl text-amber-100 drop-shadow-md">{t.companion.introTitle}</h1>
           <p className="mt-3 text-sm leading-relaxed text-amber-100/80 max-w-[280px] sm:max-w-sm drop-shadow">
-            Năm nay ta vừa tròn 18, đang chuẩn bị vào thi Đình. Trước khi thi,
-            để ta cùng bạn khám phá Quốc Tử Giám nhé!
+            {t.companion.introSubtitle}
           </p>
           <button
             type="button"
             onClick={handleAppOpened}
             className="mt-6 px-6 py-3 rounded-full bg-amber-500 text-black font-bold uppercase tracking-widest transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
           >
-            Bắt đầu hành trình
+            {t.companion.introStart}
           </button>
         </div>
 
@@ -609,7 +626,7 @@ export default function CompanionChat({
                               type="button"
                               onClick={() => void speak(message.content)}
                               className="ml-2 text-amber-300"
-                              aria-label="Nghe Lê Quý Đôn đọc"
+                              aria-label={t.companion.micLabelRead}
                             >
                               🔊
                             </button>
@@ -623,7 +640,7 @@ export default function CompanionChat({
 
 
 
-              {isLoading && <p className="text-sm text-amber-200/60">Đôn đang suy nghĩ…</p>}
+              {isLoading && <p className="text-sm text-amber-200/60">{t.companion.thinking}</p>}
               
               {/* Proactive Action Buttons */}
               {!isLoading && (suggestedNextPoint || actionButtons.length > 0) && (
@@ -672,13 +689,13 @@ export default function CompanionChat({
                           key={idx}
                           type="button"
                           onClick={() => {
-                            alert("Cảm ơn bạn đã đánh giá!");
+                            alert(t.companion.msgFeedbackThanks);
                             setActionButtons(current => current.filter(b => b.type !== "rate_experience"));
                           }}
                           className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
                         >
                           <span className="text-amber-500">🌟</span>
-                          <span>Đánh giá</span>
+                          <span>{t.companion.btnFeedback}</span>
                         </button>
                       );
                     } else if (btn.type === "text") {
@@ -706,12 +723,12 @@ export default function CompanionChat({
                         type="button"
                         onClick={() => {
                           setSuggestedNextPoint(null);
-                          void send("Kể thêm cho tôi chi tiết thú vị về hiện vật này nhé.");
+                          void send(t.companion.askMoreDetail);
                         }}
                         className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
                       >
                         <span className="text-amber-500">❓</span>
-                        Hỏi thêm về hiện vật này
+                        {t.companion.askMore}
                       </button>
                       <button
                         type="button"
@@ -723,7 +740,7 @@ export default function CompanionChat({
                         className="inline-flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-3 py-1.5 rounded-full transition-colors text-blue-100 text-sm font-medium shadow-sm"
                       >
                         <span className="text-blue-400">🗺️</span>
-                        Khám phá {suggestedNextPoint.name}
+                        {t.companion.exploreNext.replace("{name}", suggestedNextPoint.name)}
                       </button>
                       <button
                         type="button"
@@ -740,7 +757,7 @@ export default function CompanionChat({
                         className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 px-3 py-1.5 rounded-full transition-colors text-emerald-100 text-sm font-medium shadow-sm"
                       >
                         <span className="text-emerald-400">📸</span>
-                        <span>Quét tiếp</span>
+                        <span>{t.companion.scanMore}</span>
                       </button>
                     </>
                   )}
@@ -749,7 +766,7 @@ export default function CompanionChat({
 
               {history.length === 0 && (
                 <p className="rounded-xl border border-amber-300/15 bg-white/[0.04] p-4 text-center text-sm text-amber-100/70">
-                  Hãy hỏi Đôn một câu, hoặc quét một hiện vật để bắt đầu trò chuyện.
+                  {t.companion.chatEmptyState}
                 </p>
               )}
               <div ref={endRef} />
@@ -778,7 +795,7 @@ export default function CompanionChat({
                       onClick={() => void toggleMic()}
                       disabled={isTranscribing}
                       className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300 disabled:opacity-50 ${isRecording ? "scale-110 shadow-[0_0_30px_rgba(59,130,246,0.8)]" : "hover:scale-105"}`}
-                      aria-label={isRecording ? "Dừng ghi âm" : "Nói với Lê Quý Đôn"}
+                      aria-label={isRecording ? t.companion.micLabelStop : t.companion.micLabelSpeak}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -813,10 +830,10 @@ export default function CompanionChat({
                 </div>
                 
                 {isRecording && (
-                  <span className="mt-6 text-sm font-medium text-blue-300 animate-pulse drop-shadow-md tracking-wide">Đang lắng nghe...</span>
+                  <span className="mt-6 text-sm font-medium text-blue-300 animate-pulse drop-shadow-md tracking-wide">{t.companion.listening}</span>
                 )}
                 {isTranscribing && (
-                  <span className="mt-6 text-sm font-medium text-blue-200/50 tracking-wide">Đang xử lý âm thanh...</span>
+                  <span className="mt-6 text-sm font-medium text-blue-200/50 tracking-wide">{t.companion.processingAudio}</span>
                 )}
               </div>
             )}
@@ -830,7 +847,7 @@ export default function CompanionChat({
                   type="button"
                   onClick={() => void toggleMic()}
                   disabled={isTranscribing}
-                  aria-label={isRecording ? "Dừng ghi âm" : "Nói với Lê Quý Đôn"}
+                  aria-label={isRecording ? t.companion.micLabelStop : t.companion.micLabelSpeak}
                   className={`flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all ${
                     isRecording
                       ? "bg-blue-600 text-white animate-pulse scale-110 shadow-[0_0_15px_rgba(59,130,246,0.6)]"
@@ -858,14 +875,14 @@ export default function CompanionChat({
                   setShowInlineCamera(true);
                 }}
                 className="flex h-10 w-10 mx-auto shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-all hover:scale-105 active:scale-95 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
-                aria-label="Mở camera quét"
+                aria-label={t.companion.openCameraLabel}
               >
                 📸
               </button>
               <button
                 type="button"
                 onClick={() => setShowTextInput(true)}
-                aria-label="Gõ chữ"
+                aria-label={t.companion.openKeyboardLabel}
                 className="flex items-center justify-center transition-all hover:scale-105 active:scale-95 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 36" fill="currentColor" className="w-[36px] h-[18px] text-amber-200/90 hover:text-amber-100">
@@ -903,7 +920,7 @@ export default function CompanionChat({
                 type="button"
                 onClick={() => setShowTextInput(false)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-amber-100/70 hover:bg-white/[0.1] hover:text-amber-100 transition-colors"
-                aria-label="Đóng thanh gõ chữ"
+                aria-label={t.companion.closeKeyboardLabel}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -916,7 +933,7 @@ export default function CompanionChat({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void send();
                 }}
-                placeholder="Hỏi Đôn điều gì đó…"
+                placeholder={t.companion.chatPlaceholder}
                 disabled={isTranscribing || isRecording}
                 className="min-w-0 flex-1 rounded-full border border-amber-200/15 bg-white/[0.06] px-4 py-2 text-sm outline-none disabled:opacity-50"
               />
@@ -926,7 +943,7 @@ export default function CompanionChat({
                 onClick={() => void send()}
                 className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-40 transition-transform active:scale-95"
               >
-                Gửi
+                {t.companion.btnSend}
               </button>
             </div>
           )}
@@ -937,11 +954,11 @@ export default function CompanionChat({
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">
           {!fallbackSuggestions ? (
             <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4">
-              📸 Hướng camera vào hiện vật và bấm nút chụp
+              {t.companion.cameraInstruction}
             </p>
           ) : (
             <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4 animate-pulse">
-              🤔 Đôn đang phân vân...
+              🤔 {t.companion.uncertain}
             </p>
           )}
           <div className="w-full max-w-[320px] aspect-[3/4] max-h-[60vh] relative">
@@ -973,7 +990,7 @@ export default function CompanionChat({
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-amber-50 font-semibold truncate text-sm">{match.name}</p>
-                        <p className="text-amber-200/60 text-xs truncate">Chọn hiện vật này</p>
+                        <p className="text-amber-200/60 text-xs truncate">{t.companion.pickThis}</p>
                       </div>
                     </button>
                   ))}
@@ -986,7 +1003,7 @@ export default function CompanionChat({
                     }}
                     className="w-full py-3 mt-2 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-colors text-sm"
                   >
-                    ↺ Chụp lại góc khác
+                    {t.companion.retakeAngle}
                   </button>
                 </div>
               </div>
@@ -1004,7 +1021,7 @@ export default function CompanionChat({
               disabled={scanPhase !== "idle"}
               className="mt-8 w-full max-w-[240px] py-4 rounded-full bg-amber-500 text-black font-bold text-lg disabled:opacity-50 transition-transform active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
             >
-              {scanPhase === "scanning" ? "Đang quét..." : scanPhase === "found" ? "Đã nhận diện!" : "Chụp ngay"}
+              {scanPhase === "scanning" ? t.companion.scanning : scanPhase === "found" ? t.companion.identified : t.companion.captureNow}
             </button>
           )}
           
@@ -1019,7 +1036,7 @@ export default function CompanionChat({
             }}
             className="mt-6 text-amber-200/50 text-sm underline"
           >
-            Đóng camera
+            {t.companion.closeCamera}
           </button>
         </div>
       )}

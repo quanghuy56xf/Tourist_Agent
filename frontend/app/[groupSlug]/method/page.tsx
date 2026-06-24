@@ -117,10 +117,10 @@ export default function MethodSelectionPage() {
           </div>
           <div>
             <h3 className="text-sm font-bold text-amber-200">
-              Bắt đầu hành trình với Lê Quý Đôn
+              {t.method.companionTitle}
             </h3>
             <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
-              Trò chuyện bằng giọng nói cùng người bạn đồng hành 18 tuổi
+              {t.method.companionSubtitle}
             </p>
           </div>
         </button>

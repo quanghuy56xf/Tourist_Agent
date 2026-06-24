@@ -13,11 +13,13 @@ import {
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { getDynamicMinimapConfig, type MinimapConfig } from "@/lib/api";
 import { VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function CompanionPage() {
   const router = useRouter();
   const groupSlug = useGroupSlug();
   const scanPath = useGroupPath("/scan");
+  const { t } = useVisitorLocale();
   const [showIntro, setShowIntro] = useState(false);
   const [ready, setReady] = useState(false);
   const [minimapSuggestedId, setMinimapSuggestedId] = useState<number | null>(null);
@@ -56,10 +58,10 @@ export default function CompanionPage() {
       <header className="absolute left-0 right-0 top-0 z-30 flex items-start justify-between bg-gradient-to-b from-[#0b1328]/90 via-[#0b1328]/50 to-transparent px-4 py-4 pt-6 pointer-events-none">
         <div className="pointer-events-auto">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400">
-            Người bạn đồng hành
+            {t.companion.role}
           </p>
           <h1 className="font-serif text-2xl text-amber-50 drop-shadow-md">
-            Lê Quý Đôn
+            {t.companion.name}
           </h1>
         </div>
         <div className="flex gap-2 pointer-events-auto">

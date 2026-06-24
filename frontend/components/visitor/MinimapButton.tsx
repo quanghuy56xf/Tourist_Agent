@@ -12,8 +12,10 @@ import {
   MINIMAP_UPDATED_EVENT,
 } from "@/lib/minimapState";
 import MinimapModal from "./MinimapModal";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function MinimapButton() {
+  const { t } = useVisitorLocale();
   const groupSlug = useGroupSlug();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(false);
@@ -70,8 +72,8 @@ export default function MinimapButton() {
           type="button"
           onClick={handleOpen}
           className="pointer-events-auto relative grid h-12 w-12 place-items-center rounded-full border border-amber-300/40 bg-[#251b0e]/95 text-amber-300 shadow-lg shadow-black/40 backdrop-blur transition hover:scale-105 hover:bg-[#332614] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          aria-label="Mở bản đồ tham quan"
-          title="Bản đồ tham quan"
+          aria-label={t.minimap.openMap}
+          title={t.minimap.title}
         >
           <svg
             viewBox="0 0 24 24"
@@ -90,7 +92,7 @@ export default function MinimapButton() {
           {unread && (
             <span
               className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#251b0e] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.9)]"
-              aria-label="Có vị trí mới trên bản đồ"
+              aria-label={t.minimap.newLocation}
             />
           )}
         </button>

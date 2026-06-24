@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { MinimapConfig } from "@/lib/api";
 import { readRememberedMinimapItem } from "@/lib/minimapState";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface MinimapModalProps {
   open: boolean;
@@ -21,6 +22,7 @@ export default function MinimapModal({
   suggestedItemId,
   suggestedItemName,
 }: MinimapModalProps) {
+  const { t } = useVisitorLocale();
   const [lastItemId, setLastItemId] = useState<number | null>(null);
   const currentZone =
     lastItemId === null
@@ -49,7 +51,7 @@ export default function MinimapModal({
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Bản đồ tham quan"
+      aria-label={t.minimap.title}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -58,17 +60,17 @@ export default function MinimapModal({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-amber-400">
-              Hành trình tham quan
+              {t.minimap.journey}
             </p>
             <h2 className="mt-1 font-serif text-xl font-semibold">
-              Bản đồ khu tham quan
+              {t.minimap.mapLabel}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-amber-200/20 bg-white/5 text-xl text-amber-100 transition hover:bg-white/10"
-            aria-label="Đóng bản đồ"
+            aria-label={t.minimap.close}
           >
             ×
           </button>
@@ -79,7 +81,7 @@ export default function MinimapModal({
             <div className="relative overflow-hidden rounded-xl border border-amber-300/20 bg-[#211b12]">
               <img
                 src={config.imageSrc}
-                alt="Bản đồ khu tham quan"
+                alt={t.minimap.mapLabel}
                 className="block h-auto w-full"
               />
               {currentZone && (
@@ -105,21 +107,21 @@ export default function MinimapModal({
             </div>
             <div className="mt-3 rounded-xl bg-white/[0.04] px-4 py-3">
               <p className="text-xs text-amber-200/65">
-                Vị trí gần nhất dựa trên hiện vật vừa quét
+                {t.minimap.nearestLocation}
               </p>
               <p className="mt-1 font-medium text-amber-50">
-                {currentZone?.zoneName ?? "Chưa xác định vị trí"}
+                {currentZone?.zoneName ?? t.minimap.unknownLocation}
               </p>
               {suggestedZone && (
                 <p className="mt-2 text-sm text-amber-300">
-                  Đôn gợi ý tiếp theo: {suggestedItemName ? `${suggestedItemName} (thuộc ${suggestedZone.zoneName})` : suggestedZone.zoneName}
+                  {t.minimap.nextSuggestion} {suggestedItemName ? `${suggestedItemName} (${suggestedZone.zoneName})` : suggestedZone.zoneName}
                 </p>
               )}
             </div>
           </>
         ) : (
           <p className="rounded-xl bg-white/[0.04] px-4 py-6 text-center text-amber-100/70">
-            Bản đồ chưa khả dụng cho khu tham quan này.
+            {t.minimap.notAvailable}
           </p>
         )}
       </div>

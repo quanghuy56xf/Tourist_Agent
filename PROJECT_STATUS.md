@@ -60,6 +60,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Companion chủ động chào hỏi, yêu cầu khách quét hiện vật, có thể mở camera ngay trong giao diện chat và đề xuất điểm đến tiếp theo.
 - Nội dung chat được truyền trực tiếp (Streaming) qua kiến trúc Backend-Driven Pipeline: Backend xử lý song song Text Generation và TTS, đẩy trực tiếp audio Base64 qua một EventStream duy nhất giúp giảm thiểu độ trễ Time-to-First-Audio.
 - Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
+- UX cơ bản đã hoàn thiện (collapsible avatar, floating scanner, smart idle timer). Tính năng hỗ trợ Tiếng Anh (i18n) đã được triển khai hoàn tất với giọng đọc `en-US-GuyNeural` và các luồng UI được dịch đầy đủ.
 
 ### Định hướng giao diện Companion
 
@@ -69,8 +70,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 
 ## 4. Current focus và TODO ưu tiên
 
-1. **[Hoàn thành] Companion Chat UX/UI:** Nâng cấp Dynamic Collapsible Avatar với đường cắt gradient hoàn hảo, thêm đồng hồ đếm ngược thông minh (Smart Idle Timer) và chuyển Camera sang dạng Float UI để tránh nhầm lẫn luồng quét.
-2. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
+1. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
 3. **Dọn state Admin:** thay thế hoàn toàn `localStorage` và window events còn sót lại (`adminAuth`, `groups-changed`) bằng Context hoặc store để quản lý trạng thái đồng nhất hơn.
 4. **Kiểm thử thiết bị thật:** xác nhận microphone, camera, TTS, inline scan và Minimap trên Safari iPhone.
 
