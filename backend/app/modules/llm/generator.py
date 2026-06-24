@@ -210,60 +210,6 @@ Tài liệu được cung cấp (Context):
         return extract_complete_text(response)
 
 
-    def generate_companion_chat(
-        self,
-        message: str,
-        history: List[dict],
-        retrieved_docs: List[Document],
-        current_item: str | None,
-        visited_items: List[str],
-        next_item_name: str | None = None,
-    ) -> str:
-        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-        context = (
-            self._format_context(retrieved_docs)
-            if retrieved_docs
-            else "Không có ngữ cảnh xác thực bổ sung."
-        )
-        journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
-        current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
-        next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
-        suggestion_prompt = f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'" if next_item_name else "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không."
-        system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
-đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
-
-Phong cách giao tiếp:
-- Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
-- Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
-- Kể chuyện sinh động và liên hệ những nơi khách đã ghé khi phù hợp.
-- Khi tài liệu không đủ, nói: "Cái này ta chưa đọc đến, để tra lại sau!"
-- KHÔNG bịa; chỉ dùng kiến thức từ Context được cung cấp.
-- Trả lời bằng tiếng Việt, tự nhiên, không quá 300 từ.
-
-Các chỉ thị hệ thống đặc biệt (du khách không gõ những dòng này):
-- Nếu tin nhắn là "[SYSTEM_EVENT]: APP_OPENED": Du khách vừa mở ứng dụng. 
-  + Nếu "Du khách đã tham quan" là "Chưa có điểm nào": Hãy chào mừng. Sau đó, XUỐNG DÒNG (bằng 2 dấu enter) và YÊU CẦU họ: "Để bắt đầu hành trình, hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta nhé!".
-  + Nếu họ đã tham quan vài điểm: Hãy tóm tắt lại và gợi ý họ đi tiếp. {next_item_str}. Cuối cùng, XUỐNG DÒNG (bằng 2 dấu enter) và thêm câu: "Hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta để ta biết bạn đang ở đâu nhé!".
-- Nếu tin nhắn là "[SYSTEM_EVENT]: SCANNED_ITEM_ID=...": Khách vừa chụp ảnh hiện vật. Hãy bắt đầu kể chuyện về hiện vật đó. {suggestion_prompt}
-
-Hiện vật đang xem: {current_item_str}
-Du khách đã tham quan: {journey}
-{next_item_str}
-
-Context xác thực:
-{context}
-"""
-        messages = [SystemMessage(content=system_prompt)]
-        for entry in history[-10:]:
-            if entry["role"] == "user":
-                messages.append(HumanMessage(content=entry["content"]))
-            elif entry["role"] == "assistant":
-                messages.append(AIMessage(content=entry["content"]))
-        messages.append(HumanMessage(content=message))
-
-        response = invoke_llm(self.llm, messages)
-        return extract_complete_text(response)
 
     async def generate_companion_chat_stream(
         self,
@@ -284,27 +230,28 @@ Context xác thực:
         journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
         current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
         next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
-        suggestion_prompt = f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'" if next_item_name else "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không."
+        suggestion_prompt = (
+            f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'\n"
+            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+        ) if next_item_name else (
+            "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không.\n"
+            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+        )
+        tour_completion_prompt = (
+            "Du khách đã đi hết các điểm. Hãy khen ngợi họ, tóm tắt ngắn hành trình "
+            "và kết thúc hành trình một cách ấm áp."
+            if next_item_name is None and len(visited_items) > 1
+            else ""
+        )
         system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
 đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
 
 Phong cách giao tiếp:
 - Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
 - Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
-- Kể chuyện sinh động và liên hệ những nơi khách đã ghé khi phù hợp.
-- Khi tài liệu không đủ, nói: "Cái này ta chưa đọc đến, để tra lại sau!"
-- KHÔNG bịa; chỉ dùng kiến thức từ Context được cung cấp.
-- Trả lời bằng tiếng Việt, tự nhiên, không quá 300 từ.
-
-Các chỉ thị hệ thống đặc biệt (du khách không gõ những dòng này):
-- Nếu tin nhắn là "[SYSTEM_EVENT]: APP_OPENED": Du khách vừa mở ứng dụng. 
-  + Nếu "Du khách đã tham quan" là "Chưa có điểm nào": Hãy chào mừng. Sau đó, XUỐNG DÒNG (bằng 2 dấu enter) và YÊU CẦU họ: "Để bắt đầu hành trình, hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta nhé!".
-  + Nếu họ đã tham quan vài điểm: Hãy tóm tắt lại và gợi ý họ đi tiếp. {next_item_str}. Cuối cùng, XUỐNG DÒNG (bằng 2 dấu enter) và thêm câu: "Hãy chụp ảnh hiện vật gần nhất của bạn gửi cho ta để ta biết bạn đang ở đâu nhé!".
-- Nếu tin nhắn là "[SYSTEM_EVENT]: SCANNED_ITEM_ID=...": Khách vừa chụp ảnh hiện vật. Hãy bắt đầu kể chuyện về hiện vật đó. {suggestion_prompt}
-
-Hiện vật đang xem: {current_item_str}
 Du khách đã tham quan: {journey}
 {next_item_str}
+{tour_completion_prompt}
 
 Context xác thực:
 {context}

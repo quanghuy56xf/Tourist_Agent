@@ -6,7 +6,6 @@ import BackButton from "@/components/visitor/BackButton";
 import HomeButton from "@/components/visitor/HomeButton";
 import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
-import CompanionChat from "@/components/visitor/CompanionChat";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
 import { playChatTts, stopChatTts } from "@/lib/chatTts";
@@ -20,7 +19,7 @@ import {
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
 import { rememberMinimapItem } from "@/lib/minimapState";
-import { addVisitedItem, isCompanionMode } from "@/lib/companionState";
+import { addVisitedItem } from "@/lib/companionState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
@@ -67,7 +66,6 @@ export default function ItemDetailPage() {
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [introActive, setIntroActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
-  const [companionMode, setCompanionMode] = useState(false);
 
   const stopGuidePlayback = () => {
     heraPanelRef.current?.stopPlayback();
@@ -78,11 +76,6 @@ export default function ItemDetailPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setAutoSpeak(localStorage.getItem("chat_auto_speak") === "true");
-    }
-  }, []);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setCompanionMode(isCompanionMode(window.sessionStorage));
     }
   }, []);
 
@@ -109,7 +102,7 @@ export default function ItemDetailPage() {
         setItem(data);
         setLoadingItem(false);
         try {
-          const itemContent = await getItemContent(itemId, companionMode ? "Companion" : persona, language);
+          const itemContent = await getItemContent(itemId, persona, language);
           if (!cancelled) {
             setContent(itemContent.content);
             setAudioUrl(
@@ -140,7 +133,7 @@ export default function ItemDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [companionMode, groupSlug, itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
+  }, [groupSlug, itemId, persona, language, localeReady, personaReady, t.item.contentError, t.item.loadError]);
 
   useEffect(() => {
     if (!itemId || !personaReady || !localeReady) return;
@@ -217,7 +210,7 @@ export default function ItemDetailPage() {
   const slideshowImages = getItemImageUrls(item);
 
   return (
-    <main className={`flex flex-1 flex-col w-full overflow-hidden ${companionMode ? "pb-4" : "pb-24"}`}>
+    <main className="flex flex-1 flex-col w-full overflow-hidden pb-24 relative">
       <div className="relative h-44 shrink-0 overflow-hidden">
         <ItemHeroSlideshow
           images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
@@ -231,9 +224,7 @@ export default function ItemDetailPage() {
           <BackButton
             onClick={() =>
               router.push(
-                companionMode
-                  ? groupPath(groupSlug, "/companion")
-                  : inTour
+                inTour
                   ? groupPath(groupSlug, `/tour/${tourId}/play`)
                   : groupPath(groupSlug, "/method")
               )
@@ -241,7 +232,7 @@ export default function ItemDetailPage() {
             label={t.common.back}
             variant="dark"
           />
-          {!companionMode && !inTour && (
+          {!inTour && (
             <button
               type="button"
               onClick={() => router.push(scanPath)}
@@ -268,41 +259,37 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      <section className={`flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 ${companionMode ? "" : "overflow-y-auto"}`}>
-        <div className={`flex flex-col ${companionMode ? "flex-1 min-h-0" : "hera-guide-sticky-wrap"}`}>
+      <section className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 overflow-y-auto">
+        <div className="flex flex-col hera-guide-sticky-wrap">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-px flex-1" style={{ background: "var(--border)" }} />
             <span className="artifact-section-label px-2">{t.item.guideSection}</span>
             <div className="h-px flex-1" style={{ background: "var(--border)" }} />
           </div>
 
-          {companionMode ? (
-            <CompanionChat itemId={itemId} initialNarration={content} compact />
-          ) : (
-            <HeraGuidePanel
-              ref={heraPanelRef}
-              content={content}
-              audioUrl={audioUrl}
-              audioReady={audioReady}
-              loading={loadingContent}
-              language={language}
-              overlay={introActive}
-              slideshowImages={
-                slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []
-              }
-              slideshowAlt={item.name}
-              onIntroActiveChange={setIntroActive}
-            />
-          )}
+          <HeraGuidePanel
+            ref={heraPanelRef}
+            content={content}
+            audioUrl={audioUrl}
+            audioReady={audioReady}
+            loading={loadingContent}
+            language={language}
+            overlay={introActive}
+            slideshowImages={
+              slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []
+            }
+            slideshowAlt={item.name}
+            onIntroActiveChange={setIntroActive}
+          />
         </div>
 
-        <div className={`${companionMode ? "hidden" : "mb-3 flex items-center gap-2"}`}>
+        <div className="mb-3 flex items-center gap-2">
           <div className="h-px flex-1" style={{ background: "var(--border)" }} />
           <span className="artifact-section-label px-2">{t.item.qaSection}</span>
           <div className="h-px flex-1" style={{ background: "var(--border)" }} />
         </div>
 
-        <div className={companionMode ? "hidden" : "space-y-3"}>
+        <div className="space-y-3">
           {chatHistory.map((msg, idx) => (
             <div
               key={idx}
@@ -343,7 +330,7 @@ export default function ItemDetailPage() {
       </section>
 
       <div
-        className={companionMode ? "hidden" : "artifact-fixed-bar"}
+        className="artifact-fixed-bar"
         style={{ background: "rgba(14,11,7,0.95)", borderTop: "1px solid var(--border)" }}
       >
         <div className="space-y-2">
@@ -407,6 +394,15 @@ export default function ItemDetailPage() {
           </button>
           </div>
         </div>
+      </div>
+
+      <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-2 pointer-events-none">
+        <button 
+          onClick={() => router.push(groupPath(groupSlug, "/companion"))}
+          className="relative block h-16 w-16 rounded-full border-2 border-amber-400/50 overflow-hidden shadow-[0_0_20px_rgba(201,168,76,0.3)] transition-transform hover:scale-105 active:scale-95 bg-[#1a2333] pointer-events-auto animate-pulse"
+        >
+          <img src="/images/companion/companion-idle.png" alt="Lê Quý Đôn" className="h-[130%] w-[130%] max-w-none object-cover object-top -ml-[15%]" />
+        </button>
       </div>
     </main>
   );

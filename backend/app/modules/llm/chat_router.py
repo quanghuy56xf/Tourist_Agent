@@ -21,7 +21,6 @@ from app.schemas.generate import (
     ChatRequest,
     ChatResponse,
     CompanionChatRequest,
-    CompanionChatResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,95 +142,6 @@ def chat_with_ai(
     return ChatResponse(content=content)
 
 
-@router.post("/companion/chat", response_model=CompanionChatResponse)
-def chat_with_companion(
-    request: CompanionChatRequest,
-    db: Session = Depends(get_db),
-):
-    if request.item_id is not None:
-        item = db.query(Item).filter(Item.id == request.item_id).first()
-        if item is None:
-            raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
-
-        docs, has_verified = build_chat_item_context(
-            item_id=item.id,
-            item_name=item.name,
-            item_description=item.description,
-            group_id=item.group_id,
-            retriever=try_get_rag_retriever(),
-            top_k=RAG_CHAT_TOP_K,
-            query=request.message,
-        )
-        if not has_verified:
-            return CompanionChatResponse(
-                content="Cái này ta chưa đọc đến, để tra lại sau!"
-            )
-        group_id = item.group_id
-        current_item_name = item.name
-    else:
-        item = None
-        docs = []
-        group_id = None
-        current_item_name = None
-
-    query_visited = db.query(Item.id, Item.name).filter(Item.id.in_(request.visited_item_ids))
-    if group_id is not None:
-        query_visited = query_visited.filter(Item.group_id == group_id)
-        
-    visited_rows = query_visited.all() if request.visited_item_ids else []
-
-    names_by_id = {row.id: row.name for row in visited_rows}
-    visited_names = [
-        names_by_id[visited_id]
-        for visited_id in request.visited_item_ids
-        if visited_id in names_by_id
-    ]
-    history = [
-        {"role": entry.role, "content": entry.content}
-        for entry in request.history
-    ]
-
-    if group_id is None and visited_rows:
-        first_item = db.query(Item.group_id).filter(Item.id == request.visited_item_ids[0]).first()
-        if first_item:
-            group_id = first_item.group_id
-
-    next_item_id = None
-    next_item_name = None
-    if request.suggest_next and group_id is not None:
-        excluded_ids = set(request.visited_item_ids)
-        if item is not None:
-            excluded_ids.add(item.id)
-        next_item = (
-            db.query(Item)
-            .filter(
-                Item.group_id == group_id,
-                Item.id.notin_(excluded_ids),
-            )
-            .order_by(Item.id.asc())
-            .first()
-        )
-        if next_item is not None:
-            next_item_id = next_item.id
-            next_item_name = next_item.name
-
-    try:
-        content = get_rag_generator().generate_companion_chat(
-            message=request.message,
-            history=history,
-            retrieved_docs=docs,
-            current_item=current_item_name,
-            visited_items=visited_names,
-            next_item_name=next_item_name,
-        )
-    except LLMServiceUnavailableError:
-        raise HTTPException(status_code=503, detail="Dịch vụ AI tạm thời không khả dụng") from None
-    except Exception:
-        logger.exception("Companion chat generation failed for item %s", item.id if item else None)
-        raise HTTPException(status_code=502, detail="Không thể trò chuyện với nhân vật lúc này") from None
-    return CompanionChatResponse(content=content, next_item_id=next_item_id, next_item_name=next_item_name)
-
-
 import json
 
 @router.post("/companion/chat/stream")
@@ -290,6 +200,7 @@ async def chat_with_companion_stream(
 
     next_item_id = None
     next_item_name = None
+    tour_completed = False
     if request.suggest_next and group_id is not None:
         excluded_ids = set(request.visited_item_ids)
         if item is not None:
@@ -306,6 +217,8 @@ async def chat_with_companion_stream(
         if next_item is not None:
             next_item_id = next_item.id
             next_item_name = next_item.name
+        elif item is not None or visited_names:
+            tour_completed = True
 
     async def event_generator():
         event_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -368,9 +281,36 @@ async def chat_with_companion_stream(
             finally:
                 await event_queue.put(None)
 
-        if next_item_id is not None:
-            metadata = {"next_item_id": next_item_id, "next_item_name": next_item_name}
+        if "[SYSTEM_EVENT]: APP_OPENED" in request.message:
+            actions = {
+                "buttons": [
+                    {
+                        "type": "open_camera",
+                        "label": "📸 Quét hiện vật gần nhất",
+                    }
+                ]
+            }
+            yield f"event: actions\ndata: {json.dumps(actions)}\n\n"
+
+        if next_item_id is not None or tour_completed:
+            metadata = {
+                "next_item_id": next_item_id,
+                "next_item_name": next_item_name,
+            }
+            if tour_completed:
+                metadata["tour_completed"] = True
             yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
+
+        if tour_completed:
+            actions = {
+                "buttons": [
+                    {
+                        "type": "restart_tour",
+                        "label": "🔄 Bắt đầu hành trình mới",
+                    }
+                ]
+            }
+            yield f"event: actions\ndata: {json.dumps(actions)}\n\n"
 
         producer_task = asyncio.create_task(llm_producer())
         consumer_task = asyncio.create_task(tts_consumer())

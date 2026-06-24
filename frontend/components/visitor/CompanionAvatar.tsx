@@ -73,9 +73,9 @@ export default function CompanionAvatar({
 
   return (
     <div
-      className={`relative shrink-0 pointer-events-none transition-all duration-500 ease-in-out overflow-hidden ${
+      className={`relative shrink-0 pointer-events-none transition-all duration-500 ease-in-out overflow-hidden transform-gpu ${
         collapsed
-          ? "w-16 h-16 rounded-full shadow-lg"
+          ? "w-16 aspect-square rounded-full shadow-lg mx-auto"
           : introMode
             ? "w-full aspect-square"
             : "w-full aspect-[4/3]"
@@ -100,7 +100,7 @@ export default function CompanionAvatar({
           src={SOURCES[state]}
           alt="Minh họa Lê Quý Đôn 18 tuổi"
           className={`absolute top-0 left-0 w-full aspect-square object-cover object-top transition-transform duration-500 ease-in-out ${
-            !introMode && !collapsed ? "scale-[0.6] origin-top" : "scale-100 origin-top"
+            !introMode && !collapsed ? "scale-[0.62] origin-top translate-y-[6%]" : "scale-100 origin-top translate-y-0"
           }`}
           onError={() => setAssetAvailable(false)}
         />
@@ -119,10 +119,8 @@ export default function CompanionAvatar({
           autoPlay
           playsInline
           className="absolute inset-0 h-full w-full object-cover object-top z-10"
-          onEnded={onIntroComplete}
           onError={() => {
              setVideoFailed(true);
-             if (onIntroComplete) onIntroComplete();
           }}
         />
       )}

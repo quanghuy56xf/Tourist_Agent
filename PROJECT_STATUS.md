@@ -1,7 +1,6 @@
 # PROJECT STATUS: HERA - AI Heritage Guide V2
 
-**Cập nhật gần nhất:** 2026-06-23
-
+**Cập nhật gần nhất:** 2026-06-24
 Tài liệu này là ảnh chụp ngắn gọn về trạng thái hiện tại của dự án, dành cho AI Agent và developer mới. Lịch sử triển khai chi tiết được lưu tại `WORKLOG.md`.
 
 ## 1. Tổng quan
@@ -70,7 +69,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 
 ## 4. Current focus và TODO ưu tiên
 
-1. **[Hoàn thành] Dynamic Collapsible Avatar:** Đã tối ưu không gian, hiệu ứng chuyển đổi mượt mà (500ms) và cho phép toggle thủ công.
+1. **[Hoàn thành] Companion Chat UX/UI:** Nâng cấp Dynamic Collapsible Avatar với đường cắt gradient hoàn hảo, thêm đồng hồ đếm ngược thông minh (Smart Idle Timer) và chuyển Camera sang dạng Float UI để tránh nhầm lẫn luồng quét.
 2. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
 3. **Dọn state Admin:** thay thế hoàn toàn `localStorage` và window events còn sót lại (`adminAuth`, `groups-changed`) bằng Context hoặc store để quản lý trạng thái đồng nhất hơn.
 4. **Kiểm thử thiết bị thật:** xác nhận microphone, camera, TTS, inline scan và Minimap trên Safari iPhone.

@@ -25,9 +25,9 @@ Frontend dùng Next.js 14; backend dùng FastAPI; dữ liệu metadata lưu tron
 - Cập nhật `PROJECT_STATUS.md` khi có thay đổi kiến trúc đáng kể.
 
 ## Current Focus
-- Dynamic Minimap được cấu hình theo từng Group bằng JSON và `itemNames`.
-- AI Companion Lê Quý Đôn 18 tuổi: avatar, voice chat, session memory và hướng dẫn điểm tiếp theo.
-- Tiếp tục ổn định test backend, content/TTS và trải nghiệm visitor trên thiết bị di động.
+- Hoàn thiện luồng AI Companion Lê Quý Đôn: Tối ưu UX/UI (Dynamic Avatar, Floating Scanner, Suggested Questions).
+- Dynamic Minimap cấu hình động theo từng Group bằng JSON và `itemNames`.
+- Tiếp tục dọn dẹp state Admin và kiểm thử thực tế trên thiết bị di động (Camera, Mic, Safari iOS).
 
 ## Prompt Usage
 Mở đầu task mới bằng:

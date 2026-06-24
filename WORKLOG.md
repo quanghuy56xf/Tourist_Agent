@@ -284,3 +284,19 @@ Các thay đổi:
 - **Backend:** Nâng cấp Endpoint `POST /api/companion/chat/stream` để chạy song song LLM Streaming và TTS Synthesizing bằng `asyncio`. Ngay khi gom đủ một câu (dấu câu hoặc dòng mới), Backend tự động gọi Edge TTS và đẩy audio MP3 đã mã hóa Base64 qua SSE (`event: audio`).
 - **Frontend:** Cập nhật `chatWithCompanionStream` để xử lý event `audio`. Thay vì gọi API rời rạc, Frontend hiện chỉ cần giải mã Base64 sang Blob, tạo ObjectURL, và đưa vào một Audio Queue nhỏ gọn nội bộ để phát nhạc nối tiếp.
 - Giảm tổng số lượng kết nối mạng xuống còn đúng 1 request Server-Sent Events (SSE) duy nhất, kéo giảm độ trễ Time-to-First-Audio và loại bỏ hoàn toàn các HTTP Request thừa.
+
+## 2026-06-24 - Nâng cấp UX/UI và hoàn thiện Companion Chat
+
+Bối cảnh:
+- Màn hình trò chuyện với Lê Quý Đôn (Companion Chat) cần được điều chỉnh giao diện (UI) và trải nghiệm (UX) để trực quan hơn, thân thiện với thiết bị di động hơn và tránh gây nhầm lẫn với các tính năng quét của hệ thống cũ.
+
+Các thay đổi:
+- **Tính năng A (Fixed Camera Button)**: Di chuyển nút mở Camera 📸 ra khỏi ô nhập liệu (text input) và thiết kế lại dưới dạng giao diện nổi (Floating UI) nằm ngay phía trên biểu tượng bàn phím.
+- **Tính năng B (Suggested Questions)**: Tích hợp hệ thống câu hỏi gợi ý từ LLM (với định dạng `||Q: ...||`). Trích xuất câu hỏi và biến thành các nút bấm hành động (Action Buttons) để khách dễ dàng tương tác.
+- **Tính năng C (Smart Idle Timer)**: Thêm đồng hồ đếm ngược thông minh (30 giây) để hiển thị nút mồi "📸 Quét tiếp" nếu người dùng không có tương tác nào sau khi Lê Quý Đôn nói xong, và chỉ hiển thị khi không có nút gợi ý nào khác.
+- **Sửa lỗi Avatar Layout**:
+  - Dịch chuyển avatar ở trạng thái thu gọn (collapsed) xuống dưới để không bị đè lên chữ tiêu đề.
+  - Sửa lỗi hoạt ảnh phóng to/thu nhỏ (zoom effect) trên thiết bị di động bằng cách đổi `aspect-[4/3]` và `h-16 w-16` sang `aspect-square`, thêm `transform-gpu` để khắc phục lỗi phần cứng Safari.
+  - Đẩy avatar xuống dưới và thêm hiệu ứng `radial-gradient` vào viền lõm để mượt mà hơn với hình nền chat.
+- **Responsive Wrapper**: Giới hạn lại kích thước màn hình `page.tsx` của Companion bằng một vùng chứa `max-w-md` (tự động căn giữa nền đen trên máy tính/tablet) để giao diện không bị vỡ hoặc xê dịch thất thường.
+- **Đồng bộ hóa luồng quét**: Ẩn nút "Quét" mặc định ở góc trên bên phải màn hình Lê Quý Đôn để giảm nhầm lẫn, tập trung toàn bộ người dùng vào trải nghiệm quét bằng nút nổi (Inline Scanner) trong luồng chat.

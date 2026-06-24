@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { chatWithCompanion, chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
+import { chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
 import { getVisitedItemIds } from "@/lib/companionState";
-import { rememberMinimapSuggestion } from "@/lib/minimapState";
+import { rememberMinimapSuggestion, rememberMinimapItem } from "@/lib/minimapState";
 import { getVisitorSessionId } from "@/lib/visitorAnalytics";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import {
@@ -24,15 +24,26 @@ interface CompanionChatProps {
   compact?: boolean;
   showIntro?: boolean;
   onCompleteIntro?: () => void;
-  onSuggestNextPoint?: (itemId: number) => void;
+  onSuggestNextPoint?: (itemId: number, itemName?: string) => void;
 }
 
 function useStreamingText(text: string): string {
-  const [length, setLength] = useState(text.length);
+  const [length, setLength] = useState(0);
+  const prevTextRef = useRef("");
 
   useEffect(() => {
-    setLength(0);
-    if (!text) return;
+    if (!text) {
+      setLength(0);
+      prevTextRef.current = "";
+      return;
+    }
+    
+    // Reset length only if it's a completely new message
+    if (!text.startsWith(prevTextRef.current)) {
+      setLength(0);
+    }
+    prevTextRef.current = text;
+
     const timer = window.setInterval(() => {
       setLength((current) => {
         const next = Math.min(text.length, current + 3);
@@ -52,6 +63,7 @@ export default function CompanionChat({
   compact = false,
   showIntro = false,
   onCompleteIntro,
+  onSuggestNextPoint,
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
   const [history, setHistory] = useState<ChatMessage[]>(
@@ -87,12 +99,10 @@ export default function CompanionChat({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestionRequested, setSuggestionRequested] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
   const { searchImage } = useObjectSearch();
   const [showInlineCamera, setShowInlineCamera] = useState(false);
-  const [showCameraButton, setShowCameraButton] = useState(false);
   const [frozen, setFrozen] = useState(false);
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "found">("idle");
   const [scanProgress, setScanProgress] = useState(0);
@@ -100,6 +110,25 @@ export default function CompanionChat({
   const [scanErrorMsg, setScanErrorMsg] = useState<string | null>(null);
   const [fallbackSuggestions, setFallbackSuggestions] = useState<SearchMatch[] | null>(null);
   const [suggestedNextPoint, setSuggestedNextPoint] = useState<{ id: number; name: string } | null>(null);
+  const [actionButtons, setActionButtons] = useState<{ type: string; label: string }[]>([]);
+  const [activeItemId, setActiveItemId] = useState<number | null>(itemId || null);
+  useEffect(() => {
+    if (itemId !== undefined) setActiveItemId(itemId || null);
+  }, [itemId]);
+
+  useEffect(() => {
+    if (isLoading || isSpeaking || isRecording || isTranscribing || showInlineCamera || scanPhase !== "idle" || history.length === 0 || suggestedNextPoint !== null || actionButtons.length > 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setActionButtons(current => {
+        if (current.length > 0) return current;
+        return [{ type: "open_camera", label: "📸 Quét tiếp" }];
+      });
+    }, 30000);
+    return () => window.clearTimeout(timer);
+  }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, scanPhase, history.length, suggestedNextPoint, actionButtons.length]);
+
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopProgress = () => {
@@ -146,34 +175,13 @@ export default function CompanionChat({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, isLoading]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const appOpenedFired = useRef(false);
 
   useEffect(() => {
-    if (!itemId || !initialNarration || suggestionRequested) return;
-    setSuggestionRequested(true);
-    const visited = getVisitedItemIds(window.localStorage);
-    void chatWithCompanion(
-      itemId,
-      "Hãy gợi ý ngắn gọn một câu dẫn du khách đến điểm tiếp theo.",
-      [],
-      visited,
-      getVisitorSessionId(),
-      true
-    )
-      .then((response) => {
-        if (response.next_item_id !== null) {
-          rememberMinimapSuggestion(groupSlug, response.next_item_id);
-        }
-        setHistory((current) => [
-          ...current,
-          { role: "assistant", content: response.content },
-        ]);
-      })
-      .catch(() => {
-        // A suggestion is helpful but must not block the main narration.
-      });
-  }, [groupSlug, initialNarration, itemId, suggestionRequested]);
-
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+    persistentAudioRef.current = new Audio();
+  }, []);
 
   const stopAllAudio = () => {
     if (currentAudioRef.current) {
@@ -204,7 +212,12 @@ export default function CompanionChat({
         setIsSpeaking(true);
         try {
           await new Promise<void>((resolve, reject) => {
-            const audio = new Audio(url);
+            const audio = persistentAudioRef.current;
+            if (!audio) {
+              resolve();
+              return;
+            }
+            audio.src = url;
             currentAudioRef.current = audio;
             audio.onended = () => {
               URL.revokeObjectURL(url);
@@ -230,7 +243,7 @@ export default function CompanionChat({
     processAudioQueue();
   };
 
-  const send = async (message = input, isSystemEvent = false, requestSuggestNext = false) => {
+  const send = async (message = input, isSystemEvent = false, requestSuggestNext = false, overrideItemId?: number) => {
     const cleaned = message.trim();
     if (!cleaned || isLoading) return;
     
@@ -239,7 +252,7 @@ export default function CompanionChat({
     
     if (!isSystemEvent) {
       setSuggestedNextPoint(null);
-      setShowCameraButton(false);
+      setActionButtons([]);
     }
     
     const userMessage: ChatMessage = { role: "user", content: cleaned };
@@ -254,7 +267,7 @@ export default function CompanionChat({
 
     try {
       const stream = chatWithCompanionStream(
-        itemId || null,
+        overrideItemId ?? activeItemId,
         cleaned,
         previous,
         getVisitedItemIds(window.localStorage),
@@ -271,13 +284,35 @@ export default function CompanionChat({
         if (chunk.type === "metadata") {
           nextItemId = chunk.data.next_item_id;
           nextItemName = chunk.data.next_item_name;
+        } else if (chunk.type === "actions") {
+          setActionButtons(chunk.data.buttons || []);
         } else if (chunk.type === "chunk") {
           fullContent += chunk.data.text;
+          
+          let displayContent = fullContent;
+          const questions: { type: string; label: string; payload: string }[] = [];
+          
+          const regex = /\|\|Q:\s*(.+?)\|\|/g;
+          let match;
+          while ((match = regex.exec(fullContent)) !== null) {
+            questions.push({
+              type: "text",
+              label: match[1].trim(),
+              payload: match[1].trim()
+            });
+          }
+          
+          displayContent = fullContent.replace(/\|\|Q:\s*(.+?)\|\|/g, "").trim();
+          
           setHistory((current) => {
             const newHistory = [...current];
-            newHistory[newHistory.length - 1] = { role: "assistant", content: fullContent };
+            newHistory[newHistory.length - 1] = { role: "assistant", content: displayContent };
             return newHistory;
           });
+
+          if (questions.length > 0) {
+            setActionButtons(questions);
+          }
         } else if (chunk.type === "audio") {
           const bytes = Uint8Array.from(atob(chunk.data.audio_base64), c => c.charCodeAt(0));
           const blob = new Blob([bytes], { type: 'audio/mpeg' });
@@ -285,25 +320,29 @@ export default function CompanionChat({
         }
       }
 
-      const lowerResp = fullContent.toLowerCase();
-      const shouldOpenCamera = (cleaned === "[SYSTEM_EVENT]: APP_OPENED" && getVisitedItemIds(window.localStorage).length === 0) ||
-        lowerResp.includes("chụp ảnh") ||
-        lowerResp.includes("hướng camera");
-
       if (nextItemId !== null && nextItemName && onSuggestNextPoint) {
         setSuggestedNextPoint({ id: nextItemId, name: nextItemName });
       } else {
         setSuggestedNextPoint(null);
       }
-      
-      setShowCameraButton(shouldOpenCamera);
-    } catch {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
       setHistory((current) => {
         const newHistory = [...current];
-        newHistory[newHistory.length - 1] = {
-          role: "assistant",
-          content: "Đường truyền hơi chập chờn, bạn hỏi lại ta một lần nữa nhé.",
-        };
+        const lastMsg = newHistory[newHistory.length - 1];
+        if (lastMsg && lastMsg.role === "assistant") {
+          if (lastMsg.content.trim()) {
+            newHistory[newHistory.length - 1] = {
+              ...lastMsg,
+              content: lastMsg.content + `\n\n*(Lỗi: ${errMsg})*`,
+            };
+          } else {
+            newHistory[newHistory.length - 1] = {
+              ...lastMsg,
+              content: `Lỗi: ${errMsg}`,
+            };
+          }
+        }
         return newHistory;
       });
     } finally {
@@ -357,12 +396,14 @@ export default function CompanionChat({
           currentVisited.push(bestMatch.item_id);
           window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
         }
+        rememberMinimapItem(groupSlug, bestMatch.item_id);
         
         setTimeout(() => {
           setShowInlineCamera(false);
+          setActiveItemId(bestMatch.item_id);
           // Let AI know about the scanned item and request next suggestion
           const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${bestMatch.item_id}`;
-          void send(scanMessage, true, true);
+          void send(scanMessage, true, true, bestMatch.item_id);
         }, 900);
         return;
       }
@@ -413,17 +454,32 @@ export default function CompanionChat({
       currentVisited.push(match.item_id);
       window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
     }
+    rememberMinimapItem(groupSlug, match.item_id);
     
     setTimeout(() => {
       setShowInlineCamera(false);
+      setActiveItemId(match.item_id);
       const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${match.item_id}`;
-      void send(scanMessage, true, true);
+      void send(scanMessage, true, true, match.item_id);
     }, 900);
   };
 
   const handleAppOpened = () => {
     if (onCompleteIntro) onCompleteIntro();
-    if (history.length === 0) {
+    
+    // Unlock Audio Context on iOS/Safari by playing a silent sound on first user interaction
+    try {
+      const audio = persistentAudioRef.current;
+      if (audio) {
+        audio.src = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+        audio.play().catch(() => {});
+      }
+    } catch (e) {}
+
+    if (history.length === 0 && !appOpenedFired.current) {
+      if ((window as any).__companionAppOpenedFired) return;
+      (window as any).__companionAppOpenedFired = true;
+      appOpenedFired.current = true;
       void send("[SYSTEM_EVENT]: APP_OPENED", true);
     }
   };
@@ -479,6 +535,14 @@ export default function CompanionChat({
         style={{ cursor: (!compact && !showIntro && (avatarCollapsed || isManuallyExpanded)) ? 'pointer' : 'default' }}
       >
         <CompanionAvatar isSpeaking={isSpeaking} size={compact ? "sm" : "lg"} collapsed={avatarCollapsed} introMode={showIntro} onIntroComplete={handleAppOpened} />
+        {!compact && !showIntro && !avatarCollapsed && (
+          <div 
+            className="absolute inset-0 pointer-events-none z-20" 
+            style={{
+              background: "radial-gradient(ellipse 100% 100% at 50% -18%, transparent 88%, rgba(34, 56, 104, 0.8) 100%)"
+            }}
+          />
+        )}
       </div>
 
       <div className="relative min-h-0 flex-1 flex flex-col z-10" style={{ marginTop: gapMargin }}>
@@ -562,21 +626,80 @@ export default function CompanionChat({
               {isLoading && <p className="text-sm text-amber-200/60">Đôn đang suy nghĩ…</p>}
               
               {/* Proactive Action Buttons */}
-              {!isLoading && (showCameraButton || suggestedNextPoint) && (
-                <div className="flex flex-col gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
-                  {showCameraButton && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCameraButton(false);
-                        setShowInlineCamera(true);
-                      }}
-                      className="self-start inline-flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-full text-sm font-medium transition-all shadow-sm"
-                    >
-                      <span className="text-base">📸</span>
-                      <span>Chụp ảnh</span>
-                    </button>
-                  )}
+              {!isLoading && (suggestedNextPoint || actionButtons.length > 0) && (
+                <div className="flex flex-wrap gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
+                  {actionButtons.map((btn, idx) => {
+                    if (btn.type === "open_camera") {
+                      if (suggestedNextPoint) return null;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setFrozen(false);
+                            if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+                            setCapturedUrl(null);
+                            setScanPhase("idle");
+                            setScanProgress(0);
+                            setScanErrorMsg(null);
+                            setFallbackSuggestions(null);
+                            setShowInlineCamera(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 px-3 py-1.5 rounded-full transition-colors text-emerald-100 text-sm font-medium shadow-sm"
+                        >
+                          <span className="text-emerald-400">📸</span>
+                          <span>{btn.label.replace("📸 ", "")}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "restart_tour") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            window.localStorage.removeItem("visited_item_ids");
+                            window.location.reload();
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/30 hover:bg-blue-500/25 px-3 py-1.5 rounded-full transition-colors text-blue-100 text-sm font-medium shadow-sm"
+                        >
+                          <span className="text-blue-400">🔄</span>
+                          <span>{btn.label.replace("🔄 ", "")}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "rate_experience") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            alert("Cảm ơn bạn đã đánh giá!");
+                            setActionButtons(current => current.filter(b => b.type !== "rate_experience"));
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
+                        >
+                          <span className="text-amber-500">🌟</span>
+                          <span>Đánh giá</span>
+                        </button>
+                      );
+                    } else if (btn.type === "text") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setActionButtons([]);
+                            void send((btn as any).payload || btn.label);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
+                        >
+                          <span className="text-amber-500">💬</span>
+                          <span>{btn.label}</span>
+                        </button>
+                      );
+                    }
+                    return null;
+                  })}
+                  
                   {suggestedNextPoint && (
                     <>
                       <button
@@ -585,25 +708,39 @@ export default function CompanionChat({
                           setSuggestedNextPoint(null);
                           void send("Kể thêm cho tôi chi tiết thú vị về hiện vật này nhé.");
                         }}
-                        className="w-full text-left bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-4 py-3 rounded-xl transition-colors text-amber-100 text-sm flex items-center gap-3 shadow-sm"
+                        className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
                       >
-                        <span className="text-amber-500 text-lg">❓</span>
+                        <span className="text-amber-500">❓</span>
                         Hỏi thêm về hiện vật này
                       </button>
                       <button
                         type="button"
                         onClick={() => {
                           if (onSuggestNextPoint) {
-                            onSuggestNextPoint(suggestedNextPoint.id);
+                            onSuggestNextPoint(suggestedNextPoint.id, suggestedNextPoint.name);
                           }
-                          setSuggestedNextPoint(null);
                         }}
-                        className="w-full text-left bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-4 py-3 rounded-xl transition-colors text-blue-100 text-sm flex items-center gap-3 shadow-md relative overflow-hidden group"
+                        className="inline-flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/40 hover:bg-blue-500/25 px-3 py-1.5 rounded-full transition-colors text-blue-100 text-sm font-medium shadow-sm"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-400/10 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                        <span className="text-blue-400 text-xl relative z-10">🗺️</span>
-                        <span className="font-semibold tracking-wide relative z-10 drop-shadow-md">Khám phá {suggestedNextPoint.name}</span>
-                        <span className="ml-auto text-blue-400 opacity-60">→</span>
+                        <span className="text-blue-400">🗺️</span>
+                        Khám phá {suggestedNextPoint.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFrozen(false);
+                          if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+                          setCapturedUrl(null);
+                          setScanPhase("idle");
+                          setScanProgress(0);
+                          setScanErrorMsg(null);
+                          setFallbackSuggestions(null);
+                          setShowInlineCamera(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 px-3 py-1.5 rounded-full transition-colors text-emerald-100 text-sm font-medium shadow-sm"
+                      >
+                        <span className="text-emerald-400">📸</span>
+                        <span>Quét tiếp</span>
                       </button>
                     </>
                   )}
@@ -708,6 +845,23 @@ export default function CompanionChat({
                   </svg>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setFrozen(false);
+                  if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+                  setCapturedUrl(null);
+                  setScanPhase("idle");
+                  setScanProgress(0);
+                  setScanErrorMsg(null);
+                  setFallbackSuggestions(null);
+                  setShowInlineCamera(true);
+                }}
+                className="flex h-10 w-10 mx-auto shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-all hover:scale-105 active:scale-95 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+                aria-label="Mở camera quét"
+              >
+                📸
+              </button>
               <button
                 type="button"
                 onClick={() => setShowTextInput(true)}

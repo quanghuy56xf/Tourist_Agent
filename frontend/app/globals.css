@@ -616,9 +616,9 @@ html[lang="en"] .font-display {
 }
 
 .companion-avatar-wrapper--collapsed {
-  max-height: 104px;
-  /* 64px avatar + 16px top padding + 24px bottom padding */
-  padding-top: 16px;
+  max-height: 120px;
+  /* 64px avatar + 32px top padding + 24px bottom padding */
+  padding-top: 32px;
   /* Căn ngang với text header */
   padding-bottom: 24px;
   /* bỏ padding-left để avatar được center */

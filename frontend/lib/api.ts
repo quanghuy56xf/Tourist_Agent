@@ -787,33 +787,6 @@ export async function chatWithAI(
   }
   return res.json();
 }
-export async function chatWithCompanion(
-  itemId: number | null,
-  message: string,
-  history: ChatMessage[],
-  visitedItemIds: number[],
-  sessionId?: string,
-  suggestNext = false
-): Promise<CompanionChatResponse> {
-  const res = await fetch(`${API_URL}/api/companion/chat`, {
-    method: "POST",
-    headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      item_id: itemId,
-      message,
-      history,
-      visited_item_ids: visitedItemIds,
-      session_id: sessionId,
-      suggest_next: suggestNext,
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(
-      await parseApiError(res, "Không thể trò chuyện với Lê Quý Đôn lúc này")
-    );
-  }
-  return res.json();
-}
 
 export async function* chatWithCompanionStream(
   itemId: number | null,
@@ -822,7 +795,7 @@ export async function* chatWithCompanionStream(
   visitedItemIds: number[],
   sessionId?: string,
   suggestNext = false
-): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error', data: any }, void, unknown> {
+): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error' | 'actions', data: any }, void, unknown> {
   const res = await fetch(`${API_URL}/api/companion/chat/stream`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },

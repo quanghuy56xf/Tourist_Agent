@@ -10,6 +10,7 @@ interface MinimapModalProps {
   groupSlug: string;
   config: MinimapConfig | null;
   suggestedItemId: number | null;
+  suggestedItemName?: string | null;
 }
 
 export default function MinimapModal({
@@ -18,6 +19,7 @@ export default function MinimapModal({
   groupSlug,
   config,
   suggestedItemId,
+  suggestedItemName,
 }: MinimapModalProps) {
   const [lastItemId, setLastItemId] = useState<number | null>(null);
   const currentZone =
@@ -110,7 +112,7 @@ export default function MinimapModal({
               </p>
               {suggestedZone && (
                 <p className="mt-2 text-sm text-amber-300">
-                  Đôn gợi ý tiếp theo: {suggestedZone.zoneName}
+                  Đôn gợi ý tiếp theo: {suggestedItemName ? `${suggestedItemName} (thuộc ${suggestedZone.zoneName})` : suggestedZone.zoneName}
                 </p>
               )}
             </div>

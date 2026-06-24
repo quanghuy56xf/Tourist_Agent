@@ -40,12 +40,6 @@ class CompanionChatRequest(BaseModel):
     session_id: str | None = Field(default=None, max_length=64)
 
 
-
-class CompanionChatResponse(BaseModel):
-    content: str
-    next_item_id: int | None = None
-    next_item_name: str | None = None
-
 class ChatResponse(BaseModel):
     content: str
 
