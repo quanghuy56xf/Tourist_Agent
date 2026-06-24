@@ -17,6 +17,7 @@ import CameraCapture from "@/components/CameraCapture";
 import ScanViewfinderFrame from "./ScanViewfinderFrame";
 import { useObjectSearch } from "@/lib/useObjectSearch";
 import type { SearchMatch } from "@/lib/api/search";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface CompanionChatProps {
   itemId?: number;
@@ -66,6 +67,7 @@ export default function CompanionChat({
   onSuggestNextPoint,
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
+  const { t, language } = useVisitorLocale();
   const [history, setHistory] = useState<ChatMessage[]>(
     initialNarration
       ? [{ role: "assistant", content: initialNarration }]
@@ -272,7 +274,8 @@ export default function CompanionChat({
         previous,
         getVisitedItemIds(window.localStorage),
         getVisitorSessionId(),
-        requestSuggestNext
+        requestSuggestNext,
+        language
       );
       
       let fullContent = "";
@@ -548,17 +551,16 @@ export default function CompanionChat({
       <div className="relative min-h-0 flex-1 flex flex-col z-10" style={{ marginTop: gapMargin }}>
         {/* Intro Text Overlay */}
         <div className={`absolute left-0 right-0 flex flex-col items-center justify-start px-6 text-center transition-opacity duration-1000 z-20 ${showIntro ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ top: "-90px" }}>
-          <h1 className="font-serif text-[28px] sm:text-3xl text-amber-100 drop-shadow-md">Chào mừng đến với Quốc Tử Giám</h1>
+          <h1 className="font-serif text-[28px] sm:text-3xl text-amber-100 drop-shadow-md">{t.companion.introTitle}</h1>
           <p className="mt-3 text-sm leading-relaxed text-amber-100/80 max-w-[280px] sm:max-w-sm drop-shadow">
-            Năm nay ta vừa tròn 18, đang chuẩn bị vào thi Đình. Trước khi thi,
-            để ta cùng bạn khám phá Quốc Tử Giám nhé!
+            {t.companion.introSubtitle}
           </p>
           <button
             type="button"
             onClick={handleAppOpened}
             className="mt-6 px-6 py-3 rounded-full bg-amber-500 text-black font-bold uppercase tracking-widest transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
           >
-            Bắt đầu hành trình
+            {t.companion.introStart}
           </button>
         </div>
 
@@ -623,7 +625,7 @@ export default function CompanionChat({
 
 
 
-              {isLoading && <p className="text-sm text-amber-200/60">Đôn đang suy nghĩ…</p>}
+              {isLoading && <p className="text-sm text-amber-200/60">{t.companion.thinking}</p>}
               
               {/* Proactive Action Buttons */}
               {!isLoading && (suggestedNextPoint || actionButtons.length > 0) && (
@@ -813,10 +815,10 @@ export default function CompanionChat({
                 </div>
                 
                 {isRecording && (
-                  <span className="mt-6 text-sm font-medium text-blue-300 animate-pulse drop-shadow-md tracking-wide">Đang lắng nghe...</span>
+                  <span className="mt-6 text-sm font-medium text-blue-300 animate-pulse drop-shadow-md tracking-wide">{t.companion.listening}</span>
                 )}
                 {isTranscribing && (
-                  <span className="mt-6 text-sm font-medium text-blue-200/50 tracking-wide">Đang xử lý âm thanh...</span>
+                  <span className="mt-6 text-sm font-medium text-blue-200/50 tracking-wide">{t.companion.processingAudio}</span>
                 )}
               </div>
             )}
@@ -941,7 +943,7 @@ export default function CompanionChat({
             </p>
           ) : (
             <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4 animate-pulse">
-              🤔 Đôn đang phân vân...
+              🤔 {t.companion.uncertain}
             </p>
           )}
           <div className="w-full max-w-[320px] aspect-[3/4] max-h-[60vh] relative">
@@ -1004,7 +1006,7 @@ export default function CompanionChat({
               disabled={scanPhase !== "idle"}
               className="mt-8 w-full max-w-[240px] py-4 rounded-full bg-amber-500 text-black font-bold text-lg disabled:opacity-50 transition-transform active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
             >
-              {scanPhase === "scanning" ? "Đang quét..." : scanPhase === "found" ? "Đã nhận diện!" : "Chụp ngay"}
+              {scanPhase === "scanning" ? t.companion.scanning : scanPhase === "found" ? t.companion.identified : t.companion.captureNow}
             </button>
           )}
           

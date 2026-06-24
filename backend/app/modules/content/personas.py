@@ -37,7 +37,7 @@ EDGE_TTS_VOICES: dict[str, str] = {
 
 def language_to_edge_voice(language: str, persona: str | None = None) -> str:
     if persona == "Companion":
-        return "vi-VN-NamMinhNeural"
+        return "en-US-AndrewNeural" if language == "Tiếng Anh" else "vi-VN-NamMinhNeural"
 
     raw = (language or "").strip()
     lowered = raw.lower()

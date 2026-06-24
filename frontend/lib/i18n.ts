@@ -76,6 +76,8 @@ const vi = {
     manualSubtitle: "Xem danh sách toàn bộ di tích",
     tourTitle: "Tour khám phá",
     tourSubtitle: "Lộ trình gợi ý — chụp đúng hiện vật theo thứ tự",
+    companionTitle: "Bắt đầu hành trình với Lê Quý Đôn",
+    companionSubtitle: "Trò chuyện bằng giọng nói cùng người bạn đồng hành 18 tuổi",
     uploadError: "Lỗi khi tải ảnh lên. Vui lòng thử lại.",
     noMatch:
       "Không nhận diện được hiện vật này trong ảnh. Vui lòng thử ảnh khác.",
@@ -167,6 +169,22 @@ const vi = {
     explore: "Khám phá với AI",
     noSimilar: "Không tìm thấy hiện vật gần giống",
   },
+  companion: {
+    role: "Người bạn đồng hành",
+    name: "Lê Quý Đôn",
+    scan: "Quét hiện vật gần nhất",
+    newJourney: "Bắt đầu hành trình mới",
+    thinking: "Đôn đang suy nghĩ...",
+    listening: "Đang lắng nghe...",
+    processingAudio: "Đang xử lý âm thanh...",
+    uncertain: "Đôn đang phân vân...",
+    scanning: "Đang quét...",
+    identified: "Đã nhận diện!",
+    captureNow: "Chụp ngay",
+    introTitle: "Chào mừng đến với Quốc Tử Giám",
+    introSubtitle: "Năm nay ta vừa tròn 18, đang chuẩn bị vào thi Đình. Trước khi thi, để ta cùng bạn khám phá Quốc Tử Giám nhé!",
+    introStart: "Bắt đầu hành trình",
+  },
 } as const;
 
 type DeepStringShape<T> = {
@@ -222,6 +240,8 @@ const en: DeepStringShape<typeof vi> = {
     manualSubtitle: "View all available heritage objects",
     tourTitle: "Exploration tour",
     tourSubtitle: "Suggested routes — scan each stop in order",
+    companionTitle: "Start journey with Lê Quý Đôn",
+    companionSubtitle: "Talk to your 18-year-old companion via voice chat",
     uploadError: "The photo could not be uploaded. Please try again.",
     noMatch: "We could not identify this object. Please try another photo.",
   },
@@ -310,6 +330,22 @@ const en: DeepStringShape<typeof vi> = {
     match: "match",
     explore: "Explore with AI",
     noSimilar: "No similar object was found",
+  },
+  companion: {
+    role: "Your heritage guide",
+    name: "Lê Quý Đôn",
+    scan: "Scan nearest object",
+    newJourney: "Start a new journey",
+    thinking: "Lê Quý Đôn is thinking...",
+    listening: "Listening...",
+    processingAudio: "Processing audio...",
+    uncertain: "Lê Quý Đôn is uncertain...",
+    scanning: "Scanning...",
+    identified: "Identified!",
+    captureNow: "Capture now",
+    introTitle: "Welcome to the Temple of Literature",
+    introSubtitle: "I am 18 years old this year, preparing for the Đình exam. Let me show you around before my big day!",
+    introStart: "Start journey",
   },
 };
 

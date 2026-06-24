@@ -219,6 +219,7 @@ Tài liệu được cung cấp (Context):
         current_item: str | None,
         visited_items: List[str],
         next_item_name: str | None = None,
+        language: str = "Tiếng Việt",
     ):
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -243,12 +244,17 @@ Tài liệu được cung cấp (Context):
             if next_item_name is None and len(visited_items) > 1
             else ""
         )
+        
+        lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt." if language == "Tiếng Việt" else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+
         system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
 đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
 
 Phong cách giao tiếp:
 - Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
 - Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
+{lang_instruction}
+
 Du khách đã tham quan: {journey}
 {next_item_str}
 {tour_completion_prompt}

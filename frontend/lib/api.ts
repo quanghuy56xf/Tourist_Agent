@@ -794,7 +794,8 @@ export async function* chatWithCompanionStream(
   history: ChatMessage[],
   visitedItemIds: number[],
   sessionId?: string,
-  suggestNext = false
+  suggestNext = false,
+  language = "Tiếng Việt"
 ): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error' | 'actions', data: any }, void, unknown> {
   const res = await fetch(`${API_URL}/api/companion/chat/stream`, {
     method: "POST",
@@ -806,6 +807,7 @@ export async function* chatWithCompanionStream(
       visited_item_ids: visitedItemIds,
       session_id: sessionId,
       suggest_next: suggestNext,
+      language,
     }),
   });
 

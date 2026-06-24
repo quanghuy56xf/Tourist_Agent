@@ -234,6 +234,7 @@ async def chat_with_companion_stream(
                     current_item=current_item_name,
                     visited_items=visited_names,
                     next_item_name=next_item_name,
+                    language=request.language,
                 )
                 async for chunk in stream:
                     await event_queue.put(
@@ -265,7 +266,7 @@ async def chat_with_companion_stream(
                         break
                     audio_bytes, _ = await _synthesize_speech_async(
                         sentence,
-                        "Tiếng Việt",
+                        request.language,
                         "Companion",
                     )
                     audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
