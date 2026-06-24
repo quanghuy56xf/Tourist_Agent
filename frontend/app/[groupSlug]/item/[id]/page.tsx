@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
 import { rememberMinimapItem } from "@/lib/minimapState";
+import { addVisitedItem } from "@/lib/companionState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import {
@@ -78,6 +79,7 @@ export default function ItemDetailPage() {
     }
   }, []);
 
+
   useEffect(() => {
     return () => {
       stopChatTts();
@@ -96,6 +98,7 @@ export default function ItemDetailPage() {
         const data = await getItem(itemId);
         if (cancelled) return;
         rememberMinimapItem(groupSlug, itemId);
+        addVisitedItem(window.localStorage, itemId);
         setItem(data);
         setLoadingItem(false);
         try {
@@ -207,7 +210,7 @@ export default function ItemDetailPage() {
   const slideshowImages = getItemImageUrls(item);
 
   return (
-    <main className="flex flex-1 flex-col w-full overflow-hidden pb-24">
+    <main className="flex flex-1 flex-col w-full overflow-hidden pb-24 relative">
       <div className="relative h-44 shrink-0 overflow-hidden">
         <ItemHeroSlideshow
           images={slideshowImages.length > 0 ? slideshowImages : imgSrc ? [imgSrc] : []}
@@ -223,12 +226,22 @@ export default function ItemDetailPage() {
               router.push(
                 inTour
                   ? groupPath(groupSlug, `/tour/${tourId}/play`)
-                  : scanPath
+                  : groupPath(groupSlug, "/method")
               )
             }
             label={t.common.back}
             variant="dark"
           />
+          {!inTour && (
+            <button
+              type="button"
+              onClick={() => router.push(scanPath)}
+              className="artifact-btn-secondary"
+            >
+              <span aria-hidden="true" className="text-sm">📸</span>
+              <span className="text-xs font-medium">Chụp tiếp</span>
+            </button>
+          )}
         </div>
         {confidence && (
           <span
@@ -246,8 +259,8 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-4">
-        <div className="hera-guide-sticky-wrap">
+      <section className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 overflow-y-auto">
+        <div className="flex flex-col hera-guide-sticky-wrap">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-px flex-1" style={{ background: "var(--border)" }} />
             <span className="artifact-section-label px-2">{t.item.guideSection}</span>
@@ -381,6 +394,15 @@ export default function ItemDetailPage() {
           </button>
           </div>
         </div>
+      </div>
+
+      <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-2 pointer-events-none">
+        <button 
+          onClick={() => router.push(groupPath(groupSlug, "/companion"))}
+          className="relative block h-16 w-16 rounded-full border-2 border-amber-400/50 overflow-hidden shadow-[0_0_20px_rgba(201,168,76,0.3)] transition-transform hover:scale-105 active:scale-95 bg-[#1a2333] pointer-events-auto animate-pulse"
+        >
+          <img src="/images/companion/companion-idle.png" alt="Lê Quý Đôn" className="h-[130%] w-[130%] max-w-none object-cover object-top -ml-[15%]" />
+        </button>
       </div>
     </main>
   );

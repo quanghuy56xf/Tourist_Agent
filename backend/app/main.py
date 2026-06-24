@@ -33,6 +33,7 @@ from app.modules.auth import users_router
 from app.modules.tours import router as tours_router
 from app.modules.tour_match import router as tour_match_router
 from app.modules.analytics import router as analytics_router
+from app.modules.stt import router as stt_router
 from app.modules.vision import embedding
 from app.core.database import init_db
 
@@ -103,6 +104,7 @@ app.include_router(search.router)
 app.include_router(story_router.router)
 app.include_router(chat_router.router)
 app.include_router(tts_router.router)
+app.include_router(stt_router.router)
 
 Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

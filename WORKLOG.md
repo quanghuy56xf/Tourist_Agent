@@ -186,3 +186,117 @@ Các thay đổi (Phương án 1):
 Xác nhận:
 - Giao diện đã cố định chuẩn hơn trên mobile, không còn hiện tượng xê dịch khi chuyển trang hoặc hiển thị camera/persona.
 - Đồng nhất logic layout, giảm sự trùng lặp code trong các page.
+
+## 2026-06-21 - Triển khai AI Historical Companion
+
+Bối cảnh:
+- Bổ sung một hành trình tham quan riêng với nhân vật Lê Quý Đôn ở tuổi 18.
+- Nhân vật cần kể chuyện theo ngữ cảnh hiện vật, ghi nhớ các điểm khách đã ghé và gợi ý điểm tiếp theo.
+
+Các thay đổi:
+- Thêm hành trình `/{groupSlug}/companion` và lưu Companion mode trong `sessionStorage`.
+- Thêm giao diện avatar, intro video, chat và giọng đọc riêng cho Companion.
+- Tích hợp Companion vào trang chi tiết hiện vật; lưu các hiện vật đã ghé trong trình duyệt.
+- Thêm `POST /api/companion/chat`; backend xác minh hiện vật, giới hạn lịch sử chat và chỉ sử dụng dữ liệu RAG thuộc Group hiện tại.
+- Thêm giọng Edge TTS `vi-VN-NamMinhNeural` cho nhân vật.
+- Companion có thể chủ động gợi ý điểm chưa ghé tiếp theo và gửi gợi ý sang Minimap.
+- Bổ sung fallback khi chưa quét hiện vật và hỗ trợ nhập câu hỏi bằng văn bản.
+
+## 2026-06-21 - Thay Web Speech API bằng MediaRecorder và Gemini STT
+
+Bối cảnh:
+- `webkitSpeechRecognition` thường trả lỗi `aborted` trên Safari iPhone khi nhận dạng tiếng Việt.
+- Quyền microphone, HTTPS và Cloudflare Tunnel vẫn hoạt động; vấn đề nằm ở khả năng nhận dạng tiếng Việt của Web Speech API/iOS.
+
+Các thay đổi:
+- Loại bỏ hoàn toàn `SpeechRecognition` và `webkitSpeechRecognition` khỏi Voice Input.
+- Frontend dùng `getUserMedia` và `MediaRecorder` để ghi âm; ưu tiên `audio/mp4` trên Safari và dùng WebM/Ogg khi được hỗ trợ.
+- Nút microphone chuyển qua hai trạng thái: `Đang ghi âm...` và `Đang xử lý...`.
+- Thêm `transcribeAudio()` gửi Blob bằng `multipart/form-data` đến `POST /api/stt`.
+- Thêm module backend `app/modules/stt/` dùng `gemini-2.5-flash-lite` để chép audio thành tiếng Việt.
+- API kiểm tra MIME type, file rỗng và giới hạn dung lượng 5 MB.
+- Transcript được đưa trở lại luồng Companion chat hiện có; không thay đổi logic RAG hoặc sinh câu trả lời.
+
+Xác nhận:
+- Backend STT và Companion: `9 passed`.
+- Frontend Companion và MediaRecorder contract tests: thành công.
+- `npm.cmd run build`: build production thành công.
+- `git diff --check`: không có lỗi whitespace.
+- Cần kiểm thử thủ công microphone trên Safari iPhone qua Cloudflare Tunnel.
+
+## 2026-06-21 - Chuyển Minimap sang cấu hình động theo Group
+
+Bối cảnh:
+- Minimap trước đây dựa trên cấu hình tĩnh trong frontend, khó tái sử dụng giữa nhiều Group và nhiều môi trường có Item ID khác nhau.
+
+Các thay đổi:
+- Lưu cấu hình riêng cho từng Group trong `groups.minimap_config`.
+- Cho phép Admin tải xuống, chỉnh sửa và tải lên JSON dùng `itemNames` ổn định.
+- Visitor API chuyển `itemNames` thành `itemIds` thuộc đúng Group tại runtime.
+- Visitor UI tải trước cấu hình trước khi mở modal và giữ các trạng thái marker, hiện vật gần nhất và fallback.
+- Thay `frontend/lib/minimapConfig.ts` bằng cấu hình từ API kết hợp `frontend/lib/minimapState.ts`.
+
+## 2026-06-22 - Hoàn thiện hành trình Companion chủ động
+
+Bối cảnh:
+- Companion cần dẫn dắt khách tham quan chủ động hơn thay vì chờ khách tự tìm camera, quét hiện vật và mở bản đồ.
+
+Các thay đổi:
+- Tự động chào hỏi khi mở hành trình và yêu cầu khách quét hiện vật.
+- Nhúng camera toàn màn hình vào giao diện chat; có thể tự mở khi câu thoại yêu cầu chụp ảnh hoặc hướng camera.
+- Tách câu trả lời theo ngắt đoạn thành các bong bóng chat riêng để làm rõ lời hướng dẫn.
+- Giữ một lần gọi TTS cho toàn bộ câu trả lời dù giao diện hiển thị nhiều bong bóng.
+- Khi Companion gợi ý điểm tiếp theo, Minimap tự mở sau khoảng hai giây và làm nổi bật vị trí được đề xuất.
+
+## 2026-06-23 - Chọn avatar 2D thay cho MVP 3D
+
+Bối cảnh:
+- Logic đọc `emotion` và kích hoạt animation cho avatar 3D `.glb` đã được thử nghiệm.
+- Model web bị giới hạn dung lượng dẫn đến chất lượng low-poly, tăng nguy cơ uncanny valley và ảnh hưởng thời gian tải trên mobile.
+
+Quyết định:
+- Loại bỏ avatar 3D khỏi phạm vi MVP.
+- Tiếp tục sử dụng hình ảnh 2D chất lượng cao cho Lê Quý Đôn.
+- Định hướng tiếp theo là Dynamic Collapsible Avatar: hiển thị lớn ở phần mở đầu rồi thu gọn thành avatar tròn khi hội thoại dài, dành thêm không gian cho chat, camera và Minimap.
+
+## 2026-06-23 - Triển khai Dynamic Collapsible Avatar với đường phân cách lõm (Concave Curve)
+
+Bối cảnh:
+- Sau khi loại bỏ Avatar 3D, Avatar 2D cần được nâng cấp để tạo ấn tượng sống động khi AI nói nhưng lại phải tiết kiệm không gian màn hình thiết bị di động khi AI ngừng nói để hiển thị khung Chat.
+- Yêu cầu chuyển tiếp mượt mà từ diện tích ảnh Avatar xuống không gian Chat bằng đường cong tự nhiên và hiệu ứng fade.
+
+Các thay đổi:
+- Cập nhật `CompanionAvatar.tsx` thêm prop `collapsed`. Khi `isSpeaking=true`, Avatar lớn chiếm ~35-40% chiều cao màn hình. Khi `isSpeaking=false` và đã có chat history, Avatar thu nhỏ thành hình tròn ở góc trái, nhường chỗ cho khung Chat.
+- Cập nhật `CompanionChat.tsx` tính toán state `avatarCollapsed`, điều hướng CSS cho Wrapper và tự động kích hoạt `scrollIntoView` mượt mà với độ trễ `300ms` ngay sau khi Avatar thu gọn.
+- Thêm đường phân cách tạo từ SVG lõm (`Q200,50`) cùng Gradient mờ ảo trong suốt `40px` tạo hiệu ứng nối mạch tự nhiên giữa vùng Avatar và màn hình Chat. Cả hai layer này đều có animation mờ đi khi Avatar thu nhỏ.
+- Cập nhật `globals.css` để thêm `transition: max-height 300ms ease-out` cho lớp `.companion-avatar-wrapper`.
+- Tinh chỉnh đường cong ranh giới (clip-path) và mask-image để ảnh Avatar khớp hoàn hảo với khung Chat mà không bị lộ viền cắt.
+- Nâng cấp tốc độ chuyển đổi CSS/React (max-height, scale) sang 500ms `ease-in-out` để tạo cảm giác mượt mà, đậm chất điện ảnh.
+- Bổ sung khả năng toggle mở rộng/thu nhỏ Avatar thủ công thông qua click/touch, tiện lợi khi khách muốn nhìn rõ nhân vật.
+- Cải thiện không gian Chat bằng cách thu nhỏ cụm nút Micro/Waveform xuống 2/3 và căn chỉnh lại các lề (margin/padding) để phần Chat được đẩy sâu xuống phía dưới.
+
+## 2026-06-23 - Tối ưu hiệu năng âm thanh (Backend-Driven Pipeline Streaming)
+
+Bối cảnh:
+- Trước đây, Frontend phải đợi LLM stream chữ về, cắt thành bong bóng rồi mới gọi `fetch` HTTP (`POST /api/tts`) cho từng bong bóng. Việc này tạo ra nhiều request HTTP và tăng độ trễ (Time-To-First-Byte của audio bị chậm).
+
+Các thay đổi:
+- **Backend:** Nâng cấp Endpoint `POST /api/companion/chat/stream` để chạy song song LLM Streaming và TTS Synthesizing bằng `asyncio`. Ngay khi gom đủ một câu (dấu câu hoặc dòng mới), Backend tự động gọi Edge TTS và đẩy audio MP3 đã mã hóa Base64 qua SSE (`event: audio`).
+- **Frontend:** Cập nhật `chatWithCompanionStream` để xử lý event `audio`. Thay vì gọi API rời rạc, Frontend hiện chỉ cần giải mã Base64 sang Blob, tạo ObjectURL, và đưa vào một Audio Queue nhỏ gọn nội bộ để phát nhạc nối tiếp.
+- Giảm tổng số lượng kết nối mạng xuống còn đúng 1 request Server-Sent Events (SSE) duy nhất, kéo giảm độ trễ Time-to-First-Audio và loại bỏ hoàn toàn các HTTP Request thừa.
+
+## 2026-06-24 - Nâng cấp UX/UI và hoàn thiện Companion Chat
+
+Bối cảnh:
+- Màn hình trò chuyện với Lê Quý Đôn (Companion Chat) cần được điều chỉnh giao diện (UI) và trải nghiệm (UX) để trực quan hơn, thân thiện với thiết bị di động hơn và tránh gây nhầm lẫn với các tính năng quét của hệ thống cũ.
+
+Các thay đổi:
+- **Tính năng A (Fixed Camera Button)**: Di chuyển nút mở Camera 📸 ra khỏi ô nhập liệu (text input) và thiết kế lại dưới dạng giao diện nổi (Floating UI) nằm ngay phía trên biểu tượng bàn phím.
+- **Tính năng B (Suggested Questions)**: Tích hợp hệ thống câu hỏi gợi ý từ LLM (với định dạng `||Q: ...||`). Trích xuất câu hỏi và biến thành các nút bấm hành động (Action Buttons) để khách dễ dàng tương tác.
+- **Tính năng C (Smart Idle Timer)**: Thêm đồng hồ đếm ngược thông minh (30 giây) để hiển thị nút mồi "📸 Quét tiếp" nếu người dùng không có tương tác nào sau khi Lê Quý Đôn nói xong, và chỉ hiển thị khi không có nút gợi ý nào khác.
+- **Sửa lỗi Avatar Layout**:
+  - Dịch chuyển avatar ở trạng thái thu gọn (collapsed) xuống dưới để không bị đè lên chữ tiêu đề.
+  - Sửa lỗi hoạt ảnh phóng to/thu nhỏ (zoom effect) trên thiết bị di động bằng cách đổi `aspect-[4/3]` và `h-16 w-16` sang `aspect-square`, thêm `transform-gpu` để khắc phục lỗi phần cứng Safari.
+  - Đẩy avatar xuống dưới và thêm hiệu ứng `radial-gradient` vào viền lõm để mượt mà hơn với hình nền chat.
+- **Responsive Wrapper**: Giới hạn lại kích thước màn hình `page.tsx` của Companion bằng một vùng chứa `max-w-md` (tự động căn giữa nền đen trên máy tính/tablet) để giao diện không bị vỡ hoặc xê dịch thất thường.
+- **Đồng bộ hóa luồng quét**: Ẩn nút "Quét" mặc định ở góc trên bên phải màn hình Lê Quý Đôn để giảm nhầm lẫn, tập trung toàn bộ người dùng vào trải nghiệm quét bằng nút nổi (Inline Scanner) trong luồng chat.

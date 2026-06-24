@@ -1,58 +1,92 @@
-# 🚀 PROJECT STATUS: HERA - AI Heritage Guide V2
+# PROJECT STATUS: HERA - AI Heritage Guide V2
 
-**Bản cập nhật gần nhất:** 2026-06-20
+**Cập nhật gần nhất:** 2026-06-24
+Tài liệu này là ảnh chụp ngắn gọn về trạng thái hiện tại của dự án, dành cho AI Agent và developer mới. Lịch sử triển khai chi tiết được lưu tại `WORKLOG.md`.
 
-Đây là tài liệu ngắn gọn dành riêng cho các AI Agent hoặc Developer mới để nắm bắt toàn bộ ngữ cảnh, kiến trúc và tiến độ hiện tại của dự án một cách nhanh nhất, mà không cần phải đọc lại toàn bộ PRD hay Log. Hãy cập nhật file này nếu có những thay đổi lớn về mặt cấu trúc.
+## 1. Tổng quan
 
----
+HERA là nền tảng hướng dẫn tham quan di sản bằng AI, vận hành theo mô hình self-hosted và multi-tenant. Một máy chủ có thể phục vụ nhiều bảo tàng, di tích hoặc khu triển lãm độc lập dưới dạng các Group.
 
-## 1. 🌟 TỔNG QUAN (OVERVIEW)
-- **Tên dự án:** AI Heritage Guide V2 (Nền tảng Hướng dẫn viên số bằng AI).
-- **Mục tiêu:** Cung cấp trải nghiệm nhận diện hiện vật qua Camera với độ trễ thấp (Local AI), kết hợp tra cứu tri thức chuyên sâu (RAG) và kể chuyện/hỏi đáp đa ngôn ngữ (GenAI) cho khách tham quan bảo tàng, di tích. Dành cho admin, có giao diện quản lý đa nhóm (groups) và tải lên kho tri thức.
-- **Tính chất:** Self-hosted & Multi-tenant (hỗ trợ nhiều khu triển lãm trên một server).
+Trải nghiệm chính của khách tham quan gồm:
 
-## 2. 🏛️ KIẾN TRÚC & CÔNG NGHỆ (ARCHITECTURE)
-- **Frontend:** Next.js 14 App Router, React 18, Tailwind CSS. Giao tiếp qua `lib/api.ts` & `lib/useObjectSearch.ts`. Xử lý proxy API trong `next.config.mjs`.
-- **Backend:** Python / FastAPI, quản lý bằng `uv` (`pyproject.toml`).
-- **Database:** SQLite (`app.db`) cho dữ liệu metadata (Group, Item, Content).
-- **Core AI Pipeline:**
-  1. **Vision (Nhận diện):** `DINOv2` mã nguồn mở + ChromaDB Vector (Tìm kiếm ảnh cục bộ, rất nhanh).
-  2. **RAG (Tra cứu):** Hybrid RAG = Vietnamese Bi-encoder (ChromaDB) + BM25 Sparse (`chunks.pkl`).
-  3. **Generative (Sinh nội dung):** Google Gemini API (Tạo câu chuyện dựa theo Persona & chat ngữ cảnh RAG).
-  4. **Text-to-Speech (TTS):** Edge TTS (Tạo luồng âm thanh đa ngôn ngữ tự nhiên).
+- Nhận diện hiện vật từ camera với độ trễ thấp.
+- Tra cứu tri thức chuyên sâu từ tài liệu của từng Group.
+- Sinh nội dung thuyết minh và hỏi đáp theo persona, có hỗ trợ đa ngôn ngữ.
+- Phát giọng đọc tự nhiên và hỗ trợ tương tác bằng giọng nói.
+- Hiển thị Minimap và gợi ý điểm tham quan tiếp theo.
 
-## 3. ✅ TIẾN ĐỘ & TRẠNG THÁI HIỆN TẠI (CURRENT STATUS)
-- **[ĐÃ HOÀN THÀNH]** Nâng cấp kiến trúc V1 (Supabase) lên V2 (Self-hosted FastAPI).
-- **[ĐÃ HOÀN THÀNH]** Chuẩn hóa toàn bộ biến môi trường về 1 file `.env` duy nhất ở thư mục gốc (root), loại bỏ `backend/.env`.
-- **[ĐÃ HOÀN THÀNH]** Tối ưu Frontend UI: Sửa lỗi nhảy giao diện trên Mobile (dùng Global wrapper `min-h-[100dvh]`), gom nhóm các xử lý tìm kiếm ảnh vào `useObjectSearch.ts`.
-- **[ĐÃ HOÀN THÀNH]** Tối ưu Backend RAG & Content: 
-  - Tăng độ chính xác RAG (chấp nhận khớp từ khóa chính).
-  - Khắc phục tình trạng gọi Audio TTS bị trùng lặp, tối ưu payload chat history (giới hạn 10 messages gần nhất).
-  - Cập nhật luồng Khám phá (Discoverable) nhóm triển lãm dành cho Visitor (API `/api/groups/discover`).
-- **[ĐÃ HOÀN THÀNH]** Khôi phục Minimap MVP cho Visitor:
-  - Bản đồ tĩnh theo `groupSlug`, cấu hình zone và tọa độ tại `frontend/lib/minimapConfig.ts`.
-  - Ghi nhớ hiện vật gần nhất bằng `localStorage`; icon Minimap hiện chấm đỏ sau khi mở/quét hiện vật và tắt khi khách mở bản đồ.
-  - Modal có marker vị trí, fallback khi chưa xác định/group chưa có bản đồ và hỗ trợ Escape/click backdrop.
-  - Hiện chỉ có SVG minh họa cho Văn Miếu - Quốc Tử Giám. Chưa có zoom/pan, Admin config hoặc lưu cấu hình ở Backend.
+Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri thức và cấu hình Minimap.
 
-## 4. 🚧 CÁC VẤN ĐỀ ĐANG TỒN ĐỌNG & NEXT STEPS (TODO)
-Nếu bạn (AI Agent) tiếp nhận dự án này, hãy xem xét các task sau để tiếp tục tối ưu:
-1. **Khắc phục môi trường Test (Pytest):** Các virtualenv đang có chút lộn xộn (thiếu `pytest` ở backend/.venv hoặc sai đường dẫn). Cần dọn dẹp và chạy lại unit test cho `config/auth`.
-2. **Cải tiến trạng thái Audio API:** Thêm một trường dữ liệu trạng thái rõ ràng (như `audio_status: "pending" | "ready" | "failed"`) vào Content API để UI trên Frontend không phải phỏng đoán qua biến `has_audio` và `audio_url`.
-3. **Cải thiện Hash Cache Nội Dung:** Đưa biến `group.knowledge_version` vào hàm băm sinh nội dung. Nếu Admin cập nhật tài liệu RAG, mọi phiên bản nội dung (variants) đã tạo phải tự động vô hiệu hóa mà không cần xóa tay.
-4. **Tối ưu hình ảnh (Frontend):** Dần dần chuyển các thẻ `<img>` hiện tại chịu tải cao sang sử dụng thẻ `<Image>` chuẩn của `next/image` một cách cẩn thận để khắc phục warning build.
-5. **Dọn dẹp State Admin:** Có thể thay thế `localStorage` của Admin bằng Context/State management chuẩn mực hơn trên Next.js.
+## 2. Kiến trúc và công nghệ
 
-## 5. 🛠️ LƯU Ý CHO CÁC AGENT (AGENT GUIDELINES)
-- Hãy bám sát vào file **.env gốc** (root), không tạo lại `.env` trong thư mục `backend/`.
-- File **PRD** và **Architecture** nằm trong `docs/prd/PRD_v2.md` và `docs/architecture/architecture_v2.md`.
-- File ghi chép công việc chi tiết (hàng ngày) là `WORKLOG.md`.
-- Các file backup dữ liệu RAG, CSDL SQLite được hệ thống tự lưu tại `backend/data/backups/`. Đừng xóa chúng.
-- Trước khi thực hiện lệnh bash, sử dụng các công cụ chuyên biệt của IDE (như `grep_search`, `read_file`, v.v.) thay vì chạy `grep`, `cat` trực tiếp trên terminal. Mọi thay đổi liên quan đến cấu trúc cần update lại file `PROJECT_STATUS.md` này.
+- **Frontend:** Next.js 14 App Router, React 18 và Tailwind CSS. Visitor UI và Admin UI nằm trong `frontend/app/`; các thành phần tham quan chính nằm tại `frontend/components/visitor/`.
+- **Backend:** Python/FastAPI, quản lý dependency bằng `uv` qua `pyproject.toml`.
+- **Database:** SQLite (`app.db`) lưu metadata như Group, Item, Content và cấu hình Minimap.
+- **Vision:** DINOv2 kết hợp ChromaDB để tạo vector và tìm ảnh hiện vật cục bộ.
+- **RAG:** Hybrid RAG gồm Vietnamese Bi-encoder trong ChromaDB và BM25 sparse index (`chunks.pkl`).
+- **Generative AI:** Google Gemini dùng để sinh nội dung, chat theo persona, AI Companion và nhận dạng lời nói.
+- **TTS:** Edge TTS tạo giọng đọc đa ngôn ngữ; Companion dùng giọng `vi-VN-NamMinhNeural`.
+- **API frontend:** Các lời gọi chính đi qua `frontend/lib/api.ts`; luồng nhận diện ảnh được tập trung trong `frontend/lib/useObjectSearch.ts`.
 
-## 6. Dynamic Minimap Update (2026-06-21)
-- Minimap configuration is now stored per Group in `groups.minimap_config`.
-- Admin can download/edit/upload JSON using stable `itemNames`.
-- Visitor API resolves `itemNames` to environment-local `itemIds` within the selected Group.
-- Visitor UI prefetches the configuration before opening the modal.
-- Static `frontend/lib/minimapConfig.ts` has been replaced by API configuration plus `frontend/lib/minimapState.ts`.
+## 3. Trạng thái hiện tại
+
+### Nền tảng cốt lõi
+
+- Kiến trúc V1 dựa trên Supabase đã được chuyển sang V2 self-hosted với FastAPI và SQLite.
+- Cấu hình môi trường đã được chuẩn hóa về một file `.env` duy nhất tại thư mục gốc.
+- Visitor có thể khám phá các Group qua `GET /api/groups/discover`.
+- Luồng nhận diện ảnh, truy xuất RAG, sinh nội dung, chat và TTS đã hoạt động xuyên suốt.
+- RAG đã được cải thiện để chấp nhận từ khóa chính và tận dụng tài liệu thuộc đúng Group.
+- TTS được tạo theo yêu cầu, tránh gọi trùng; frontend chỉ gửi 10 tin nhắn gần nhất lên API chat.
+- Giao diện mobile sử dụng chiều cao động `100dvh` và wrapper chung để giảm layout shift.
+
+### Dynamic Minimap
+
+- Cấu hình Minimap được lưu riêng cho từng Group trong `groups.minimap_config`.
+- Admin có thể tải xuống, chỉnh sửa và tải lên JSON sử dụng `itemNames` ổn định giữa các môi trường.
+- Visitor API chuyển `itemNames` thành `itemIds` thuộc đúng Group tại runtime.
+- Visitor UI tải trước cấu hình, ghi nhớ hiện vật gần nhất và hiển thị marker hoặc trạng thái fallback phù hợp.
+- Cấu hình tĩnh cũ trong `frontend/lib/minimapConfig.ts` đã được thay bằng cấu hình từ API và state tại `frontend/lib/minimapState.ts`.
+- Khi Companion gợi ý điểm tiếp theo, Minimap có thể tự mở và làm nổi bật vị trí được đề xuất.
+
+### AI Historical Companion
+
+- Có hành trình riêng tại `/{groupSlug}/companion` với nhân vật Lê Quý Đôn 18 tuổi, chuẩn bị thi Đình.
+- Persona xưng “ta” hoặc “Đôn này”, gọi khách là “bạn”, thể hiện sự thông minh, nhiệt huyết và tự tin; không dùng cách xưng hô già dặn như “lão phu” hoặc “tiên sinh”.
+- Companion mode tồn tại trong phiên trình duyệt, ghi nhớ các hiện vật đã ghé và dùng ngữ cảnh thuộc đúng Group.
+- Trang hiện vật sử dụng nội dung kể chuyện và giao diện chat riêng khi Companion mode đang bật.
+- `POST /api/companion/chat` xác minh hiện vật, lịch sử tham quan và phạm vi Group trước khi sinh câu trả lời.
+- Voice input dùng `getUserMedia` và `MediaRecorder`; audio được gửi tới `POST /api/stt` để Gemini chép thành tiếng Việt.
+- Companion chủ động chào hỏi, yêu cầu khách quét hiện vật, có thể mở camera ngay trong giao diện chat và đề xuất điểm đến tiếp theo.
+- Nội dung chat được truyền trực tiếp (Streaming) qua kiến trúc Backend-Driven Pipeline: Backend xử lý song song Text Generation và TTS, đẩy trực tiếp audio Base64 qua một EventStream duy nhất giúp giảm thiểu độ trễ Time-to-First-Audio.
+- Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
+
+### Định hướng giao diện Companion
+
+- MVP avatar 3D `.glb` đã bị loại bỏ vì giới hạn dung lượng, chất lượng low-poly, nguy cơ uncanny valley và chi phí hiệu năng trên mobile.
+- Phiên bản hiện tại ưu tiên avatar 2D chất lượng cao.
+- Hướng cải tiến tiếp theo là Dynamic Collapsible Avatar: giữ hình ảnh lớn khi mở hành trình, sau đó thu gọn thành avatar tròn khi hội thoại dài để dành không gian cho chat, camera và Minimap.
+
+## 4. Current focus và TODO ưu tiên
+
+1. **[Hoàn thành] Companion Chat UX/UI:** Nâng cấp Dynamic Collapsible Avatar với đường cắt gradient hoàn hảo, thêm đồng hồ đếm ngược thông minh (Smart Idle Timer) và chuyển Camera sang dạng Float UI để tránh nhầm lẫn luồng quét.
+2. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
+3. **Dọn state Admin:** thay thế hoàn toàn `localStorage` và window events còn sót lại (`adminAuth`, `groups-changed`) bằng Context hoặc store để quản lý trạng thái đồng nhất hơn.
+4. **Kiểm thử thiết bị thật:** xác nhận microphone, camera, TTS, inline scan và Minimap trên Safari iPhone.
+
+## 5. Quy tắc quan trọng
+
+- Không đọc, hiển thị hoặc chỉnh sửa `.env` nếu người dùng không yêu cầu rõ ràng.
+- Chỉ sử dụng `.env` tại thư mục gốc; không tạo lại `backend/.env`.
+- Ưu tiên diff nhỏ, bám sát task và không refactor phần không liên quan.
+- Không xóa dữ liệu, database, vector store hoặc backup trong `backend/data/backups/`.
+- Viết test trước cho feature hoặc bug fix khi phù hợp.
+- Luôn chạy test liên quan và build/type-check trước khi báo hoàn thành thay đổi code.
+- Chỉ cập nhật tài liệu này khi trạng thái hiện tại, kiến trúc hoặc ưu tiên lớn thay đổi; ghi diễn tiến hằng ngày vào `WORKLOG.md`.
+
+## 6. Tài liệu liên quan
+
+- Product requirements: `docs/prd/PRD_v2.md`
+- Architecture: `docs/architecture/architecture_v2.md`
+- AI context ngắn: `AI_CONTEXT.md`
+- Nhật ký triển khai: `WORKLOG.md`

@@ -79,6 +79,12 @@ class RAGGenerator:
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
 - Đưa các sự thật bất ngờ (Fact/Fun Fact) lên đầu.
 - Sử dụng emoji một cách hợp lý."""
+        elif persona == "Companion":
+            persona_instructions = """Phong cách trả lời (Lê Quý Đôn 18 tuổi):
+- Xưng "ta", gọi du khách là "bạn".
+- Hào hứng, thông minh, kể chuyện sinh động nhưng không kiêu ngạo.
+- Chỉ sử dụng dữ kiện trong tài liệu, tuyệt đối không bịa.
+- Khi thiếu thông tin, thành thật nói rằng ta chưa đọc đến."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách trả lời (Persona: Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
@@ -122,6 +128,12 @@ Câu trả lời:"""
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
 - Đưa các sự thật bất ngờ lên đầu nếu phù hợp.
 - Có thể dùng emoji hợp lý."""
+        elif persona == "Companion":
+            persona_instructions = """Phong cách (Lê Quý Đôn 18 tuổi):
+- Xưng "ta", gọi người nghe là "bạn".
+- Giọng trẻ trung, uyên bác, hào hứng và sinh động.
+- Có thể tự trêu nhẹ: "À ta lại nói nhiều quá rồi..."
+- Giữ nguyên toàn bộ dữ kiện gốc, tuyệt đối không thêm thông tin."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách (Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
@@ -197,6 +209,64 @@ Tài liệu được cung cấp (Context):
         response = invoke_llm(self.llm, messages)
         return extract_complete_text(response)
 
+
+
+    async def generate_companion_chat_stream(
+        self,
+        message: str,
+        history: List[dict],
+        retrieved_docs: List[Document],
+        current_item: str | None,
+        visited_items: List[str],
+        next_item_name: str | None = None,
+    ):
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+        context = (
+            self._format_context(retrieved_docs)
+            if retrieved_docs
+            else "Không có ngữ cảnh xác thực bổ sung."
+        )
+        journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
+        current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
+        next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
+        suggestion_prompt = (
+            f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'\n"
+            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+        ) if next_item_name else (
+            "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không.\n"
+            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+        )
+        tour_completion_prompt = (
+            "Du khách đã đi hết các điểm. Hãy khen ngợi họ, tóm tắt ngắn hành trình "
+            "và kết thúc hành trình một cách ấm áp."
+            if next_item_name is None and len(visited_items) > 1
+            else ""
+        )
+        system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
+đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
+
+Phong cách giao tiếp:
+- Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
+- Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
+Du khách đã tham quan: {journey}
+{next_item_str}
+{tour_completion_prompt}
+
+Context xác thực:
+{context}
+"""
+        messages = [SystemMessage(content=system_prompt)]
+        for entry in history[-10:]:
+            if entry["role"] == "user":
+                messages.append(HumanMessage(content=entry["content"]))
+            elif entry["role"] == "assistant":
+                messages.append(AIMessage(content=entry["content"]))
+        messages.append(HumanMessage(content=message))
+
+        async for chunk in self.llm.astream(messages):
+            if chunk.content:
+                yield chunk.content
 
 # Singleton instance
 _generator_instance = None

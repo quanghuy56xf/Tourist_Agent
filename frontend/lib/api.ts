@@ -756,6 +756,11 @@ export interface ChatResponse {
   content: string;
 }
 
+export interface CompanionChatResponse extends ChatResponse {
+  next_item_id: number | null;
+  next_item_name?: string | null;
+}
+
 export async function chatWithAI(
   itemId: number,
   message: string,
@@ -783,6 +788,105 @@ export async function chatWithAI(
   return res.json();
 }
 
+export async function* chatWithCompanionStream(
+  itemId: number | null,
+  message: string,
+  history: ChatMessage[],
+  visitedItemIds: number[],
+  sessionId?: string,
+  suggestNext = false
+): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error' | 'actions', data: any }, void, unknown> {
+  const res = await fetch(`${API_URL}/api/companion/chat/stream`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_id: itemId,
+      message,
+      history,
+      visited_item_ids: visitedItemIds,
+      session_id: sessionId,
+      suggest_next: suggestNext,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không thể trò chuyện với Lê Quý Đôn lúc này"));
+  }
+
+  if (!res.body) {
+    throw new Error("Luồng dữ liệu rỗng");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEvent = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      if (buffer) {
+        const lines = buffer.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("event: ")) currentEvent = line.substring(7).trim();
+          else if (line.startsWith("data: ")) {
+            const dataStr = line.substring(6).trim();
+            if (dataStr) yield { type: currentEvent as any, data: JSON.parse(dataStr) };
+          }
+        }
+      }
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        currentEvent = line.substring(7).trim();
+      } else if (line.startsWith("data: ")) {
+        const dataStr = line.substring(6).trim();
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr);
+            yield { type: currentEvent as any, data };
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+  }
+}
+
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  const extension = audioBlob.type.includes("mp4")
+    ? "m4a"
+    : audioBlob.type.includes("ogg")
+      ? "ogg"
+      : "webm";
+  formData.append("audio", audioBlob, `speech.${extension}`);
+
+  const res = await fetch(`${API_URL}/api/stt`, {
+    method: "POST",
+    headers: apiHeaders(),
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(
+      await parseApiError(res, "Không thể nhận diện giọng nói lúc này")
+    );
+  }
+  const data = (await res.json()) as { transcript?: string };
+  const transcript = data.transcript?.trim();
+  if (!transcript) throw new Error("Không nhận diện được nội dung giọng nói");
+  return transcript;
+}
+
+
+
 export function toTtsLanguageCode(language: string): "vi" | "en" {
   const normalized = language.trim().toLowerCase();
   if (normalized === "tiếng việt" || normalized === "tieng viet" || normalized.startsWith("vi")) {
@@ -794,12 +898,17 @@ export function toTtsLanguageCode(language: string): "vi" | "en" {
 export async function fetchTTSAudio(
   text: string,
   language: string = "vi",
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  persona?: "Companion"
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/tts`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ text, language: toTtsLanguageCode(language) }),
+    body: JSON.stringify({
+      text,
+      language: toTtsLanguageCode(language),
+      persona,
+    }),
     signal,
   });
   if (!res.ok) {

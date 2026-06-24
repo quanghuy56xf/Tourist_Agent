@@ -29,7 +29,8 @@ export function stopChatTts() {
 export async function playChatTts(
   text: string,
   language: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  persona?: "Companion"
 ): Promise<void> {
   const cleaned = text.trim();
   if (!cleaned) return;
@@ -43,7 +44,7 @@ export async function playChatTts(
   signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
-    const url = await fetchTTSAudio(cleaned, language, controller.signal);
+    const url = await fetchTTSAudio(cleaned, language, controller.signal, persona);
     if (controller.signal.aborted) {
       URL.revokeObjectURL(url);
       return;

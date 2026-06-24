@@ -1,4 +1,5 @@
 PERSONAS = ("Mặc định", "Gen Z Explorer", "Family Visitor")
+COMPANION_PERSONA = "Companion"
 LANGUAGES = ("Tiếng Việt", "Tiếng Anh")
 
 DEFAULT_PERSONA = PERSONAS[0]
@@ -13,6 +14,8 @@ def all_variants() -> list[tuple[str, str]]:
 def normalize_persona(persona: str) -> str:
     if persona in PERSONAS:
         return persona
+    if persona == COMPANION_PERSONA:
+        return COMPANION_PERSONA
     return DEFAULT_PERSONA
 
 
@@ -32,7 +35,10 @@ EDGE_TTS_VOICES: dict[str, str] = {
 }
 
 
-def language_to_edge_voice(language: str) -> str:
+def language_to_edge_voice(language: str, persona: str | None = None) -> str:
+    if persona == "Companion":
+        return "vi-VN-NamMinhNeural"
+
     raw = (language or "").strip()
     lowered = raw.lower()
     if raw in EDGE_TTS_VOICES:

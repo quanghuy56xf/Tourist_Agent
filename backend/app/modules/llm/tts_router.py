@@ -15,7 +15,11 @@ router = APIRouter(prefix="/api", tags=["tts"])
 @router.post("/tts")
 def text_to_speech(request: TTSRequest):
     try:
-        result = synthesize_speech(request.text, request.language)
+        result = (
+            synthesize_speech(request.text, request.language, request.persona)
+            if request.persona
+            else synthesize_speech(request.text, request.language)
+        )
         if not result:
             raise HTTPException(
                 status_code=502,
