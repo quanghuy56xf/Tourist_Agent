@@ -165,7 +165,8 @@ async def chat_with_companion_stream(
         )
         if not has_verified:
             async def generate_fallback():
-                yield f"event: chunk\ndata: {json.dumps({'text': 'Cái này ta chưa đọc đến, để tra lại sau!'})}\n\n"
+                fallback_msg = "Cái này ta chưa đọc đến, để tra lại sau!" if request.language == "Tiếng Việt" else "I haven't read about this yet, let me check it later!"
+                yield f"event: chunk\ndata: {json.dumps({'text': fallback_msg})}\n\n"
                 yield "event: done\ndata: {}\n\n"
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
         group_id = item.group_id
@@ -226,6 +227,7 @@ async def chat_with_companion_stream(
 
         async def llm_producer():
             current_sentence = ""
+            stop_tts = False
             try:
                 stream = get_rag_generator().generate_companion_chat_stream(
                     message=request.message,
@@ -240,7 +242,16 @@ async def chat_with_companion_stream(
                     await event_queue.put(
                         f"event: chunk\ndata: {json.dumps({'text': chunk})}\n\n"
                     )
+                    if stop_tts:
+                        continue
+
                     current_sentence += chunk
+                    
+                    if "||Q:" in current_sentence:
+                        idx = current_sentence.find("||Q:")
+                        current_sentence = current_sentence[:idx]
+                        stop_tts = True
+                        
                     while match := re.search(r"(?<=[.?!])\s+|\n\n", current_sentence):
                         sentence = current_sentence[: match.start()].strip()
                         current_sentence = current_sentence[match.end() :]
@@ -283,11 +294,12 @@ async def chat_with_companion_stream(
                 await event_queue.put(None)
 
         if "[SYSTEM_EVENT]: APP_OPENED" in request.message:
+            scan_label = "📸 Quét hiện vật gần nhất" if request.language == "Tiếng Việt" else "📸 Scan nearest object"
             actions = {
                 "buttons": [
                     {
                         "type": "open_camera",
-                        "label": "📸 Quét hiện vật gần nhất",
+                        "label": scan_label,
                     }
                 ]
             }
@@ -303,11 +315,12 @@ async def chat_with_companion_stream(
             yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
 
         if tour_completed:
+            restart_label = "🔄 Bắt đầu hành trình mới" if request.language == "Tiếng Việt" else "🔄 Start a new journey"
             actions = {
                 "buttons": [
                     {
                         "type": "restart_tour",
-                        "label": "🔄 Bắt đầu hành trình mới",
+                        "label": restart_label,
                     }
                 ]
             }

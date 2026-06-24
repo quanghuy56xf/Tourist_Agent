@@ -16,6 +16,8 @@ const SOURCES: Record<AvatarState, string> = {
   blink: "/images/companion/companion-blink.png",
 };
 
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+
 export default function CompanionAvatar({
   isSpeaking,
   size = "lg",
@@ -23,6 +25,7 @@ export default function CompanionAvatar({
   introMode = false,
   onIntroComplete,
 }: CompanionAvatarProps & { introMode?: boolean; onIntroComplete?: () => void }) {
+  const { t } = useVisitorLocale();
   const [state, setState] = useState<AvatarState>("idle");
   const [assetAvailable, setAssetAvailable] = useState(true);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -52,7 +55,7 @@ export default function CompanionAvatar({
     return (
       <div
         className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-amber-300/35 shadow-xl"
-        aria-label="Lê Quý Đôn thời trẻ"
+        aria-label={t.companion.avatarAlt}
       >
         <img
           src="/images/companion/companion-bg.png"
@@ -88,7 +91,7 @@ export default function CompanionAvatar({
             }
           : {}
       }
-      aria-label="Lê Quý Đôn thời trẻ"
+      aria-label={t.companion.avatarAlt}
     >
       <img
         src="/images/companion/companion-bg.png"

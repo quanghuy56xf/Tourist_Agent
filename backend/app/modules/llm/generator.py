@@ -228,34 +228,76 @@ Tài liệu được cung cấp (Context):
             if retrieved_docs
             else "Không có ngữ cảnh xác thực bổ sung."
         )
-        journey = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
-        current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
-        next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
-        suggestion_prompt = (
-            f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'\n"
-            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
-        ) if next_item_name else (
-            "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không.\n"
-            "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
-        )
-        tour_completion_prompt = (
-            "Du khách đã đi hết các điểm. Hãy khen ngợi họ, tóm tắt ngắn hành trình "
-            "và kết thúc hành trình một cách ấm áp."
-            if next_item_name is None and len(visited_items) > 1
-            else ""
-        )
-        
-        lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt." if language == "Tiếng Việt" else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+        if language == "Tiếng Anh":
+            lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+            journey_str = ", ".join(visited_items) if visited_items else "No locations visited yet"
+            current_item_str = current_item if current_item else "No specific object"
+            next_item_str = f"Suggest the visitor to go to: {next_item_name}" if next_item_name else ""
+            
+            if next_item_name:
+                suggestion_prompt = (
+                    f"AT THE END of the story, ALWAYS ask an open question to suggest the next stop, for example: 'Do you want to know more about this place? If not, the next stop I want to show you is {next_item_name}!'\n"
+                    "AT THE END of each response, ALWAYS provide 1-2 suggested questions for the visitor to ask you more. These questions MUST strictly relate to the historical site, specific artifacts, or unique historical facts. Put these suggested questions in the syntax: ||Q: Question 1|| ||Q: Question 2||."
+                )
+            else:
+                suggestion_prompt = (
+                    "AT THE END of the story, ALWAYS ask if they want to know more details.\n"
+                    "AT THE END of each response, ALWAYS provide 1-2 suggested questions for the visitor to ask you more. These questions MUST strictly relate to the historical site, specific artifacts, or unique historical facts. Put these suggested questions in the syntax: ||Q: Question 1|| ||Q: Question 2||."
+                )
+            tour_completion_prompt = (
+                "The visitor has visited all stops. Praise them, briefly summarize the journey "
+                "and conclude the journey warmly."
+                if next_item_name is None and len(visited_items) > 1
+                else ""
+            )
+            system_prompt = f"""You are Lê Quý Đôn, 18 years old, a young prodigy from Thái Bình,
+preparing for the Đình exam at the Temple of Literature.
 
-        system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
+Communication style:
+- Refer to yourself as "I" or "Đôn", call the visitor "you".
+- Confident, enthusiastic, and excited, but not arrogant.
+{lang_instruction}
+{suggestion_prompt}
+
+Visitor has visited: {journey_str}
+{next_item_str}
+{tour_completion_prompt}
+
+Verified Context:
+{context}
+"""
+        else:
+            lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt."
+            journey_str = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
+            current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
+            next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""
+            
+            if next_item_name:
+                suggestion_prompt = (
+                    f"KHI KẾT THÚC câu chuyện, HÃY luôn hỏi một câu mở để gợi ý khách đi tiếp, ví dụ: 'Bạn có muốn hỏi thêm gì về chỗ này không? Nếu không, điểm tiếp theo ta muốn dẫn bạn đến là {next_item_name}!'\n"
+                    "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. YÊU CẦU ƯU TIÊN các câu hỏi mồi liên quan trực tiếp đến khu di tích, hiện vật hoặc những sự thật lịch sử thú vị độc đáo. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+                )
+            else:
+                suggestion_prompt = (
+                    "KHI KẾT THÚC câu chuyện, HÃY hỏi xem họ có muốn biết thêm chi tiết nào không.\n"
+                    "KẾT THÚC mỗi câu trả lời, hãy luôn đưa ra 1-2 câu hỏi mồi (gợi ý) để người dùng có thể hỏi thêm bạn. YÊU CẦU ƯU TIÊN các câu hỏi mồi liên quan trực tiếp đến khu di tích, hiện vật hoặc những sự thật lịch sử thú vị độc đáo. Đặt các câu hỏi gợi ý này trong cú pháp: ||Q: Câu hỏi 1|| ||Q: Câu hỏi 2||."
+                )
+            tour_completion_prompt = (
+                "Du khách đã đi hết các điểm. Hãy khen ngợi họ, tóm tắt ngắn hành trình "
+                "và kết thúc hành trình một cách ấm áp."
+                if next_item_name is None and len(visited_items) > 1
+                else ""
+            )
+            system_prompt = f"""Ngươi là Lê Quý Đôn, 18 tuổi, một thần đồng trẻ tuổi quê Thái Bình,
 đang chuẩn bị bước vào kỳ thi Đình tại Quốc Tử Giám.
 
 Phong cách giao tiếp:
 - Xưng "ta" hoặc "Đôn này", gọi du khách là "bạn".
 - Tự tin, nhiệt huyết, hào hứng nhưng không kiêu ngạo.
 {lang_instruction}
+{suggestion_prompt}
 
-Du khách đã tham quan: {journey}
+Du khách đã tham quan: {journey_str}
 {next_item_str}
 {tour_completion_prompt}
 

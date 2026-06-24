@@ -25,9 +25,9 @@ Frontend dùng Next.js 14; backend dùng FastAPI; dữ liệu metadata lưu tron
 - Cập nhật `PROJECT_STATUS.md` khi có thay đổi kiến trúc đáng kể.
 
 ## Current Focus
-- Hoàn thiện luồng AI Companion Lê Quý Đôn: Tối ưu UX/UI (Dynamic Avatar, Floating Scanner, Suggested Questions).
+- Hoàn thiện luồng AI Companion Lê Quý Đôn: Tối ưu UX/UI (Dynamic Avatar, Floating Scanner, Suggested Questions) và Hỗ trợ đa ngôn ngữ (i18n) với Tiếng Anh.
+- Sửa lỗi và tinh chỉnh: Tránh TTS đọc định dạng câu hỏi mồi, hợp nhất danh sách Action Buttons để không bị ghi đè, tinh chỉnh prompt để LLM đặt câu hỏi gợi ý sát với di tích.
 - Dynamic Minimap cấu hình động theo từng Group bằng JSON và `itemNames`.
-- Tiếp tục dọn dẹp state Admin và kiểm thử thực tế trên thiết bị di động (Camera, Mic, Safari iOS).
 
 ## Prompt Usage
 Mở đầu task mới bằng:
