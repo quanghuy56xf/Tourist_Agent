@@ -14,6 +14,9 @@ NO_ITEM_KNOWLEDGE_EN = (
     "Please add a description or heritage-site documents that mention this artifact."
 )
 
+ITEM_REGISTRATION_SOURCE = "item"
+ITEM_REGISTRATION_SECTION = "Thông tin đăng ký hiện vật"
+
 
 class Retriever(Protocol):
     def retrieve(
@@ -104,6 +107,101 @@ def no_item_knowledge_message(language: str) -> str:
     return NO_ITEM_KNOWLEDGE_VI
 
 
+def is_item_registration_document(document: Document) -> bool:
+    return document.metadata.get("source") == ITEM_REGISTRATION_SOURCE
+
+
+def build_item_registration_document(item_id: int, item_description: str) -> Document:
+    return Document(
+        page_content=item_description,
+        metadata={
+            "source": ITEM_REGISTRATION_SOURCE,
+            "page": f"item-{item_id}",
+            "section_title": ITEM_REGISTRATION_SECTION,
+        },
+    )
+
+
+def build_item_retrieval_query(item_name: str, item_description: str) -> str:
+    name = " ".join((item_name or "").split()).strip()
+    description = " ".join((item_description or "").split()).strip()
+    if description:
+        return f"Giới thiệu chi tiết về {name}. {description}"
+    return f"Giới thiệu chi tiết về {name}."
+
+
+_VAGUE_FOLLOW_UP_PATTERNS = (
+    "cho biết thêm",
+    "thêm thông tin",
+    "kể thêm",
+    "nói thêm",
+    "còn gì",
+    "còn thông tin",
+    "thú vị",
+    "chi tiết hơn",
+    "tell me more",
+    "more info",
+    "more information",
+)
+
+
+def is_vague_follow_up(user_message: str, item_name: str) -> bool:
+    normalized = normalize_text(user_message)
+    if not normalized:
+        return True
+
+    name = normalize_text(item_name)
+    if name and name in normalized:
+        return False
+    if any(term in normalized for term in _primary_item_terms(item_name)):
+        return False
+
+    if any(pattern in normalized for pattern in _VAGUE_FOLLOW_UP_PATTERNS):
+        return True
+
+    return len(normalized.split()) <= 6
+
+
+def build_chat_retrieval_query(
+    item_name: str,
+    item_description: str,
+    user_message: str,
+) -> str:
+    base = build_item_retrieval_query(item_name, item_description)
+    message = " ".join((user_message or "").split()).strip()
+    if not message:
+        return base
+    if is_vague_follow_up(message, item_name):
+        return base
+    return f"{base} Câu hỏi của khách: {message}"
+
+
+def _order_chat_documents(
+    *,
+    item_name: str,
+    item_description: str,
+    documents: list[Document],
+    vague_follow_up: bool,
+) -> list[Document]:
+    registration = [doc for doc in documents if is_item_registration_document(doc)]
+    item_group_docs = filter_group_docs_for_item(
+        item_name,
+        item_description,
+        documents,
+    )
+    if vague_follow_up:
+        return registration + item_group_docs
+
+    item_group_set = set(id(doc) for doc in item_group_docs)
+    registration_set = set(id(doc) for doc in registration)
+    other_group_docs = [
+        doc
+        for doc in documents
+        if id(doc) not in registration_set and id(doc) not in item_group_set
+    ]
+    return registration + item_group_docs + other_group_docs
+
+
 def build_item_context(
     *,
     item_id: int,
@@ -114,18 +212,13 @@ def build_item_context(
     group_id: int | None = None,
     query: str | None = None,
 ) -> list[Document]:
-    docs = [
-        Document(
-            page_content=item_description,
-            metadata={"source": "item", "page": f"item-{item_id}"},
-        )
-    ]
+    docs = [build_item_registration_document(item_id, item_description)]
     if retriever is None or group_id is None:
         return docs
 
     try:
         retrieved = retriever.retrieve(
-            query or f"Giới thiệu chi tiết về {item_name}.",
+            query or build_item_retrieval_query(item_name, item_description),
             top_k=top_k,
             group_id=group_id,
         )
@@ -211,6 +304,12 @@ def build_chat_item_context(
     all retrieved group chunks (including lower-ranked matches), not only those
     that explicitly name the artifact.
     """
+    user_message = query or ""
+    retrieval_query = build_chat_retrieval_query(
+        item_name,
+        item_description,
+        user_message,
+    )
     all_docs = build_item_context(
         item_id=item_id,
         item_name=item_name,
@@ -218,7 +317,7 @@ def build_chat_item_context(
         retriever=retriever,
         top_k=top_k,
         group_id=group_id,
-        query=query,
+        query=retrieval_query,
     )
     relevant_group_docs = filter_group_docs_for_item(
         item_name,
@@ -231,5 +330,10 @@ def build_chat_item_context(
     )
     has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
 
-    chat_docs: list[Document] = list(all_docs)
+    chat_docs = _order_chat_documents(
+        item_name=item_name,
+        item_description=item_description,
+        documents=all_docs,
+        vague_follow_up=is_vague_follow_up(user_message, item_name),
+    )
     return chat_docs, has_verified_knowledge

@@ -58,6 +58,66 @@ def test_list_published_tours(client, db_session):
     assert len(response.json()) == 1
 
 
+def test_list_tours_filters_by_group_id(client, db_session):
+    first_group = Group(name="Văn Miếu")
+    second_group = Group(name="Hoàng Thành")
+    db_session.add_all([first_group, second_group])
+    db_session.flush()
+
+    vm_first = Item(
+        name="Chuông",
+        description="Chuông văn miếu",
+        group_id=first_group.id,
+    )
+    vm_second = Item(
+        name="Bia",
+        description="Bia tiến sĩ",
+        group_id=first_group.id,
+    )
+    ht_first = Item(
+        name="Điện Kính Thiên",
+        description="Điện chính",
+        group_id=second_group.id,
+    )
+    ht_second = Item(
+        name="Hậu Lâu",
+        description="Khu hậu cung",
+        group_id=second_group.id,
+    )
+    db_session.add_all([vm_first, vm_second, ht_first, ht_second])
+    db_session.commit()
+
+    client.post(
+        "/api/tours",
+        json={
+            "title_vi": "Tour Văn Miếu",
+            "title_en": "Van Mieu tour",
+            "stops": [
+                {"item_id": vm_first.id, "hint_vi": "A"},
+                {"item_id": vm_second.id, "hint_vi": "B"},
+            ],
+        },
+    )
+    client.post(
+        "/api/tours",
+        json={
+            "title_vi": "Tour Hoàng Thành",
+            "title_en": "Imperial tour",
+            "stops": [
+                {"item_id": ht_first.id, "hint_vi": "A"},
+                {"item_id": ht_second.id, "hint_vi": "B"},
+            ],
+        },
+    )
+
+    all_tours = client.get("/api/tours").json()
+    filtered = client.get(f"/api/tours?group_id={first_group.id}").json()
+
+    assert len(all_tours) == 2
+    assert len(filtered) == 1
+    assert filtered[0]["title_vi"] == "Tour Văn Miếu"
+
+
 def test_get_tour_detail(client, db_session):
     first, second = _seed_items(db_session)
     created = client.post(

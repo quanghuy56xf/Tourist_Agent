@@ -11,12 +11,15 @@ import {
   deleteItemImage,
   generateItemContentDraft,
   getGroupItems,
+  getGroupContentSyncStatus,
   getItemContent,
   getUngroupedItems,
   GroupItem,
   GroupSummary,
+  ItemContentSyncState,
   isEditableContentVariant,
   resolveImageUrl,
+  syncMissingGroupContent,
   updateItem,
   updateItemContent,
   updateItemImage,
@@ -31,6 +34,8 @@ import { compressImage } from "@/lib/imageCompress";
 const SYNC_STATUS_POLL_MS = 60_000;
 
 type BrowseFilter = number | "ungrouped" | null;
+
+const CONTENT_SYNC_POLL_MS = 3000;
 
 interface ItemsManagementPanelProps {
   groups: GroupSummary[];
@@ -76,6 +81,12 @@ export default function ItemsManagementPanel({
   const [selectedPersona, setSelectedPersona] = useState<string>(EDITABLE_CONTENT_PERSONA);
   const [selectedLanguage, setSelectedLanguage] = useState<string>(EDITABLE_CONTENT_LANGUAGE);
   const [regenNotice, setRegenNotice] = useState<string | null>(null);
+  const [contentSyncing, setContentSyncing] = useState(false);
+  const [contentSyncMessage, setContentSyncMessage] = useState<string | null>(null);
+  const [itemSyncStates, setItemSyncStates] = useState<Map<number, ItemContentSyncState>>(
+    () => new Map()
+  );
+  const [contentSyncPollRun, setContentSyncPollRun] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [syncStatus, setSyncStatus] = useState<GroupSyncStatusResponse | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -177,8 +188,77 @@ export default function ItemsManagementPanel({
     setExpandedId(null);
     cancelEdit();
     resetStoryState();
+    setContentSyncMessage(null);
+    setContentSyncing(false);
+    setItemSyncStates(new Map());
     loadItems();
   }, [cancelEdit, loadItems, refreshToken, resetStoryState]);
+
+  useEffect(() => {
+    let active = true;
+    let timeoutId: number | null = null;
+
+    if (typeof resolvedFilter !== "number") {
+      setItemSyncStates(new Map());
+      return;
+    }
+
+    const schedule = () => {
+      timeoutId = window.setTimeout(() => void poll(), CONTENT_SYNC_POLL_MS);
+    };
+
+    const poll = async () => {
+      try {
+        const status = await getGroupContentSyncStatus(resolvedFilter);
+        if (!active) return;
+        setItemSyncStates(new Map(status.items.map((row) => [row.item_id, row])));
+        const needsWork = status.summary.needs_update > 0;
+        if (status.is_sync_active || (contentSyncing && needsWork)) {
+          schedule();
+        } else {
+          setContentSyncing(false);
+          if (
+            needsWork === false &&
+            status.summary.total > 0 &&
+            status.summary.synced === status.summary.total
+          ) {
+            setContentSyncMessage("Tất cả hiện vật đã có đủ mô tả và audio.");
+          }
+        }
+      } catch (pollError) {
+        console.error("Failed to fetch content sync status", pollError);
+        if (active && contentSyncing) {
+          schedule();
+        }
+      }
+    };
+
+    void poll();
+
+    return () => {
+      active = false;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [resolvedFilter, contentSyncPollRun, contentSyncing]);
+
+  const handleUpdateContent = async () => {
+    if (typeof resolvedFilter !== "number") return;
+    setContentSyncing(true);
+    setContentSyncMessage(null);
+    setError(null);
+    try {
+      const result = await syncMissingGroupContent(resolvedFilter);
+      setContentSyncMessage(result.message);
+      if (result.queued_count === 0) {
+        setContentSyncing(false);
+      } else {
+        setContentSyncPollRun((current) => current + 1);
+      }
+    } catch (err) {
+      setContentSyncing(false);
+      setError(err instanceof Error ? err.message : "Cập nhật thông tin thất bại");
+    }
+  };
 
   useEffect(() => {
     if (expandedId === null) {
@@ -571,6 +651,43 @@ export default function ItemsManagementPanel({
           </p>
         </div>
 
+        {typeof resolvedFilter === "number" && !loading && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              disabled={contentSyncing || loading}
+              onClick={() => void handleUpdateContent()}
+              className="admin-btn-primary px-4 py-2 text-sm disabled:opacity-50 inline-flex items-center gap-2 w-fit"
+            >
+              <svg
+                className={`w-4 h-4 ${contentSyncing ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              {contentSyncing ? "Đang cập nhật thông tin..." : "Cập nhật thông tin"}
+            </button>
+            {itemSyncStates.size > 0 && (
+              <p className="admin-muted text-xs">
+                {Array.from(itemSyncStates.values()).filter((row) => row.state === "synced").length}
+                /{itemSyncStates.size} hiện vật đã đủ mô tả &amp; audio
+              </p>
+            )}
+          </div>
+        )}
+        {contentSyncMessage && (
+          <p className="text-xs" style={{ color: "var(--primary)" }}>
+            {contentSyncMessage}
+          </p>
+        )}
+
         {!hideGroupSelector && (
           <div>
             <label className="admin-label mb-1.5">
@@ -714,6 +831,7 @@ export default function ItemsManagementPanel({
                   regenNotice={expandedId === item.id ? regenNotice : null}
                   onForceSyncItem={() => handleForceSyncItem(item.id)}
                   syncingItem={syncingItemId === item.id}
+                  contentSyncState={itemSyncStates.get(item.id) ?? null}
                 />
               ))}
             </div>

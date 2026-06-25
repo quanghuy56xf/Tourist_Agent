@@ -7,6 +7,10 @@ from app.core.config import CONTENT_REGEN_MAX_WORKERS
 from app.core.database import SessionLocal
 from app.models.item import Item
 from app.modules.content.audio_jobs import ensure_audio_parallel
+from app.modules.content.content_analytics import (
+    CONTENT_EVENT_TEXT_ERROR,
+    record_content_issue,
+)
 from app.modules.content.personas import (
     DEFAULT_LANGUAGE,
     DEFAULT_PERSONA,
@@ -14,6 +18,7 @@ from app.modules.content.personas import (
 )
 from app.modules.content.relevance import items_affected_by_documents
 from app.modules.content.service import get_item_content_service
+from app.modules.content.text_utils import is_no_information_content
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,7 @@ def _other_variants() -> list[tuple[str, str]]:
 
 def _regenerate_base_variant(item_id: int) -> tuple[int, str | None]:
     db = SessionLocal()
+    item = None
     try:
         item = db.query(Item).filter(Item.id == item_id).first()
         if item is None:
@@ -42,8 +48,17 @@ def _regenerate_base_variant(item_id: int) -> tuple[int, str | None]:
             source="generated",
         )
         return item_id, result.content
-    except Exception:
+    except Exception as exc:
         logger.exception("Base content regenerate failed for item %s", item_id)
+        record_content_issue(
+            event_type=CONTENT_EVENT_TEXT_ERROR,
+            item_id=item_id,
+            group_id=item.group_id if item else None,
+            persona=DEFAULT_PERSONA,
+            language=DEFAULT_LANGUAGE,
+            error_detail=str(exc)[:500],
+            item_name=item.name if item else None,
+        )
         return item_id, None
     finally:
         db.close()
@@ -67,12 +82,22 @@ def _regenerate_adapted_variant(
             language,
             base_content,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "Adapted variant regenerate failed for item %s (%s, %s)",
             item_id,
             persona,
             language,
+        )
+        item = db.query(Item).filter(Item.id == item_id).first()
+        record_content_issue(
+            event_type=CONTENT_EVENT_TEXT_ERROR,
+            item_id=item_id,
+            group_id=item.group_id if item else None,
+            persona=persona,
+            language=language,
+            error_detail=str(exc)[:500],
+            item_name=item.name if item else None,
         )
     finally:
         db.close()
@@ -123,12 +148,12 @@ def regenerate_items_parallel(
 
     regenerated_ids = list(base_contents.keys())
 
-    audio_targets: list[tuple[int, str, str]] = [
-        (item_id, DEFAULT_PERSONA, DEFAULT_LANGUAGE) for item_id in regenerated_ids
-    ]
+    audio_targets: list[tuple[int, str, str]] = []
     for item_id in regenerated_ids:
-        if not base_contents.get(item_id, "").strip():
+        base_text = base_contents.get(item_id, "")
+        if not base_text.strip() or is_no_information_content(base_text):
             continue
+        audio_targets.append((item_id, DEFAULT_PERSONA, DEFAULT_LANGUAGE))
         for persona, language in _other_variants():
             audio_targets.append((item_id, persona, language))
     if audio_targets:
