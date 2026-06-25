@@ -434,6 +434,8 @@ export default forwardRef<HeraGuidePanelHandle, HeraGuidePanelProps>(function He
         />
       ) : null}
 
+      <img src="/images/mascot.gif" alt="HERA" className="hera-mascot-fixed" />
+
       <div
         className={`hera-guide-card overflow-hidden ${overlay ? "hera-guide-card--overlay" : "artifact-card"}`}
       >

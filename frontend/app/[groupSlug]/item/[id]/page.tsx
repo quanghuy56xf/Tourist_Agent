@@ -402,14 +402,7 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-2 pointer-events-none">
-        <button 
-          onClick={() => router.push(groupPath(groupSlug, "/companion"))}
-          className="relative block h-16 w-16 rounded-full border-2 border-amber-400/50 overflow-hidden shadow-[0_0_20px_rgba(201,168,76,0.3)] transition-transform hover:scale-105 active:scale-95 bg-[#1a2333] pointer-events-auto animate-pulse"
-        >
-          <img src="/images/companion/companion-idle.png" alt="Lê Quý Đôn" className="h-[130%] w-[130%] max-w-none object-cover object-top -ml-[15%]" />
-        </button>
-      </div>
+
     </main>
   );
 }
