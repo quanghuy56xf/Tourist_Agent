@@ -209,6 +209,12 @@ export const en: DeepStringShape<typeof vi> = {
     matchErrConnectServer: "Unable to connect to the match server.",
     matchErrNotInPlayers: "You are not in this room's player list.",
     matchErrDisconnected: "Connection to the match server was lost.",
+    matchWrongObject:
+      'Wrong item! Match with "{name}" is only {percent}% (requires >= {min}%).',
+    matchScanUnrecognized:
+      "Could not identify target object (Match: {percent}%, requires >= {min}%).",
+    matchLobbyBtn: "⚔ Online match (create room)",
+    matchTourBtn: "⚔ Match this tour (create room)",
   },
   item: {
     objectLabel: "Heritage object",
@@ -238,6 +244,7 @@ export const en: DeepStringShape<typeof vi> = {
     chatPlaceholder: "Type your question here...",
     send: "Send",
     continueTour: "Next stop in tour",
+    scanAgain: "Scan again",
   },
   results: {
     found: "Match found!",
@@ -293,6 +300,9 @@ export const en: DeepStringShape<typeof vi> = {
     closeKeyboardLabel: "Close keyboard",
     errorPrefix: "Error: ",
     avatarAlt: "Young Lê Quý Đôn",
+    micErrorRecognize: "Cannot recognize voice at this time.",
+    avatarFallbackName: "Đôn",
+    avatarAgeLabel: "Age 18",
   },
   minimap: {
     title: "Heritage map",
@@ -305,5 +315,7 @@ export const en: DeepStringShape<typeof vi> = {
     nextSuggestion: "My suggestion for your next stop:",
     unknownLocation: "Unknown location",
     notAvailable: "Map is not available for this heritage site.",
+    currentLocationAria: "Current location: {name}",
+    suggestedLocationAria: "Suggested point: {name}",
   },
 };

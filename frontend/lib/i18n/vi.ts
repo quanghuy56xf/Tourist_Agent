@@ -209,6 +209,12 @@ export const vi = {
     matchErrConnectServer: "Không thể kết nối tới máy chủ phòng đấu.",
     matchErrNotInPlayers: "Bạn không ở trong danh sách người chơi của phòng này.",
     matchErrDisconnected: "Kết nối tới máy chủ thi đấu đã bị ngắt.",
+    matchWrongObject:
+      'Chưa đúng hiện vật! Độ khớp với "{name}" là {percent}% (yêu cầu >= {min}%).',
+    matchScanUnrecognized:
+      "Không nhận diện được hiện vật (Độ khớp: {percent}%, yêu cầu >= {min}%).",
+    matchLobbyBtn: "⚔ Thi đấu trực tuyến (tạo phòng)",
+    matchTourBtn: "⚔ Thi đấu tour này (tạo phòng)",
   },
   item: {
     objectLabel: "Hiện vật",
@@ -238,6 +244,7 @@ export const vi = {
     chatPlaceholder: "Nhập câu hỏi của bạn tại đây...",
     send: "Gửi",
     continueTour: "Di tích tiếp theo trong tour",
+    scanAgain: "Chụp tiếp",
   },
   results: {
     found: "Tìm thấy!",
@@ -293,6 +300,9 @@ export const vi = {
     closeKeyboardLabel: "Đóng thanh gõ chữ",
     errorPrefix: "Lỗi: ",
     avatarAlt: "Lê Quý Đôn thời trẻ",
+    micErrorRecognize: "Không thể nhận diện giọng nói lúc này.",
+    avatarFallbackName: "Đôn",
+    avatarAgeLabel: "18 tuổi",
   },
   minimap: {
     title: "Bản đồ tham quan",
@@ -305,5 +315,7 @@ export const vi = {
     nextSuggestion: "Đôn gợi ý tiếp theo:",
     unknownLocation: "Chưa xác định vị trí",
     notAvailable: "Bản đồ chưa khả dụng cho khu tham quan này.",
+    currentLocationAria: "Vị trí hiện tại: {name}",
+    suggestedLocationAria: "Điểm được gợi ý: {name}",
   },
 } as const;

@@ -203,7 +203,11 @@ export const ko: VisitorTranslations = {
     "matchCompletedBadge": "완료 ✓",
     "matchErrConnectServer": "대결 서버에 연결할 수 없습니다.",
     "matchErrNotInPlayers": "이 방의 플레이어 목록에 없습니다.",
-    "matchErrDisconnected": "대결 서버 연결이 끊어졌습니다."
+    "matchErrDisconnected": "대결 서버 연결이 끊어졌습니다.",
+    "matchWrongObject": "대상 유물이 아닙니다! \"{name}\" 일치도는 {percent}%입니다({min}% 이상 필요).",
+    "matchScanUnrecognized": "유물을 식별할 수 없습니다(일치도: {percent}%, {min}% 이상 필요).",
+    "matchLobbyBtn": "⚔ 온라인 대결(방 만들기)",
+    "matchTourBtn": "⚔ 이 투어로 대결(방 만들기)"
   },
   "item": {
     "objectLabel": "문화유산",
@@ -232,7 +236,8 @@ export const ko: VisitorTranslations = {
     "chatConnectionError": "연결 오류. 나중에 다시 시도해 주세요.",
     "chatPlaceholder": "여기에 질문을 입력하세요...",
     "send": "보내기",
-    "continueTour": "투어의 다음 정차지"
+    "continueTour": "투어의 다음 정차지",
+    "scanAgain": "다시 촬영"
   },
   "results": {
     "found": "일치 항목을 찾았습니다!",
@@ -287,7 +292,10 @@ export const ko: VisitorTranslations = {
     "openKeyboardLabel": "키보드 열기",
     "closeKeyboardLabel": "키보드 닫기",
     "errorPrefix": "오류: ",
-    "avatarAlt": "젊은 레 쿠이 돈"
+    "avatarAlt": "젊은 레 쿠이 돈",
+    "micErrorRecognize": "지금은 음성을 인식할 수 없습니다.",
+    "avatarFallbackName": "Đôn",
+    "avatarAgeLabel": "18세"
   },
   "minimap": {
     "title": "유산 지도",
@@ -299,6 +307,8 @@ export const ko: VisitorTranslations = {
     "nearestLocation": "최근 스캔한 유물 기준 가장 가까운 위치",
     "nextSuggestion": "다음 정차지 추천:",
     "unknownLocation": "알 수 없는 위치",
-    "notAvailable": "이 유산 사이트에서는 지도를 사용할 수 없습니다."
+    "notAvailable": "이 유산 사이트에서는 지도를 사용할 수 없습니다.",
+    "currentLocationAria": "현재 위치: {name}",
+    "suggestedLocationAria": "추천 지점: {name}"
   }
 };

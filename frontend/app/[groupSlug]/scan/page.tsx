@@ -130,7 +130,7 @@ export default function SearchPage() {
           <LanguageSelector compact />
         </div>
         <p className="text-center text-sm font-medium mt-1" style={{ color: "var(--muted-foreground)" }}>
-          Hướng Camera vào hiện vật và bấm nút chụp
+          {t.scan.instruction}
         </p>
       </header>
 

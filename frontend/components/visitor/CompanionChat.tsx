@@ -137,11 +137,11 @@ export default function CompanionChat({
     const timer = window.setTimeout(() => {
       setActionButtons(current => {
         if (current.length > 0) return current;
-        return [{ type: "open_camera", label: language === "Tiếng Anh" ? "📸 Scan more" : "📸 Quét tiếp" }];
+        return [{ type: "open_camera", label: `📸 ${t.companion.scanMore}` }];
       });
     }, 30000);
     return () => window.clearTimeout(timer);
-  }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, scanPhase, history.length, suggestedNextPoint, actionButtons.length]);
+  }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, scanPhase, history.length, suggestedNextPoint, actionButtons.length, t.companion.scanMore]);
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -381,9 +381,7 @@ export default function CompanionChat({
         await send(transcript);
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
-            : language === "Tiếng Anh" ? "Cannot recognize voice at this time." : "Không thể nhận diện giọng nói lúc này.";
+          error instanceof Error ? error.message : t.companion.micErrorRecognize;
         alert(message);
       } finally {
         setIsTranscribing(false);

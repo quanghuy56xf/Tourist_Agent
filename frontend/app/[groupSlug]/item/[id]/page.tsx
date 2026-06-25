@@ -246,7 +246,7 @@ export default function ItemDetailPage() {
               className="artifact-btn-secondary"
             >
               <span aria-hidden="true" className="text-sm">📸</span>
-              <span className="text-xs font-medium">Chụp tiếp</span>
+              <span className="text-xs font-medium">{t.item.scanAgain}</span>
             </button>
           )}
         </div>

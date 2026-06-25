@@ -203,7 +203,11 @@ export const fr: VisitorTranslations = {
     "matchCompletedBadge": "Termine ✓",
     "matchErrConnectServer": "Impossible de se connecter au serveur de match.",
     "matchErrNotInPlayers": "Vous n etes pas dans la liste des joueurs de cette salle.",
-    "matchErrDisconnected": "La connexion au serveur de match a ete interrompue."
+    "matchErrDisconnected": "La connexion au serveur de match a ete interrompue.",
+    "matchWrongObject": "Mauvais objet ! Correspondance avec \"{name}\" : {percent}% (requis >= {min}%).",
+    "matchScanUnrecognized": "Impossible d'identifier l'objet cible (Correspondance : {percent}%, requis >= {min}%).",
+    "matchLobbyBtn": "⚔ Match en ligne (creer une salle)",
+    "matchTourBtn": "⚔ Match pour cette visite (creer une salle)"
   },
   "item": {
     "objectLabel": "Objet du patrimoine",
@@ -232,7 +236,8 @@ export const fr: VisitorTranslations = {
     "chatConnectionError": "Erreur de connexion. Veuillez réessayer plus tard.",
     "chatPlaceholder": "Saisissez votre question ici...",
     "send": "Envoyer",
-    "continueTour": "Prochaine étape de la visite"
+    "continueTour": "Prochaine étape de la visite",
+    "scanAgain": "Scanner a nouveau"
   },
   "results": {
     "found": "Correspondance trouvée !",
@@ -287,7 +292,10 @@ export const fr: VisitorTranslations = {
     "openKeyboardLabel": "Ouvrir le clavier",
     "closeKeyboardLabel": "Fermer le clavier",
     "errorPrefix": "Erreur : ",
-    "avatarAlt": "Jeune Lê Quý Đôn"
+    "avatarAlt": "Jeune Lê Quý Đôn",
+    "micErrorRecognize": "Impossible de reconnaitre la voix pour le moment.",
+    "avatarFallbackName": "Đôn",
+    "avatarAgeLabel": "18 ans"
   },
   "minimap": {
     "title": "Carte du patrimoine",
@@ -299,6 +307,8 @@ export const fr: VisitorTranslations = {
     "nearestLocation": "Emplacement le plus proche selon l'objet récemment scanné",
     "nextSuggestion": "Ma suggestion pour votre prochaine étape :",
     "unknownLocation": "Emplacement inconnu",
-    "notAvailable": "La carte n'est pas disponible pour ce site patrimonial."
+    "notAvailable": "La carte n'est pas disponible pour ce site patrimonial.",
+    "currentLocationAria": "Emplacement actuel : {name}",
+    "suggestedLocationAria": "Point suggere : {name}"
   }
 };

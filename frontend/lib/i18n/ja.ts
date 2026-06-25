@@ -203,7 +203,11 @@ export const ja: VisitorTranslations = {
     "matchCompletedBadge": "完了 ✓",
     "matchErrConnectServer": "対戦サーバーに接続できません。",
     "matchErrNotInPlayers": "このルームのプレイヤーリストにいません。",
-    "matchErrDisconnected": "対戦サーバーとの接続が切断されました。"
+    "matchErrDisconnected": "対戦サーバーとの接続が切断されました。",
+    "matchWrongObject": "対象の遺物ではありません！「{name}」との一致度は {percent}% です（{min}% 以上が必要）。",
+    "matchScanUnrecognized": "遺物を識別できませんでした（一致度: {percent}%、{min}% 以上が必要）。",
+    "matchLobbyBtn": "⚔ オンライン対戦（ルーム作成）",
+    "matchTourBtn": "⚔ このツアーで対戦（ルーム作成）"
   },
   "item": {
     "objectLabel": "文化遺産",
@@ -232,7 +236,8 @@ export const ja: VisitorTranslations = {
     "chatConnectionError": "接続エラー。後でもう一度お試しください。",
     "chatPlaceholder": "ここに質問を入力...",
     "send": "送信",
-    "continueTour": "ツアーの次の停留所"
+    "continueTour": "ツアーの次の停留所",
+    "scanAgain": "もう一度撮影"
   },
   "results": {
     "found": "一致が見つかりました！",
@@ -287,7 +292,10 @@ export const ja: VisitorTranslations = {
     "openKeyboardLabel": "キーボードを開く",
     "closeKeyboardLabel": "キーボードを閉じる",
     "errorPrefix": "エラー：",
-    "avatarAlt": "若きレ・クイ・ドン"
+    "avatarAlt": "若きレ・クイ・ドン",
+    "micErrorRecognize": "現在、音声を認識できません。",
+    "avatarFallbackName": "Đôn",
+    "avatarAgeLabel": "18歳"
   },
   "minimap": {
     "title": "遺産マップ",
@@ -299,6 +307,8 @@ export const ja: VisitorTranslations = {
     "nearestLocation": "最近スキャンした遺物に基づく最寄りの場所",
     "nextSuggestion": "次の停留所のおすすめ：",
     "unknownLocation": "不明な場所",
-    "notAvailable": "この遺産サイトでは地図を利用できません。"
+    "notAvailable": "この遺産サイトでは地図を利用できません。",
+    "currentLocationAria": "現在地: {name}",
+    "suggestedLocationAria": "おすすめ地点: {name}"
   }
 };

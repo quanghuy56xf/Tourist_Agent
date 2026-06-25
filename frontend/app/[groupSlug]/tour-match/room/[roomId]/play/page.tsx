@@ -301,21 +301,18 @@ export default function TourMatchPlayPage() {
       if (gameMode === "free" && matchedId && myFoundIds.includes(matchedId)) {
         setErrorMsg(t.tour.matchAlreadyFound);
       } else if (best && expectedId !== null && Number(best.item_id) !== expectedId) {
-        if (locale === "vi") {
-          setErrorMsg(
-            `Chưa đúng hiện vật! Độ khớp với "${currentStop?.name ?? ""}" là ${matchPercent}% (yêu cầu >= 55%).`
-          );
-        } else {
-          setErrorMsg(
-            `Wrong item! Match with "${currentStop?.name ?? ""}" is only ${matchPercent}% (requires >= 55%).`
-          );
-        }
+        setErrorMsg(
+          t.tour.matchWrongObject
+            .replace("{name}", currentStop?.name ?? "")
+            .replace("{percent}", String(matchPercent))
+            .replace("{min}", "55")
+        );
       } else {
-        if (locale === "vi") {
-          setErrorMsg(`Không nhận diện được hiện vật (Độ khớp: ${matchPercent}%, yêu cầu >= 55%).`);
-        } else {
-          setErrorMsg(`Could not identify target object (Match: ${matchPercent}%, requires >= 55%).`);
-        }
+        setErrorMsg(
+          t.tour.matchScanUnrecognized
+            .replace("{percent}", String(matchPercent))
+            .replace("{min}", "55")
+        );
       }
 
       URL.revokeObjectURL(url);

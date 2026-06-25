@@ -203,7 +203,11 @@ export const zh: VisitorTranslations = {
     "matchCompletedBadge": "已完成 ✓",
     "matchErrConnectServer": "无法连接到对战服务器。",
     "matchErrNotInPlayers": "您不在此房间的玩家列表中。",
-    "matchErrDisconnected": "与对战服务器的连接已断开。"
+    "matchErrDisconnected": "与对战服务器的连接已断开。",
+    "matchWrongObject": "不是目标文物！与「{name}」的匹配度为 {percent}%（需要 >= {min}%）。",
+    "matchScanUnrecognized": "无法识别文物（匹配度：{percent}%，需要 >= {min}%）。",
+    "matchLobbyBtn": "⚔ 在线对战（创建房间）",
+    "matchTourBtn": "⚔ 对战此路线（创建房间）"
   },
   "item": {
     "objectLabel": "文化遗产",
@@ -232,7 +236,8 @@ export const zh: VisitorTranslations = {
     "chatConnectionError": "连接错误，请稍后重试。",
     "chatPlaceholder": "在此输入你的问题...",
     "send": "发送",
-    "continueTour": "之旅下一站"
+    "continueTour": "之旅下一站",
+    "scanAgain": "继续拍摄"
   },
   "results": {
     "found": "找到匹配！",
@@ -287,7 +292,10 @@ export const zh: VisitorTranslations = {
     "openKeyboardLabel": "打开键盘",
     "closeKeyboardLabel": "关闭键盘",
     "errorPrefix": "错误：",
-    "avatarAlt": "少年黎贵惇"
+    "avatarAlt": "少年黎贵惇",
+    "micErrorRecognize": "目前无法识别语音。",
+    "avatarFallbackName": "Đôn",
+    "avatarAgeLabel": "18岁"
   },
   "minimap": {
     "title": "遗产地图",
@@ -299,6 +307,8 @@ export const zh: VisitorTranslations = {
     "nearestLocation": "根据最近扫描文物的最近位置",
     "nextSuggestion": "我对你下一站的建议：",
     "unknownLocation": "未知位置",
-    "notAvailable": "此遗产站点暂无地图。"
+    "notAvailable": "此遗产站点暂无地图。",
+    "currentLocationAria": "当前位置：{name}",
+    "suggestedLocationAria": "推荐地点：{name}"
   }
 };
