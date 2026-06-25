@@ -22,7 +22,7 @@ import {
   AdminPageHeader,
   AdminSelect,
 } from "@/components/admin/ui";
-import { AnalyticsSummary, fetchAnalyticsSummary, GroupSummary, listGroups } from "@/lib/api";
+import { AnalyticsSummary, ContentIssueRow, fetchAnalyticsSummary, GroupSummary, listGroups } from "@/lib/api";
 import { canAccessGroup, getAdminSession } from "@/lib/adminAuth";
 
 const DAY_OPTIONS = [
@@ -376,9 +376,98 @@ export default function AdminAnalyticsPage() {
               <IssueTable rows={summary.recent_errors} emptyLabel="Không có lỗi ghi nhận." />
             </AdminCard>
           </div>
+
+          <AdminCard
+            title="Sinh nội dung hiện vật"
+            description="Thiếu thông tin RAG, lỗi sinh text hoặc lỗi sinh audio theo hiện vật / persona / ngôn ngữ."
+          >
+            <dl className="mb-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="admin-muted">Không có thông tin</dt>
+                <dd className="text-lg font-semibold text-amber-300">
+                  {summary.content_no_information_count}
+                </dd>
+              </div>
+              <div>
+                <dt className="admin-muted">Lỗi sinh text</dt>
+                <dd className="text-lg font-semibold text-red-300">
+                  {summary.content_text_error_count}
+                </dd>
+              </div>
+              <div>
+                <dt className="admin-muted">Lỗi sinh audio</dt>
+                <dd className="text-lg font-semibold text-red-300">
+                  {summary.content_audio_error_count}
+                </dd>
+              </div>
+            </dl>
+            <ContentIssueTable
+              rows={summary.content_issues}
+              emptyLabel="Chưa có sự kiện sinh nội dung."
+            />
+          </AdminCard>
         </>
       )}
     </AdminPage>
+  );
+}
+
+function contentEventLabel(eventType: string): string {
+  switch (eventType) {
+    case "content_no_information":
+      return "Không có thông tin";
+    case "content_text_error":
+      return "Lỗi sinh text";
+    case "content_audio_error":
+      return "Lỗi sinh audio";
+    default:
+      return eventType;
+  }
+}
+
+function ContentIssueTable({
+  rows,
+  emptyLabel,
+}: {
+  rows: ContentIssueRow[];
+  emptyLabel: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="admin-muted text-sm">{emptyLabel}</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-white/10 text-left">
+            <th className="py-2 pr-3 font-medium">Loại</th>
+            <th className="py-2 pr-3 font-medium">Thời gian</th>
+            <th className="py-2 pr-3 font-medium">Khu / hiện vật</th>
+            <th className="py-2 pr-3 font-medium">Persona</th>
+            <th className="py-2 pr-3 font-medium">Ngôn ngữ</th>
+            <th className="py-2 pr-3 font-medium">Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
+              <td className="py-2 pr-3">{contentEventLabel(row.event_type)}</td>
+              <td className="py-2 pr-3">
+                {new Date(row.created_at).toLocaleString("vi-VN")}
+              </td>
+              <td className="py-2 pr-3">
+                {row.group_name ?? "—"}
+                {row.item_name ? ` · ${row.item_name}` : ""}
+              </td>
+              <td className="py-2 pr-3">{row.persona ?? "—"}</td>
+              <td className="py-2 pr-3">{row.language ?? "—"}</td>
+              <td className="max-w-[220px] truncate py-2 pr-3">{row.error_detail ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

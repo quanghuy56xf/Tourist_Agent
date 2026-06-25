@@ -64,7 +64,26 @@ function toStop(item: GroupItem): TourStop {
   };
 }
 
-async function loadLegacyTours(): Promise<ResolvedTour[]> {
+async function loadLegacyTours(groupId?: number): Promise<ResolvedTour[]> {
+  if (groupId != null) {
+    try {
+      const data = await getGroupItems(groupId);
+      if (data.items.length < 2) return [];
+      return [
+        {
+          id: `group-${groupId}`,
+          titleVi: `Tour ${data.group_name}`,
+          titleEn: `${data.group_name} Tour`,
+          descriptionVi: `Khám phá ${data.items.length} hiện vật theo thứ tự trong khu di tích.`,
+          descriptionEn: `Explore ${data.items.length} objects in order across this heritage site.`,
+          stops: data.items.map(toStop),
+        },
+      ];
+    } catch {
+      return [];
+    }
+  }
+
   const tours: ResolvedTour[] = [];
   const seen = new Set<string>();
 
@@ -111,9 +130,9 @@ async function loadLegacyTours(): Promise<ResolvedTour[]> {
   return tours;
 }
 
-export async function loadSuggestedTours(): Promise<ResolvedTour[]> {
+export async function loadSuggestedTours(groupId?: number): Promise<ResolvedTour[]> {
   try {
-    const summaries = await listTours(true);
+    const summaries = await listTours(true, groupId);
     if (summaries.length > 0) {
       const details = await Promise.all(summaries.map((summary) => getTour(summary.id)));
       return details.map(mapApiTour);
@@ -121,7 +140,7 @@ export async function loadSuggestedTours(): Promise<ResolvedTour[]> {
   } catch {
     /* fallback below */
   }
-  return loadLegacyTours();
+  return loadLegacyTours(groupId);
 }
 
 export async function loadTourById(tourId: string): Promise<ResolvedTour | null> {

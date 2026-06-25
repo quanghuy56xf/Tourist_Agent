@@ -105,7 +105,7 @@ export default function CompanionChat({
   const speak = async (text: string) => {
     setIsSpeaking(true);
     try {
-      await playChatTts(text, language);
+      await playChatTts(text, language, undefined, "Companion");
     } catch {
       // ignore
     } finally {

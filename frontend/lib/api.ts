@@ -723,6 +723,57 @@ export async function bulkRegenerateGroupContent(
   return res.json();
 }
 
+export interface ItemContentSyncState {
+  item_id: number;
+  state: "synced" | "partial" | "missing" | "syncing";
+  variants_ready: number;
+  variants_total: number;
+  needs_regeneration: boolean;
+}
+
+export interface GroupContentSyncStatusResponse {
+  group_id: number;
+  is_sync_active: boolean;
+  summary: {
+    total: number;
+    synced: number;
+    needs_update: number;
+    in_progress: number;
+  };
+  items: ItemContentSyncState[];
+}
+
+export interface SyncMissingContentResponse {
+  queued_count: number;
+  queued_item_ids: number[];
+  message: string;
+}
+
+export async function getGroupContentSyncStatus(
+  groupId: number
+): Promise<GroupContentSyncStatusResponse> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/content/sync-status`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được trạng thái đồng bộ"));
+  }
+  return res.json();
+}
+
+export async function syncMissingGroupContent(
+  groupId: number
+): Promise<SyncMissingContentResponse> {
+  const res = await fetch(`${API_URL}/api/groups/${groupId}/content/sync-missing`, {
+    method: "POST",
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Cập nhật thông tin thất bại"));
+  }
+  return res.json();
+}
+
 export interface GenerateResponse {
   item_id: number;
 
@@ -903,7 +954,29 @@ export async function fetchTTSAudio(
   signal?: AbortSignal,
   persona?: "Companion"
 ): Promise<string> {
-  const res = await fetch(`${API_URL}/api/tts`, {
+  const res = await fetchTTSResponse(text, language, signal, false, persona);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+export async function fetchTTSStreamResponse(
+  text: string,
+  language: string = "vi",
+  signal?: AbortSignal,
+  persona?: "Companion"
+): Promise<Response> {
+  return fetchTTSResponse(text, language, signal, true, persona);
+}
+
+async function fetchTTSResponse(
+  text: string,
+  language: string,
+  signal: AbortSignal | undefined,
+  stream: boolean,
+  persona?: "Companion"
+): Promise<Response> {
+  const endpoint = stream ? `${API_URL}/api/tts/stream` : `${API_URL}/api/tts`;
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -916,8 +989,7 @@ export async function fetchTTSAudio(
   if (!res.ok) {
     throw new Error("Lỗi tải âm thanh");
   }
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+  return res;
 }
 
 export interface TourStopPayload {
@@ -960,8 +1032,15 @@ export interface TourDetail extends TourSummary {
   stops: TourStopDetail[];
 }
 
-export async function listTours(publishedOnly = true): Promise<TourSummary[]> {
-  const res = await fetch(`${API_URL}/api/tours?published_only=${publishedOnly}`, {
+export async function listTours(
+  publishedOnly = true,
+  groupId?: number
+): Promise<TourSummary[]> {
+  const params = new URLSearchParams({ published_only: String(publishedOnly) });
+  if (groupId != null) {
+    params.set("group_id", String(groupId));
+  }
+  const res = await fetch(`${API_URL}/api/tours?${params.toString()}`, {
     headers: apiHeaders(),
   });
   if (!res.ok) throw new Error(await parseApiError(res, "Failed to load tours"));
@@ -1071,6 +1150,20 @@ export interface AnalyticsSummary {
   };
   slow_events: AnalyticsIssueRow[];
   recent_errors: AnalyticsIssueRow[];
+  content_no_information_count: number;
+  content_text_error_count: number;
+  content_audio_error_count: number;
+  content_issues: ContentIssueRow[];
+}
+
+export interface ContentIssueRow {
+  event_type: string;
+  group_name: string | null;
+  item_name: string | null;
+  persona: string | null;
+  language: string | null;
+  error_detail: string | null;
+  created_at: string;
 }
 
 export interface AnalyticsIssueRow {

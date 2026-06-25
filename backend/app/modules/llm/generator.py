@@ -3,6 +3,8 @@ from typing import List
 from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from app.modules.rag.service import is_item_registration_document
+
 from app.core.config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
@@ -14,6 +16,10 @@ from app.core.config import (
     LLM_TIMEOUT_SECONDS,
 )
 from app.modules.llm.client import extract_complete_text, invoke_llm
+
+_NATURAL_SPEECH_RULE = """KHÔNG mở đầu hoặc chen các cụm meta như "Dựa trên tài liệu được cung cấp",
+"Theo thông tin trong tài liệu", "Based on the provided documents".
+Viết như người thuyết minh tại chỗ: đi thẳng vào nội dung, tự nhiên, phù hợp đọc thành audio."""
 
 
 def _build_llm(model_name: str | None, temperature: float):
@@ -53,9 +59,54 @@ class RAGGenerator:
     def _format_context(self, docs: List[Document]) -> str:
         formatted_docs = []
         for doc in docs:
-            label = doc.metadata.get("section_title") or doc.metadata.get("page", "Unknown")
+            if is_item_registration_document(doc):
+                label = doc.metadata.get("section_title", "Thông tin đăng ký hiện vật")
+            else:
+                label = doc.metadata.get("section_title") or doc.metadata.get(
+                    "page", "Unknown"
+                )
             formatted_docs.append(f"[Mục {label}]: {doc.page_content}")
         return "\n\n".join(formatted_docs)
+
+    def _grounding_instructions(self, retrieved_docs: List[Document], language: str) -> str:
+        lang_instruction = (
+            "BẮT BUỘC trả lời bằng Tiếng Việt."
+            if language == "Tiếng Việt"
+            else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+        )
+        has_registration = any(
+            is_item_registration_document(doc) and (doc.page_content or "").strip()
+            for doc in retrieved_docs
+        )
+        if has_registration:
+            not_found_rule = (
+                '3. Chỉ trả lời chính xác câu: "Tôi không tìm thấy thông tin trong tài liệu." '
+                "khi KHÔNG có đủ chi tiết trong cả thông tin đăng ký lẫn tài liệu khu di tích."
+            )
+            registration_rule = (
+                '2. Mục "Thông tin đăng ký hiện vật" là nguồn xác thực do quản trị viên nhập. '
+                "Nếu mục này có đủ chi tiết về hiện vật, hãy dựa vào đó để trả lời — "
+                "kể cả khi tài liệu khu di tích không nhắc cụ thể tên hiện vật."
+            )
+        else:
+            registration_rule = (
+                "2. NẾU tài liệu KHÔNG nhắc cụ thể đến hiện vật trong câu hỏi "
+                "hoặc không có đủ chi tiết, hãy trả lời chính xác câu: "
+                '"Tôi không tìm thấy thông tin trong tài liệu." '
+                "và tuyệt đối KHÔNG tự bịa ra câu trả lời."
+            )
+            not_found_rule = ""
+
+        return f"""Nhiệm vụ của bạn:
+1. Trả lời câu hỏi CHỈ dựa trên các thông tin có trong Tài liệu được cung cấp ở trên.
+{registration_rule}
+{not_found_rule}
+4. KHÔNG dùng kiến thức bên ngoài tài liệu, KHÔNG suy diễn thêm.
+5. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
+6. {_NATURAL_SPEECH_RULE}
+7. {lang_instruction}
+8. Giới hạn độ dài: câu trả lời không quá 300 từ.
+9. Length limit: the response must not exceed 300 words."""
 
     def generate_answer(self, query: str, retrieved_docs: List[Document], persona: str = "Mặc định", language: str = "Tiếng Việt") -> str:
         if not retrieved_docs:
@@ -63,35 +114,28 @@ class RAGGenerator:
 
         context = self._format_context(retrieved_docs)
 
-        lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt." if language == "Tiếng Việt" else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
-
-        base_instructions = f"""Nhiệm vụ của bạn:
-1. Trả lời câu hỏi CHỈ dựa trên các thông tin có trong Tài liệu được cung cấp ở trên.
-2. NẾU tài liệu KHÔNG nhắc cụ thể đến hiện vật trong câu hỏi hoặc không có đủ chi tiết, hãy trả lời chính xác câu: "Tôi không tìm thấy thông tin trong tài liệu." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-3. KHÔNG dùng kiến thức bên ngoài tài liệu, KHÔNG suy diễn thêm.
-4. KHÔNG thêm trích dẫn nguồn dạng [Trang X] hay [Mục ...] — nội dung sẽ được đọc thành audio, cần văn phong tự nhiên, trôi chảy.
-5. {lang_instruction}
-6. Giới hạn độ dài: câu trả lời không quá 300 từ.
-7. Length limit: the response must not exceed 300 words."""
+        base_instructions = self._grounding_instructions(retrieved_docs, language)
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
-- Đưa các sự thật bất ngờ (Fact/Fun Fact) lên đầu.
-- Sử dụng emoji một cách hợp lý."""
+- ??a c?c s? th?t b?t ng? (Fact/Fun Fact) l?n ??u n?u c? trong t?i li?u.
+- KH?NG d?ng emoji (v?n b?n s? ??c th?nh audio)."""
         elif persona == "Companion":
-            persona_instructions = """Phong cách trả lời (Lê Quý Đôn 18 tuổi):
-- Xưng "ta", gọi du khách là "bạn".
-- Hào hứng, thông minh, kể chuyện sinh động nhưng không kiêu ngạo.
-- Chỉ sử dụng dữ kiện trong tài liệu, tuyệt đối không bịa.
-- Khi thiếu thông tin, thành thật nói rằng ta chưa đọc đến."""
+            persona_instructions = """Phong c?ch tr? l?i (L? Qu? ??n 18 tu?i):
+- X?ng "ta", g?i du kh?ch l? "b?n".
+- H?o h?ng, th?ng minh, k? chuy?n sinh ??ng nh?ng kh?ng ki?u ng?o.
+- Ch? s? d?ng d? ki?n trong t?i li?u, tuy?t ??i kh?ng b?a.
+- Khi thi?u th?ng tin, th?nh th?t n?i r?ng ta ch?a ??c ??n.
+- KH?NG d?ng emoji (v?n b?n s? ??c th?nh audio)."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách trả lời (Persona: Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
 - Sử dụng dạng kể chuyện (Storytelling), ví von đơn giản.
 - Tuyệt đối tránh các thuật ngữ hàn lâm khó hiểu."""
         else:
-            persona_instructions = """Phong cách trả lời: Mặc định, rõ ràng, lịch sự và chính xác."""
+            persona_instructions = """Phong cách trả lời: Mặc định — như hướng dẫn viên thuyết minh tại chỗ, rõ ràng, lịch sự.
+Không nhắc đến "tài liệu", "nguồn tham khảo" hay "thông tin được cung cấp"."""
 
         prompt = f"""Bạn là một trợ lý AI thông minh về di tích lịch sử.
 
@@ -126,28 +170,33 @@ Câu trả lời:"""
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách (Gen Z Explorer):
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
-- Đưa các sự thật bất ngờ lên đầu nếu phù hợp.
-- Có thể dùng emoji hợp lý."""
+- ??a c?c s? th?t b?t ng? l?n ??u n?u c? trong b?n g?c.
+- KH?NG d?ng emoji (v?n b?n s? ??c th?nh audio)."""
         elif persona == "Companion":
-            persona_instructions = """Phong cách (Lê Quý Đôn 18 tuổi):
-- Xưng "ta", gọi người nghe là "bạn".
-- Giọng trẻ trung, uyên bác, hào hứng và sinh động.
-- Có thể tự trêu nhẹ: "À ta lại nói nhiều quá rồi..."
-- Giữ nguyên toàn bộ dữ kiện gốc, tuyệt đối không thêm thông tin."""
+            persona_instructions = """Phong c?ch (L? Qu? ??n 18 tu?i):
+- X?ng "ta", g?i ng??i nghe l? "b?n".
+- Gi?ng tr? trung, uy?n b?c, h?o h?ng v? sinh ??ng.
+- C? th? t? tr?u nh?: "? ta l?i n?i nhi?u qu? r?i..."
+- Gi? nguy?n to?n b? d? ki?n g?c, tuy?t ??i kh?ng th?m th?ng tin.
+- KH?NG d?ng emoji (v?n b?n s? ??c th?nh audio)."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách (Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
 - Kể chuyện, ví von đơn giản.
 - Tránh thuật ngữ hàn lâm."""
         else:
-            persona_instructions = """Phong cách: Mặc định, rõ ràng, lịch sự và chính xác."""
+            persona_instructions = """Phong cách: Mặc định — như hướng dẫn viên thuyết minh tại chỗ, rõ ràng, lịch sự.
+Không nhắc đến "tài liệu" hay "nguồn tham khảo"."""
 
         prompt = f"""Bạn là biên tập viên nội dung thuyết minh di tích.
 
 Viết lại mô tả về hiện vật "{item_name}" dựa trên nội dung gốc bên dưới.
-Giữ nguyên các thông tin chính xác, không thêm chi tiết không có trong bản gốc.
+Giữ nguyên các thông tin chính xác, KHÔNG thêm chi tiết không có trong bản gốc.
+Nếu bản gốc cho biết không có đủ thông tin, hãy giữ nguyên ý đó (chỉ đổi phong cách/ngôn ngữ).
 {lang_instruction}
 KHÔNG thêm trích dẫn dạng [Trang X] hay [Mục ...] — văn bản sẽ được đọc thành audio.
+{_NATURAL_SPEECH_RULE}
+KHÔNG dùng emoji.
 Giới hạn độ dài: câu trả lời không quá 300 từ.
 Length limit: the response must not exceed 300 words.
 
@@ -161,31 +210,43 @@ Mô tả đã viết lại:"""
         response = invoke_llm(self.llm, prompt)
         return extract_complete_text(response)
 
-    def generate_chat(self, message: str, history: List[dict], retrieved_docs: List[Document], persona: str = "Mặc định", language: str = "Tiếng Việt") -> str:
+    def generate_chat(
+        self,
+        message: str,
+        history: List[dict],
+        retrieved_docs: List[Document],
+        persona: str = "Mặc định",
+        language: str = "Tiếng Việt",
+        item_name: str = "",
+    ) -> str:
         context = self._format_context(retrieved_docs) if retrieved_docs else "Không có ngữ cảnh bổ sung."
+        artifact = " ".join((item_name or "").split()).strip() or "hiện vật đang xem"
 
         lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt." if language == "Tiếng Việt" else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
 
         base_instructions = f"""Nhiệm vụ của bạn:
 1. Bạn đang đóng vai trò một trợ lý ảo tư vấn về di tích lịch sử.
-2. Trả lời câu hỏi dựa trên các thông tin có trong Tài liệu được cung cấp (nếu có).
-3. Khi khách hỏi thêm chi tiết, điều thú vị, hoặc thông tin liên quan, hãy tổng hợp từ các đoạn tài liệu được cung cấp — kể cả khi đoạn không nhắc trực tiếp tên hiện vật — nếu nội dung liên quan đến khu di tích hoặc hiện vật đang xem.
-4. Nếu thông tin không có trong tài liệu, hãy nói "Tôi chưa có đủ thông tin xác thực để trả lời chính xác câu hỏi này." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
-5. {lang_instruction}
-6. Giới hạn độ dài: câu trả lời không quá 300 từ.
-7. Length limit: the response must not exceed 300 words."""
+2. Khách đang xem hiện vật: {artifact}. Mọi câu trả lời phải xoay quanh hiện vật này; không chuyển sang giới thiệu công trình hoặc hiện vật khác trừ khi khách hỏi rõ ràng.
+3. Trả lời câu hỏi dựa trên các thông tin có trong Tài liệu được cung cấp (nếu có).
+4. Khi khách hỏi thêm chi tiết chung chung, hãy bổ sung thông tin về {artifact} từ tài liệu — không dùng đoạn tài liệu về chủ đề khác.
+5. Nếu thông tin không có trong tài liệu, hãy nói "Tôi chưa có đủ thông tin xác thực để trả lời chính xác câu hỏi này." và tuyệt đối KHÔNG tự bịa ra câu trả lời.
+6. {_NATURAL_SPEECH_RULE}
+7. {lang_instruction}
+8. Giới hạn độ dài: câu trả lời không quá 300 từ.
+9. Length limit: the response must not exceed 300 words."""
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách trả lời (Persona: Gen Z Explorer):
 - Ngắn gọn, súc tích, ngôn ngữ trẻ trung, hiện đại.
-- Sử dụng emoji một cách hợp lý."""
+- KHÔNG dùng emoji (văn bản sẽ đọc thành audio)."""
         elif persona == "Family Visitor":
             persona_instructions = """Phong cách trả lời (Persona: Family Visitor):
 - Dành cho phụ huynh đi cùng con nhỏ.
 - Sử dụng dạng kể chuyện, ví von đơn giản.
 - Tuyệt đối tránh các thuật ngữ hàn lâm khó hiểu."""
         else:
-            persona_instructions = """Phong cách trả lời: Mặc định, rõ ràng, lịch sự và chính xác."""
+            persona_instructions = """Phong cách trả lời: Mặc định — như hướng dẫn viên thuyết minh tại chỗ, rõ ràng, lịch sự.
+Không nhắc đến "tài liệu" hay "nguồn tham khảo"."""
 
         from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 

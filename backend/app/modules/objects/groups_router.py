@@ -7,6 +7,7 @@ from app.models.item import Item
 from app.models.content_variant import ItemContentVariant
 from app.modules.content.service import compute_content_hash
 from app.modules.content.bulk_update import regenerate_items_task
+from app.schemas.content import GroupContentSyncStatusResponse, SyncMissingContentResponse
 from app.schemas.group import (
     GroupCreate,
     GroupItemsResponse,
@@ -25,6 +26,11 @@ from app.modules.auth.dependencies import (
     resolve_current_user,
 )
 from app.modules.auth.service import ensure_group_access
+from app.modules.content.sync_status import (
+    evaluate_group_content_status,
+    find_items_needing_regeneration,
+    sync_missing_items_task,
+)
 from app.modules.objects.groups import ensure_visitor_can_access_group, get_group_or_404
 from app.modules.objects.items import item_to_response
 
@@ -376,6 +382,18 @@ def get_group_sync_status(
     )
 
 
+@router.get("/{group_id}/content/sync-status", response_model=GroupContentSyncStatusResponse)
+def get_group_content_sync_status(
+    group_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    group = get_group_or_404(db, group_id)
+    if user and user.role == "manager":
+        ensure_group_access(user, group_id)
+    return GroupContentSyncStatusResponse(**evaluate_group_content_status(db, group.id))
+
+
 @router.post("/{group_id}/sync", status_code=202)
 def force_sync_group(
     group_id: int,
@@ -394,3 +412,29 @@ def force_sync_group(
 
     return {"message": f"Queued {len(target_item_ids)} items for sync"}
 
+
+@router.post("/{group_id}/content/sync-missing", status_code=202, response_model=SyncMissingContentResponse)
+def sync_missing_group_content(
+    group_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    group = get_group_or_404(db, group_id)
+    if user and user.role == "manager":
+        ensure_group_access(user, group_id)
+
+    item_ids = find_items_needing_regeneration(db, group.id)
+    if not item_ids:
+        return SyncMissingContentResponse(
+            queued_count=0,
+            queued_item_ids=[],
+            message="T?t c? hi?n v?t ?? c? ?? m? t? v? audio.",
+        )
+
+    background_tasks.add_task(sync_missing_items_task, group.id, item_ids)
+    return SyncMissingContentResponse(
+        queued_count=len(item_ids),
+        queued_item_ids=item_ids,
+        message=f"?? x?p h?ng c?p nh?t {len(item_ids)} hi?n v?t.",
+    )

@@ -1,6 +1,6 @@
 "use client";
 
-import { GroupItem, resolveImageUrl } from "@/lib/api";
+import { GroupItem, ItemContentSyncState, resolveImageUrl } from "@/lib/api";
 
 const ANGLE_LABELS: Record<string, string> = {
   front: "Mặt trước",
@@ -48,6 +48,7 @@ interface ItemCardProps {
   onLanguageChange: (value: string) => void;
   canEditStory: boolean;
   regenNotice: string | null;
+  contentSyncState?: ItemContentSyncState | null;
 }
 
 export default function ItemCard({
@@ -90,12 +91,14 @@ export default function ItemCard({
   onLanguageChange,
   canEditStory,
   regenNotice,
+  contentSyncState = null,
   onForceSyncItem,
   syncingItem,
 }: ItemCardProps & {
   onForceSyncItem?: () => void;
   syncingItem?: boolean;
 }) {
+  const isContentSyncing = contentSyncState?.state === "syncing";
   return (
     <div className="admin-item-card">
       <div className="flex w-full items-center gap-3 p-4 transition-colors hover:bg-[rgba(201,168,76,0.06)] relative group">
@@ -139,6 +142,13 @@ export default function ItemCard({
               {item.sync_state === "outdated" && (
                 <span title="Cần đồng bộ lại" className="flex items-center justify-center text-amber-500">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </span>
+              )}
+              {isContentSyncing && (
+                <span title="?ang sinh m? t? v? audio" className="inline-flex items-center gap-1 text-xs font-normal text-amber-600">
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  ?ang c?p nh?t
+                  {contentSyncState ? ` (${contentSyncState.variants_ready}/${contentSyncState.variants_total})` : ""}
                 </span>
               )}
             </p>

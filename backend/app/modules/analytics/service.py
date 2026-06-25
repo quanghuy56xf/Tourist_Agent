@@ -12,6 +12,7 @@ from app.models.item import Item
 from app.schemas.analytics import (
     AnalyticsSummaryResponse,
     ChatPerSearchStats,
+    ContentIssueRow,
     DailyCount,
     GroupActivityStats,
     SessionDurationStats,
@@ -336,11 +337,41 @@ def build_summary(
         error_query = error_query.filter(AnalyticsEvent.group_id.in_(group_filter))
     error_rows = error_query.order_by(AnalyticsEvent.created_at.desc()).limit(20).all()
 
+    from app.modules.content.content_analytics import (
+        CONTENT_EVENT_AUDIO_ERROR,
+        CONTENT_EVENT_NO_INFORMATION,
+        CONTENT_EVENT_TEXT_ERROR,
+        CONTENT_ISSUE_EVENT_TYPES,
+        parse_content_metadata,
+    )
+
+    content_issue_query = db.query(AnalyticsEvent).filter(
+        AnalyticsEvent.created_at >= since,
+        AnalyticsEvent.event_type.in_(CONTENT_ISSUE_EVENT_TYPES),
+    )
+    if group_filter is not None:
+        content_issue_query = content_issue_query.filter(
+            AnalyticsEvent.group_id.in_(group_filter)
+        )
+    content_issue_rows = (
+        content_issue_query.order_by(AnalyticsEvent.created_at.desc()).limit(50).all()
+    )
+
+    content_no_information_count = sum(
+        1 for row in content_issue_rows if row.event_type == CONTENT_EVENT_NO_INFORMATION
+    )
+    content_text_error_count = sum(
+        1 for row in content_issue_rows if row.event_type == CONTENT_EVENT_TEXT_ERROR
+    )
+    content_audio_error_count = sum(
+        1 for row in content_issue_rows if row.event_type == CONTENT_EVENT_AUDIO_ERROR
+    )
+
     related_group_ids = {
-        row.group_id for row in slow_rows + error_rows if row.group_id is not None
+        row.group_id for row in slow_rows + error_rows + content_issue_rows if row.group_id is not None
     }
     related_item_ids = {
-        row.item_id for row in slow_rows + error_rows if row.item_id is not None
+        row.item_id for row in slow_rows + error_rows + content_issue_rows if row.item_id is not None
     }
     group_name_lookup = _group_name_map(db, related_group_ids)
     item_name_lookup = _item_name_map(db, related_item_ids)
@@ -352,6 +383,26 @@ def build_summary(
             group_name=group_name_lookup.get(row.group_id) if row.group_id else None,
             item_name=item_name_lookup.get(row.item_id) if row.item_id else None,
             client_ip=row.client_ip,
+            error_detail=row.error_detail,
+            created_at=row.created_at.isoformat(),
+        )
+
+    def to_content_issue_row(row: AnalyticsEvent) -> ContentIssueRow:
+        persona, language = parse_content_metadata(row.metadata_json)
+        item_name = item_name_lookup.get(row.item_id) if row.item_id else None
+        if item_name is None and row.metadata_json:
+            try:
+                payload = json.loads(row.metadata_json)
+                if isinstance(payload, dict) and isinstance(payload.get("item_name"), str):
+                    item_name = payload["item_name"]
+            except json.JSONDecodeError:
+                pass
+        return ContentIssueRow(
+            event_type=row.event_type,
+            group_name=group_name_lookup.get(row.group_id) if row.group_id else None,
+            item_name=item_name,
+            persona=persona,
+            language=language,
             error_detail=row.error_detail,
             created_at=row.created_at.isoformat(),
         )
@@ -370,4 +421,8 @@ def build_summary(
         chat_timing=chat_timing,
         slow_events=[to_slow_row(row) for row in slow_rows],
         recent_errors=[to_slow_row(row) for row in error_rows],
+        content_no_information_count=content_no_information_count,
+        content_text_error_count=content_text_error_count,
+        content_audio_error_count=content_audio_error_count,
+        content_issues=[to_content_issue_row(row) for row in content_issue_rows],
     )

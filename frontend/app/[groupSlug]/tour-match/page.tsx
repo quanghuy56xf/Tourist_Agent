@@ -7,6 +7,7 @@ import BackButton from "@/components/visitor/BackButton";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { groupPath } from "@/lib/groupSlug";
+import { readStoredGroupId } from "@/lib/visitorAnalytics";
 import { loadSuggestedTours, ResolvedTour, tourTitle } from "@/lib/tours";
 import { fetchApi } from "@/lib/api";
 
@@ -71,7 +72,8 @@ export default function TourMatchLobbyPage() {
   // Fetch rooms and tours
   useEffect(() => {
     refreshRooms();
-    loadSuggestedTours()
+    const groupId = readStoredGroupId() ?? undefined;
+    loadSuggestedTours(groupId)
       .then((data) => {
         setTours(data);
         if (preselectedTour && data.some((t) => t.id === preselectedTour)) {
@@ -86,7 +88,7 @@ export default function TourMatchLobbyPage() {
     // Polling rooms list every 5 seconds
     const interval = setInterval(refreshRooms, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [groupSlug, preselectedTour]);
 
   const handleSaveNickname = (e: React.FormEvent) => {
     e.preventDefault();
