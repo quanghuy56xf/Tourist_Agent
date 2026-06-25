@@ -10,6 +10,8 @@ from fastapi import WebSocket
 logger = logging.getLogger(__name__)
 
 FINISHED_ROOM_TTL_SECONDS = 30 * 60
+WAITING_ROOM_CLEANUP_SECONDS = 15
+PLAYING_ROOM_CLEANUP_SECONDS = 15
 
 
 def _shuffle_item_ids(item_ids: list[int]) -> list[int]:
@@ -111,6 +113,7 @@ class RoomState:
 class RoomManager:
     def __init__(self):
         self.rooms: Dict[str, RoomState] = {}
+        self._cleanup_tasks: Dict[str, asyncio.Task] = {}
 
     def _purge_expired_finished_rooms(self) -> None:
         now = datetime.now()
@@ -161,9 +164,37 @@ class RoomManager:
         return self.rooms.get(room_id)
 
     def remove_room(self, room_id: str):
+        cleanup_task = self._cleanup_tasks.pop(room_id, None)
+        if cleanup_task and not cleanup_task.done():
+            cleanup_task.cancel()
         if room_id in self.rooms:
             del self.rooms[room_id]
             logger.info("Room removed: %s", room_id)
+
+    def _schedule_delayed_cleanup(self, room_id: str, delay_seconds: int) -> None:
+        existing = self._cleanup_tasks.get(room_id)
+        if existing and not existing.done():
+            existing.cancel()
+
+        task = asyncio.create_task(self._delayed_cleanup_check(room_id, delay_seconds))
+        self._cleanup_tasks[room_id] = task
+
+        def _clear_task(finished: asyncio.Task) -> None:
+            if self._cleanup_tasks.get(room_id) is finished:
+                self._cleanup_tasks.pop(room_id, None)
+
+        task.add_done_callback(_clear_task)
+
+    def _prune_offline_players(self, room: RoomState) -> None:
+        if room.status != "waiting":
+            return
+        if any(player.is_online for player in room.players.values()):
+            return
+        for player_id in list(room.players):
+            del room.players[player_id]
+
+    def _waiting_room_has_online_players(self, room: RoomState) -> bool:
+        return any(player.is_online for player in room.players.values())
 
     def get_active_rooms(self) -> List[Dict[str, Any]]:
         self._purge_expired_finished_rooms()
@@ -176,12 +207,16 @@ class RoomManager:
                 "game_mode": room.game_mode,
                 "with_map": room.with_map,
                 "player_count": len(
-                    [player for player in room.players.values() if player.status == "active"]
+                    [
+                        player
+                        for player in room.players.values()
+                        if player.status == "active" and player.is_online
+                    ]
                 ),
                 "status": room.status,
             }
             for room in self.rooms.values()
-            if room.status == "waiting"
+            if room.status == "waiting" and self._waiting_room_has_online_players(room)
         ]
 
     async def broadcast(self, room_id: str, message: Dict[str, Any]):
@@ -189,8 +224,8 @@ class RoomManager:
         if not room:
             return
 
-        disconnected_players = []
-        for player_id, player in room.players.items():
+        disconnected_players: list[str] = []
+        for player_id, player in list(room.players.items()):
             if player.websocket and player.is_online:
                 try:
                     await player.websocket.send_json(message)
@@ -204,7 +239,14 @@ class RoomManager:
                     disconnected_players.append(player_id)
 
         for player_id in disconnected_players:
-            await self.handle_disconnect(room_id, player_id)
+            try:
+                await self.handle_disconnect(room_id, player_id)
+            except Exception:
+                logger.exception(
+                    "Error handling disconnect for player %s in room %s",
+                    player_id,
+                    room_id,
+                )
 
     async def broadcast_room_state(self, room_id: str):
         room = self.get_room(room_id)
@@ -247,22 +289,31 @@ class RoomManager:
             player.progress += 1
 
     def _promote_next_host(self, room: RoomState, *, prefer_online: bool = True) -> None:
-        for candidate in room.players.values():
-            candidate.is_host = False
-
         active_players = sorted(
             [player for player in room.players.values() if player.status == "active"],
             key=lambda player: player.joined_at,
         )
-        if not active_players:
-            return
-
-        if prefer_online:
+        if prefer_online and active_players:
             online_players = [player for player in active_players if player.is_online]
             if online_players:
                 active_players = online_players
 
-        next_host = active_players[0]
+        if active_players:
+            next_host = active_players[0]
+        else:
+            pending_players = sorted(
+                [player for player in room.players.values() if player.status == "pending"],
+                key=lambda player: player.joined_at,
+            )
+            if not pending_players:
+                for candidate in room.players.values():
+                    candidate.is_host = False
+                return
+            next_host = pending_players[0]
+            next_host.status = "active"
+
+        for candidate in room.players.values():
+            candidate.is_host = False
         next_host.is_host = True
         next_host.is_ready = True
 
@@ -322,6 +373,8 @@ class RoomManager:
         else:
             if room.status != "waiting":
                 return False
+            if not self._waiting_room_has_online_players(room):
+                self._prune_offline_players(room)
             is_host = len(room.players) == 0
             status = "active"
             if not is_host and room.is_locked:
@@ -348,15 +401,25 @@ class RoomManager:
         room = self.get_room(room_id)
         if not room:
             return
-        if room.status in ("playing", "finished"):
-            all_offline = all(not player.is_online for player in room.players.values())
-            if all_offline and room.status != "finished":
-                logger.info(
-                    "Delayed cleanup: all players offline in room %s after %ss",
-                    room_id,
-                    delay_seconds,
-                )
-                self.remove_room(room_id)
+
+        all_offline = all(not player.is_online for player in room.players.values())
+        if not all_offline:
+            return
+
+        if room.status == "waiting":
+            logger.info(
+                "Delayed cleanup: abandoned waiting room %s after %ss",
+                room_id,
+                delay_seconds,
+            )
+            self.remove_room(room_id)
+        elif room.status == "playing":
+            logger.info(
+                "Delayed cleanup: all players offline in room %s after %ss",
+                room_id,
+                delay_seconds,
+            )
+            self.remove_room(room_id)
 
     async def handle_disconnect(self, room_id: str, player_id: str):
         room = self.get_room(room_id)
@@ -380,10 +443,10 @@ class RoomManager:
         if room.status == "playing":
             all_offline = all(not p.is_online for p in room.players.values())
             if all_offline:
-                asyncio.create_task(self._delayed_cleanup_check(room_id, 15))
+                self._schedule_delayed_cleanup(room_id, PLAYING_ROOM_CLEANUP_SECONDS)
         elif room.status == "waiting":
             if not any(p.is_online for p in room.players.values()):
-                asyncio.create_task(self._delayed_cleanup_check(room_id, 60 * 30))
+                self._schedule_delayed_cleanup(room_id, WAITING_ROOM_CLEANUP_SECONDS)
 
         await self.broadcast_room_state(room_id)
 

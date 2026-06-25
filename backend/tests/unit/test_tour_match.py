@@ -1,9 +1,19 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.models.group import Group
 from app.models.item import Item
 from app.modules.tour_match.manager import manager
+
+
+def _clear_manager_rooms() -> None:
+    for task in list(manager._cleanup_tasks.values()):
+        if not task.done():
+            task.cancel()
+    manager._cleanup_tasks.clear()
+    _clear_manager_rooms()
 
 
 def _seed_group_tour(db_session):
@@ -18,7 +28,7 @@ def _seed_group_tour(db_session):
 
 
 def test_create_and_list_rooms(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
 
     response = client.post(
@@ -51,7 +61,7 @@ def test_create_and_list_rooms(client: TestClient, db_session):
 
 
 def test_websocket_multiplayer_flow(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
 
     response = client.post(
@@ -100,7 +110,7 @@ def test_websocket_multiplayer_flow(client: TestClient, db_session):
 
 
 def test_sequential_random_assigns_unique_orders(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     room_id = client.post(
         "/api/tour-match/rooms",
@@ -137,7 +147,7 @@ def test_sequential_random_assigns_unique_orders(client: TestClient, db_session)
 
 
 def test_websocket_host_controls(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     response = client.post(
         "/api/tour-match/rooms",
@@ -193,7 +203,7 @@ def test_websocket_host_controls(client: TestClient, db_session):
 
 
 def test_host_transfer_on_disconnect(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     room_id = client.post(
         "/api/tour-match/rooms",
@@ -226,7 +236,7 @@ def test_host_transfer_on_disconnect(client: TestClient, db_session):
 
 
 def test_kick_blocked_after_match_starts(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     room_id = client.post(
         "/api/tour-match/rooms",
@@ -257,7 +267,7 @@ def test_kick_blocked_after_match_starts(client: TestClient, db_session):
 
 
 def test_waiting_room_chat_broadcast(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     room_id = client.post(
         "/api/tour-match/rooms",
@@ -283,7 +293,7 @@ def test_waiting_room_chat_broadcast(client: TestClient, db_session):
 
 
 def test_websocket_race_condition_transition(client: TestClient, db_session):
-    manager.rooms.clear()
+    _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     response = client.post(
         "/api/tour-match/rooms",
@@ -316,3 +326,108 @@ def test_websocket_race_condition_transition(client: TestClient, db_session):
     ) as ws_host_new:
         state_host = ws_host_new.receive_json()["room"]
         assert state_host["status"] == "playing"
+
+
+def test_waiting_room_removed_when_all_offline():
+    from app.modules.tour_match.manager import PlayerState
+
+    _clear_manager_rooms()
+    room_id = manager.create_room(
+        name="Abandoned",
+        description="",
+        tour_id="group-1",
+        game_mode="sequential",
+        with_map=False,
+        stop_item_ids=[1, 2],
+    )
+    solo = PlayerState("solo_id", "Solo", is_host=True)
+    solo.is_online = False
+    solo.websocket = None
+    manager.rooms[room_id].players["solo_id"] = solo
+
+    asyncio.run(manager._delayed_cleanup_check(room_id, delay_seconds=0))
+
+    assert manager.get_room(room_id) is None
+
+
+def test_abandoned_waiting_room_hidden_from_lobby():
+    from app.modules.tour_match.manager import PlayerState
+
+    _clear_manager_rooms()
+    room_id = manager.create_room(
+        name="Ghost",
+        description="",
+        tour_id="group-1",
+        game_mode="sequential",
+        with_map=False,
+        stop_item_ids=[1, 2],
+    )
+    ghost = PlayerState("ghost_id", "Ghost", is_host=True)
+    ghost.is_online = False
+    manager.rooms[room_id].players["ghost_id"] = ghost
+
+    assert manager.get_active_rooms() == []
+
+
+def test_join_abandoned_waiting_room_prunes_offline_players():
+    from app.modules.tour_match.manager import PlayerState
+
+    _clear_manager_rooms()
+    room_id = manager.create_room(
+        name="Fresh",
+        description="",
+        tour_id="group-1",
+        game_mode="sequential",
+        with_map=False,
+        stop_item_ids=[1, 2],
+    )
+    ghost = PlayerState("ghost_id", "Ghost", is_host=True)
+    ghost.is_online = False
+    manager.rooms[room_id].players["ghost_id"] = ghost
+
+    class DummyWs:
+        pass
+
+    async def run_join():
+        ok = await manager.join_room(room_id, "new_id", "Newbie", DummyWs())  # type: ignore[arg-type]
+        assert ok is True
+        room = manager.get_room(room_id)
+        assert room is not None
+        assert list(room.players) == ["new_id"]
+        assert room.players["new_id"].is_host is True
+
+    asyncio.run(run_join())
+
+
+def test_host_leave_promotes_pending_player(client: TestClient, db_session):
+    _clear_manager_rooms()
+    tour_id = _seed_group_tour(db_session)
+    room_id = client.post(
+        "/api/tour-match/rooms",
+        json={"name": "Pending Host", "description": "", "tour_id": tour_id},
+    ).json()["room_id"]
+
+    with client.websocket_connect(
+        f"/api/tour-match/ws/{room_id}/host_id?nickname=Alice"
+    ) as ws_host:
+        ws_host.receive_json()
+        ws_host.send_json({"type": "toggle_lock"})
+        ws_host.receive_json()
+
+        with client.websocket_connect(
+            f"/api/tour-match/ws/{room_id}/bob_id?nickname=Bob"
+        ) as ws_bob:
+            ws_host.receive_json()
+            ws_bob.receive_json()
+
+            ws_host.send_json({"type": "leave"})
+
+            transfer_msg = ws_bob.receive_json()
+            assert transfer_msg["type"] == "room_state"
+            bob_state = next(
+                player
+                for player in transfer_msg["room"]["players"]
+                if player["player_id"] == "bob_id"
+            )
+            assert bob_state["is_host"] is True
+            assert bob_state["status"] == "active"

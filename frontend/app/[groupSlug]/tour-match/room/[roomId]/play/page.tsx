@@ -427,7 +427,7 @@ export default function TourMatchPlayPage() {
           <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Bảng xếp hạng thời gian thực</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">🏁 {totalStops} stops</span>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex flex-wrap gap-2 pb-1">
           {sortedPlayers.map((p, idx) => {
             const isMe = p.player_id === playerId;
             const pct = Math.min((p.progress / totalStops) * 100, 100);

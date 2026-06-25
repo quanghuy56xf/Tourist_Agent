@@ -20,7 +20,7 @@ export default function LanguageSelector({ compact = false }: { compact?: boolea
         aria-label={t.home.languageLabel}
         value={locale}
         onChange={(event) => setLocale(event.target.value as VisitorLocale)}
-        className="rounded-full px-3 py-1.5 text-xs font-semibold outline-none"
+        className="rounded-full px-3 py-1.5 text-base font-semibold outline-none sm:text-xs"
         style={{
           background: "var(--secondary)",
           border: "1px solid var(--border)",

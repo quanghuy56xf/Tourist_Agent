@@ -935,7 +935,7 @@ export default function CompanionChat({
                 }}
                 placeholder={t.companion.chatPlaceholder}
                 disabled={isTranscribing || isRecording}
-                className="min-w-0 flex-1 rounded-full border border-amber-200/15 bg-white/[0.06] px-4 py-2 text-sm outline-none disabled:opacity-50"
+                className="min-w-0 flex-1 rounded-full border border-amber-200/15 bg-white/[0.06] px-4 py-2 text-base outline-none disabled:opacity-50"
               />
               <button
                 type="button"

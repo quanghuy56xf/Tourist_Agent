@@ -194,7 +194,7 @@ export default function TourMatchLobbyPage() {
                 value={nicknameInput}
                 onChange={(e) => setNicknameInput(e.target.value)}
                 placeholder="Ví dụ: Anh Hùng Sử Việt"
-                className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all text-center"
+                className="w-full rounded-xl px-4 py-3 text-base outline-none transition-all text-center"
                 style={{
                   background: "var(--secondary)",
                   border: "1px solid var(--border)",
@@ -283,7 +283,7 @@ export default function TourMatchLobbyPage() {
                     placeholder="Ví dụ: Đấu trường Lam Kinh"
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                    className="w-full rounded-xl px-3 py-2.5 text-base outline-none"
                     style={{
                       background: "var(--secondary)",
                       border: "1px solid var(--border)",
@@ -376,7 +376,7 @@ export default function TourMatchLobbyPage() {
                   placeholder="Ví dụ: Ai chụp nhanh nhất sẽ thắng!"
                   value={roomDesc}
                   onChange={(e) => setRoomDesc(e.target.value)}
-                  className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                  className="w-full rounded-xl px-3 py-2.5 text-base outline-none"
                   style={{
                     background: "var(--secondary)",
                     border: "1px solid var(--border)",

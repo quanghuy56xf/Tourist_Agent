@@ -350,7 +350,7 @@ export default function ItemDetailPage() {
               {t.item.continueTour} →
             </button>
           )}
-          <div className="flex gap-2">
+          <div className="flex min-w-0 gap-2">
           <button
             type="button"
             onClick={() => {
@@ -384,7 +384,7 @@ export default function ItemDetailPage() {
             onFocus={stopGuideIntro}
             onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
             placeholder={t.item.chatPlaceholder}
-            className="flex-1 rounded-full px-5 py-3 text-sm outline-none"
+            className="min-w-0 flex-1 rounded-full px-5 py-3 text-base outline-none"
             style={{
               background: "var(--secondary)",
               border: "1px solid var(--border)",

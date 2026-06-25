@@ -8,6 +8,7 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { groupPath } from "@/lib/groupSlug";
 import { loadTourById, ResolvedTour, tourTitle } from "@/lib/tours";
+import { fetchApi } from "@/lib/api";
 import {
   clearMatchMembership,
   gameModeLabel,
@@ -117,85 +118,126 @@ export default function TourMatchWaitingRoomPage() {
   useEffect(() => {
     if (!playerId || !nickname) return;
 
-    setWsStatus("connecting");
-    setErrorMsg(null);
+    let cancelled = false;
+    let ws: WebSocket | null = null;
 
-    // Resolve direct backend WebSocket URL
-    let apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-    let wsBase = "";
-
-    if (!apiBase) {
-      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        wsBase = "ws://localhost:8000";
-      } else {
-        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        wsBase = `${proto}//${window.location.host}`;
-      }
-    } else {
-      wsBase = apiBase.replace(/^http/, "ws");
-    }
-
-    const wsUrl = `${wsBase}/api/tour-match/ws/${roomId}/${playerId}?nickname=${encodeURIComponent(nickname)}`;
-    console.log("Connecting to WebSocket:", wsUrl);
-    
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setWsStatus("connected");
+    const connect = async () => {
+      setWsStatus("connecting");
       setErrorMsg(null);
-      writeMatchMembership({ groupSlug, roomId, playerId, nickname });
-    };
 
-    ws.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data);
-        console.log("Received WS message:", message);
+        const details = await fetchApi(`/api/tour-match/rooms/${roomId}`);
+        if (cancelled) return;
 
-        if (message.type === "room_state") {
-          const nextRoom = normalizeMatchRoom(message.room);
-          setRoom(nextRoom);
-          if (nextRoom.status === "playing") {
-            router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
-          }
-        } else if (message.type === "match_started") {
+        if (details.status === "playing") {
           router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
-        } else if (message.type === "chat_bubble") {
-          if (message.player_id && message.text) {
-            showChatBubble(String(message.player_id), String(message.text));
-          }
-        } else if (message.type === "error") {
-          setErrorMsg(message.message);
+          return;
         }
-      } catch (err) {
-        console.error("Error parsing WebSocket message:", err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-      setWsStatus("error");
-      setErrorMsg("Lỗi kết nối máy chủ thi đấu");
-    };
-
-    ws.onclose = (event) => {
-      console.log("WebSocket closed:", event.code, event.reason);
-      setWsStatus("disconnected");
-      if (event.code === 4003) {
+        if (details.status === "finished") {
+          clearMatchMembership();
+          setWsStatus("error");
+          setErrorMsg("Phòng đã kết thúc");
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+        clearMatchMembership();
+        setWsStatus("error");
         setErrorMsg("Phòng không tồn tại hoặc cuộc đua đã bắt đầu");
-      } else if (event.code === 4008) {
-        setErrorMsg("Bạn đã bị chủ phòng đuổi khỏi phòng đấu");
-      } else if (event.code === 4009) {
-        setErrorMsg("Yêu cầu tham gia phòng của bạn đã bị từ chối");
+        return;
       }
+
+      let apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+      let wsBase = "";
+
+      if (!apiBase) {
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+          wsBase = "ws://localhost:8000";
+        } else {
+          const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+          wsBase = `${proto}//${window.location.host}`;
+        }
+      } else {
+        wsBase = apiBase.replace(/^http/, "ws");
+      }
+
+      const wsUrl = `${wsBase}/api/tour-match/ws/${roomId}/${playerId}?nickname=${encodeURIComponent(nickname)}`;
+      console.log("Connecting to WebSocket:", wsUrl);
+
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (cancelled) return;
+        setWsStatus("connected");
+        setErrorMsg(null);
+        writeMatchMembership({ groupSlug, roomId, playerId, nickname });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log("Received WS message:", message);
+
+          if (message.type === "room_state") {
+            const nextRoom = normalizeMatchRoom(message.room);
+            setRoom(nextRoom);
+            if (nextRoom.status === "playing") {
+              router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+            }
+          } else if (message.type === "match_started") {
+            router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+          } else if (message.type === "chat_bubble") {
+            if (message.player_id && message.text) {
+              showChatBubble(String(message.player_id), String(message.text));
+            }
+          } else if (message.type === "error") {
+            setErrorMsg(message.message);
+          }
+        } catch (err) {
+          console.error("Error parsing WebSocket message:", err);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        setWsStatus("error");
+        setErrorMsg("Lỗi kết nối máy chủ thi đấu");
+      };
+
+      ws.onclose = (event) => {
+        console.log("WebSocket closed:", event.code, event.reason);
+        setWsStatus("disconnected");
+        if (event.code === 4003) {
+          clearMatchMembership();
+          setErrorMsg("Phòng không tồn tại hoặc cuộc đua đã bắt đầu");
+        } else if (event.code === 4008) {
+          setErrorMsg("Bạn đã bị chủ phòng đuổi khỏi phòng đấu");
+        } else if (event.code === 4009) {
+          setErrorMsg("Yêu cầu tham gia phòng của bạn đã bị từ chối");
+        }
+      };
     };
+
+    void connect();
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      cancelled = true;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         ws.close();
       }
     };
   }, [roomId, playerId, nickname, router, groupSlug]);
+
+  useEffect(() => {
+    const notifyLeave = () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "leave" }));
+      }
+    };
+    window.addEventListener("pagehide", notifyLeave);
+    return () => window.removeEventListener("pagehide", notifyLeave);
+  }, []);
 
   const handleToggleReady = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -560,14 +602,14 @@ export default function TourMatchWaitingRoomPage() {
         </div>
 
         {isWaiting ? (
-          <form onSubmit={handleSendChat} className="artifact-card p-3 flex gap-2">
+          <form onSubmit={handleSendChat} className="artifact-card flex min-w-0 gap-2 p-3">
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               maxLength={200}
               placeholder={t.tour.matchChatPlaceholder}
-              className="flex-1 rounded-xl px-3 py-2.5 text-xs outline-none"
+              className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-base outline-none"
               style={{
                 background: "var(--secondary)",
                 border: "1px solid var(--border)",
