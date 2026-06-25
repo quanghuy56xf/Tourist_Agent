@@ -216,7 +216,12 @@ export default function ItemsManagementPanel({
         if (status.is_sync_active || (contentSyncing && needsWork)) {
           schedule();
         } else {
-          setContentSyncing(false);
+          if (contentSyncing) {
+            setContentSyncing(false);
+            loadItems();
+          } else {
+            setContentSyncing(false);
+          }
           if (
             needsWork === false &&
             status.summary.total > 0 &&
@@ -239,7 +244,7 @@ export default function ItemsManagementPanel({
       active = false;
       if (timeoutId !== null) window.clearTimeout(timeoutId);
     };
-  }, [resolvedFilter, contentSyncPollRun, contentSyncing]);
+  }, [resolvedFilter, contentSyncPollRun, contentSyncing, loadItems]);
 
   const handleUpdateContent = async () => {
     if (typeof resolvedFilter !== "number") return;
@@ -347,8 +352,16 @@ export default function ItemsManagementPanel({
     };
   }, [resolvedFilter, syncPollRun]);
 
+  const refreshSyncStatuses = useCallback(() => {
+    if (typeof resolvedFilter !== "number") return;
+    setContentSyncPollRun((current) => current + 1);
+    forceNextSyncPollRef.current = true;
+    setSyncPollRun((current) => current + 1);
+  }, [resolvedFilter]);
+
   const handleForceSync = async () => {
     if (typeof resolvedFilter !== "number") return;
+    if (!confirm("Xác nhận: Tạo mới mô tả và audio cho tất cả hiện vật?")) return;
     setSyncing(true);
     setError(null);
     try {
@@ -418,6 +431,7 @@ export default function ItemsManagementPanel({
         audioRef.current = null;
       }
       setIsStoryPlaying(false);
+      refreshSyncStatuses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật mô tả thất bại");
     } finally {
@@ -491,6 +505,7 @@ export default function ItemsManagementPanel({
       await loadItems();
       await refreshCounts();
       onChanged();
+      refreshSyncStatuses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật thất bại");
     } finally {
@@ -511,6 +526,7 @@ export default function ItemsManagementPanel({
       await loadItems();
       await refreshCounts();
       onChanged();
+      refreshSyncStatuses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xóa thất bại");
     } finally {
@@ -565,6 +581,7 @@ export default function ItemsManagementPanel({
       await loadItems();
       await refreshCounts();
       onChanged();
+      refreshSyncStatuses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gỡ khu di tích thất bại");
     } finally {
@@ -587,6 +604,7 @@ export default function ItemsManagementPanel({
       await loadItems();
       await refreshCounts();
       onChanged();
+      refreshSyncStatuses();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gán khu di tích thất bại");
     } finally {
@@ -758,31 +776,6 @@ export default function ItemsManagementPanel({
                 {" · "}
                 {items.length} hiện vật — bấm thẻ để mở rộng
               </p>
-
-              {typeof resolvedFilter === "number" && syncStatus && (
-                <div className="flex items-center gap-3">
-                  {syncStatus.is_fully_synced ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                      Đã đồng bộ LLM & Audio ({syncStatus.synced_items}/{syncStatus.total_items})
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      Đang xử lý đồng bộ ({syncStatus.synced_items}/{syncStatus.total_items})
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    title="Force refresh all items LLM & Audio"
-                    disabled={syncing}
-                    onClick={handleForceSync}
-                    className="p-1.5 rounded-full hover:bg-[var(--border)] transition-colors disabled:opacity-50 text-[var(--muted-foreground)] hover:text-[var(--foreground)] focus:outline-none"
-                  >
-                    <svg className={`w-4 h-4 ${syncing || (syncStatus && !syncStatus.is_fully_synced) ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                  </button>
-                </div>
-              )}
             </div>
             <div className="space-y-3">
               {items.map((item) => (
