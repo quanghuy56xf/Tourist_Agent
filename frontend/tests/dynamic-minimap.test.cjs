@@ -75,7 +75,11 @@ assert.match(modalSource, /config: MinimapConfig \| null/);
 assert.doesNotMatch(modalSource, /getMinimapConfig/);
 assert.match(modalSource, /zone\.itemIds\.includes\(lastItemId\)/);
 
+const layoutSource = read("app/[groupSlug]/layout.tsx");
+assert.doesNotMatch(layoutSource, /<MinimapButton/);
+
 const itemSource = read("app/[groupSlug]/item/[id]/page.tsx");
 assert.match(itemSource, /from "@\/lib\/minimapState"/);
+assert.match(itemSource, /<MinimapButton/);
 
 console.log("Dynamic minimap checks passed.");

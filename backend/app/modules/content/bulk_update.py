@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from sqlalchemy.orm import Session
 
-from app.core.config import CONTENT_REGEN_MAX_WORKERS
+from app.core.config import CONTENT_REGEN_MAX_WORKERS, CONTENT_TTS_BULK_ALL_VARIANTS
 from app.core.database import SessionLocal
 from app.models.item import Item
 from app.modules.content.audio_jobs import ensure_audio_parallel
@@ -154,8 +154,9 @@ def regenerate_items_parallel(
         if not base_text.strip() or is_no_information_content(base_text):
             continue
         audio_targets.append((item_id, DEFAULT_PERSONA, DEFAULT_LANGUAGE))
-        for persona, language in _other_variants():
-            audio_targets.append((item_id, persona, language))
+        if CONTENT_TTS_BULK_ALL_VARIANTS:
+            for persona, language in _other_variants():
+                audio_targets.append((item_id, persona, language))
     if audio_targets:
         ensure_audio_parallel(audio_targets)
 

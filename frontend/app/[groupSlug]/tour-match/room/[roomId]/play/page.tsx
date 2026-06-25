@@ -13,32 +13,25 @@ import { groupPath } from "@/lib/groupSlug";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import {
+  clearMatchMembership,
+  gameModeLabel,
+  normalizeMatchRoom,
+  writeMatchMembership,
+  type MatchPlayerState,
+  type MatchRoomState,
+} from "@/lib/tourMatch";
+import { getDynamicMinimapConfig, type MinimapConfig } from "@/lib/api";
+import { VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
+import TourMatchMinimap from "@/components/visitor/TourMatchMinimap";
 import { loadTourById, ResolvedTour, tourTitle, stopHint } from "@/lib/tours";
 
 type ScanPhase = "idle" | "scanning" | "found";
 const TOUR_MATCH_MIN = 0.55;
 
-interface PlayerInfo {
-  player_id: string;
-  nickname: string;
-  is_ready: boolean;
-  is_host: boolean;
-  progress: number;
-  is_online: boolean;
-  finished: boolean;
-  completed_at: string | null;
-}
+interface PlayerInfo extends MatchPlayerState {}
 
-interface RoomInfo {
-  room_id: string;
-  name: string;
-  description: string;
-  tour_id: string;
-  status: string;
-  winner_id: string | null;
-  winner_nickname: string | null;
-  players: PlayerInfo[];
-}
+interface RoomInfo extends MatchRoomState {}
 
 export default function TourMatchPlayPage() {
   const params = useParams();
@@ -61,9 +54,11 @@ export default function TourMatchPlayPage() {
   const [scanProgress, setScanProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showHintModal, setShowHintModal] = useState(false);
+  const [minimapConfig, setMinimapConfig] = useState<MinimapConfig | null>(null);
   
   // Local tour progress
   const [myProgress, setMyProgress] = useState(0);
+  const [myFoundIds, setMyFoundIds] = useState<number[]>([]);
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -134,12 +129,16 @@ export default function TourMatchPlayPage() {
         console.log("Play message received:", message);
 
         if (message.type === "room_state" || message.type === "match_started" || message.type === "match_finished") {
-          setRoom(message.room);
+          setRoom(normalizeMatchRoom(message.room));
           
-          // Align local progress state with room state (in case of reconnect)
           const mine = message.room.players.find((p: PlayerInfo) => p.player_id === playerId);
           if (mine) {
             setMyProgress(mine.progress);
+            setMyFoundIds(mine.found_item_ids ?? []);
+          }
+        } else if (message.type === "find_rejected") {
+          if (message.player_id === playerId) {
+            setErrorMsg(t.tour.matchAlreadyFound);
           }
         }
       } catch (err) {
@@ -185,6 +184,23 @@ export default function TourMatchPlayPage() {
     }
   }, [room?.tour_id, loading]);
 
+  useEffect(() => {
+    if (!room?.with_map) {
+      setMinimapConfig(null);
+      return;
+    }
+    const groupId = Number(window.localStorage.getItem(VISITOR_GROUP_ID_KEY));
+    if (!Number.isInteger(groupId) || groupId <= 0) return;
+    void getDynamicMinimapConfig(groupId)
+      .then(setMinimapConfig)
+      .catch(() => setMinimapConfig(null));
+  }, [room?.with_map]);
+
+  useEffect(() => {
+    if (!roomId || !playerId || !nickname) return;
+    writeMatchMembership({ groupSlug, roomId, playerId, nickname });
+  }, [groupSlug, roomId, playerId, nickname]);
+
   const stopProgress = () => {
     if (progressTimer.current) {
       clearInterval(progressTimer.current);
@@ -203,12 +219,16 @@ export default function TourMatchPlayPage() {
   useEffect(() => () => stopProgress(), []);
 
   const handleCapture = async (blob: Blob) => {
-    if (!tour) return;
-    
-    const totalStops = tour.stops.length;
-    if (myProgress >= totalStops) return;
+    if (!tour || !room) return;
 
-    const currentStop = tour.stops[myProgress];
+    const totalStops = tour.stops.length;
+    const me = room.players.find((player) => player.player_id === playerId);
+    if (!me || myProgress >= totalStops) return;
+
+    const gameMode = room.game_mode;
+    const expectedId =
+      gameMode === "free" ? null : me.current_target_item_id ?? me.stop_order[myProgress] ?? null;
+
     const url = URL.createObjectURL(blob);
     
     setCapturedUrl(url);
@@ -229,25 +249,29 @@ export default function TourMatchPlayPage() {
       setScanProgress(100);
 
       const best = response.results[0];
-      const expectedId = currentStop.itemId;
-      const matched =
-        best &&
-        String(best.item_id) === String(expectedId) &&
-        (response.found || best.similarity >= TOUR_MATCH_MIN);
+      const matchedId = best ? Number(best.item_id) : null;
+      const similarityOk =
+        best && (response.found || best.similarity >= TOUR_MATCH_MIN);
 
-      if (matched) {
+      let accepted = false;
+      if (matchedId && similarityOk) {
+        if (gameMode === "free") {
+          accepted =
+            room.stop_item_ids.includes(matchedId) && !myFoundIds.includes(matchedId);
+          if (room.stop_item_ids.includes(matchedId) && myFoundIds.includes(matchedId)) {
+            setErrorMsg(t.tour.matchAlreadyFound);
+          }
+        } else if (expectedId !== null) {
+          accepted = matchedId === expectedId;
+        }
+      }
+
+      if (accepted && matchedId !== null) {
         setScanPhase("found");
-        
-        // Advance progress locally
-        const nextProgress = myProgress + 1;
-        setMyProgress(nextProgress);
-        
-        // Sync progress via WS
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({
-            type: "update_progress",
-            progress: nextProgress,
-            total_stops: totalStops
+            type: "report_find",
+            item_id: matchedId,
           }));
         }
 
@@ -261,32 +285,36 @@ export default function TourMatchPlayPage() {
         return;
       }
 
+      const currentStop =
+        expectedId !== null
+          ? tour.stops.find((stop) => stop.itemId === expectedId) ?? null
+          : null;
+
       const candidates = response.results || [];
-      const expectedResult = candidates.find((r: any) => String(r.item_id) === String(expectedId));
-      const similarityScore = expectedResult ? expectedResult.similarity : 0;
+      const expectedResult =
+        expectedId !== null
+          ? candidates.find((result) => Number(result.item_id) === expectedId)
+          : null;
+      const similarityScore = expectedResult ? expectedResult.similarity : best?.similarity ?? 0;
       const matchPercent = Math.round(similarityScore * 100);
 
-      const isBestExpected = best && String(best.item_id) === String(expectedId);
-
-      if (best && String(best.item_id) !== String(expectedId)) {
+      if (gameMode === "free" && matchedId && myFoundIds.includes(matchedId)) {
+        setErrorMsg(t.tour.matchAlreadyFound);
+      } else if (best && expectedId !== null && Number(best.item_id) !== expectedId) {
         if (locale === "vi") {
-          setErrorMsg(`Chưa đúng hiện vật! Độ khớp với "${currentStop.name}" là ${matchPercent}% (yêu cầu >= 55%).`);
+          setErrorMsg(
+            `Chưa đúng hiện vật! Độ khớp với "${currentStop?.name ?? ""}" là ${matchPercent}% (yêu cầu >= 55%).`
+          );
         } else {
-          setErrorMsg(`Wrong item! Match with "${currentStop.name}" is only ${matchPercent}% (requires >= 55%).`);
+          setErrorMsg(
+            `Wrong item! Match with "${currentStop?.name ?? ""}" is only ${matchPercent}% (requires >= 55%).`
+          );
         }
       } else {
-        if (isBestExpected) {
-          if (locale === "vi") {
-            setErrorMsg(`Đúng hiện vật nhưng ảnh chưa rõ nét. Độ khớp đạt ${matchPercent}% (yêu cầu >= 55%). Hãy căn chỉnh lại góc chụp!`);
-          } else {
-            setErrorMsg(`Correct item but unclear image. Match similarity is ${matchPercent}% (requires >= 55%). Please adjust your angle and try again!`);
-          }
+        if (locale === "vi") {
+          setErrorMsg(`Không nhận diện được hiện vật (Độ khớp: ${matchPercent}%, yêu cầu >= 55%).`);
         } else {
-          if (locale === "vi") {
-            setErrorMsg(`Không nhận diện được hiện vật (Độ khớp: ${matchPercent}%, yêu cầu >= 55%).`);
-          } else {
-            setErrorMsg(`Could not identify target object (Match: ${matchPercent}%, requires >= 55%).`);
-          }
+          setErrorMsg(`Could not identify target object (Match: ${matchPercent}%, requires >= 55%).`);
         }
       }
 
@@ -307,10 +335,15 @@ export default function TourMatchPlayPage() {
     }
   };
 
-  const handleExitMatch = () => {
+  const handleSoftExit = () => {
+    router.push(lobbyPath);
+  };
+
+  const handleLeaveMatch = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "leave" }));
     }
+    clearMatchMembership();
     router.push(lobbyPath);
   };
 
@@ -344,7 +377,15 @@ export default function TourMatchPlayPage() {
 
   const totalStops = tour.stops.length;
   const isFinished = myProgress >= totalStops;
-  const currentStop = isFinished ? null : tour.stops[myProgress];
+  const me = room.players.find((player) => player.player_id === playerId);
+  const targetItemId =
+    room.game_mode === "free"
+      ? null
+      : me?.current_target_item_id ?? me?.stop_order[myProgress] ?? null;
+  const currentStop =
+    targetItemId !== null
+      ? tour.stops.find((stop) => stop.itemId === targetItemId) ?? null
+      : null;
 
   // Sort players for leaderboard: progress (descending), then completion time
   const sortedPlayers = [...room.players].sort((a, b) => {
@@ -370,11 +411,13 @@ export default function TourMatchPlayPage() {
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <HomeButton />
-            <BackButton onClick={handleExitMatch} label="Rời giải" variant="dark" />
+            <BackButton onClick={handleSoftExit} label={t.common.back} variant="dark" />
           </div>
           <LanguageSelector compact />
         </div>
-        <p className="artifact-section-label mb-0.5">{room.name} • Đang thi đấu</p>
+        <p className="artifact-section-label mb-0.5">
+          {room.name} • {gameModeLabel(room.game_mode, locale)}
+        </p>
         <h1 className="font-display text-base tracking-normal truncate">{tourTitle(tour, locale)}</h1>
       </header>
 
@@ -424,7 +467,24 @@ export default function TourMatchPlayPage() {
       </div>
 
       {/* Main Play Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+        {room.with_map ? (
+          <div className="w-full max-w-xs">
+            <TourMatchMinimap
+              config={minimapConfig}
+              tourItemIds={room.stop_item_ids}
+              foundItemIds={myFoundIds}
+              currentTargetItemId={targetItemId}
+              showCurrentTarget={room.game_mode !== "free"}
+              title={t.tour.matchMapTitle}
+              mapLabel={t.minimap.notAvailable}
+              legendPending={t.tour.matchMapPending}
+              legendFound={t.tour.matchMapFound}
+              legendCurrent={t.tour.matchMapCurrent}
+            />
+          </div>
+        ) : null}
+
         {isFinished ? (
           <div className="artifact-card p-6 text-center max-w-xs space-y-4">
             <span className="text-4xl animate-bounce block">🏁</span>
@@ -437,37 +497,61 @@ export default function TourMatchPlayPage() {
             </div>
           </div>
         ) : (
-          currentStop && (
-            <div className="w-full flex flex-col items-center gap-4">
-              {/* Scan target instructions */}
+          <div className="w-full flex flex-col items-center gap-4">
               <div className="w-full text-center space-y-2">
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-primary">Mục tiêu hiện vật tiếp theo</p>
-                  <h2 className="text-md font-bold text-foreground leading-tight">{currentStop.name}</h2>
+                  <p className="text-[10px] uppercase tracking-widest text-primary">
+                    {room.game_mode === "free"
+                      ? t.tour.matchFreeTarget
+                      : t.tour.matchNextTarget}
+                  </p>
+                  {currentStop ? (
+                    <h2 className="text-md font-bold text-foreground leading-tight">{currentStop.name}</h2>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowHintModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border bg-secondary/80 hover:bg-secondary active:scale-95 transition-all text-primary"
-                  style={{ borderColor: "rgba(201,168,76,0.3)" }}
-                >
-                  💡 {locale === "vi" ? "Xem gợi ý & hình ảnh" : "View hint & image"}
-                </button>
+                {currentStop ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowHintModal(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border bg-secondary/80 hover:bg-secondary active:scale-95 transition-all text-primary"
+                    style={{ borderColor: "rgba(201,168,76,0.3)" }}
+                  >
+                    💡 {t.tour.matchViewHint}
+                  </button>
+                ) : null}
               </div>
 
               {/* Scan viewport */}
-              <ScanViewfinderFrame
-                scanning={scanPhase === "scanning"}
-                scanProgress={scanProgress}
-                found={scanPhase === "found"}
-              >
-                <CameraCapture
-                  layout="inline"
-                  onCapture={handleCapture}
-                  frozen={frozen}
-                  capturedUrl={capturedUrl}
-                />
-              </ScanViewfinderFrame>
+              <div className="relative w-full max-w-sm">
+                <ScanViewfinderFrame
+                  scanning={scanPhase === "scanning"}
+                  scanProgress={scanProgress}
+                  found={scanPhase === "found"}
+                >
+                  <CameraCapture
+                    layout="inline"
+                    onCapture={handleCapture}
+                    frozen={frozen}
+                    capturedUrl={capturedUrl}
+                  />
+                  {!isFinished && scanPhase === "idle" ? (
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("camera-capture-btn")?.click()}
+                      disabled={scanPhase !== "idle"}
+                      className="absolute bottom-4 left-4 right-4 z-30 rounded-2xl py-3.5 text-xs font-semibold transition-all disabled:opacity-40 active:scale-[0.98]"
+                      style={{
+                        background: "rgba(14, 11, 7, 0.45)",
+                        border: "1px solid rgba(201, 168, 76, 0.35)",
+                        color: "#f0e8d5",
+                        backdropFilter: "blur(6px)",
+                      }}
+                    >
+                      {t.scan.hiddenCapture} ({myProgress + 1}/{totalStops})
+                    </button>
+                  ) : null}
+                </ScanViewfinderFrame>
+              </div>
 
               {/* Error log info */}
               {errorMsg && (
@@ -482,24 +566,7 @@ export default function TourMatchPlayPage() {
                   {errorMsg}
                 </div>
               )}
-
-              {/* Scan Capture button */}
-              <button
-                type="button"
-                onClick={() => document.getElementById("camera-capture-btn")?.click()}
-                disabled={scanPhase !== "idle"}
-                className="artifact-btn-primary w-full max-w-xs disabled:opacity-50 text-xs font-semibold py-3.5"
-              >
-                {scanPhase === "scanning" ? (
-                  <>⟳ {t.scan.scanning}</>
-                ) : scanPhase === "found" ? (
-                  <>✦ Khớp Hiện Vật!</>
-                ) : (
-                  <>📷 Quét Hiện Vật ({myProgress + 1}/{totalStops})</>
-                )}
-              </button>
             </div>
-          )
         )}
       </div>
 
@@ -592,7 +659,7 @@ export default function TourMatchPlayPage() {
 
             {/* Exit Action button */}
             <button
-              onClick={handleExitMatch}
+              onClick={handleLeaveMatch}
               className="artifact-btn-primary w-full py-3.5 text-xs font-bold"
             >
               Quay lại Sảnh chờ
@@ -610,7 +677,7 @@ export default function TourMatchPlayPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h3 className="text-sm font-bold text-primary uppercase tracking-wide flex items-center gap-1.5">
-                💡 {locale === "vi" ? "Gợi ý hiện vật" : "Artifact Hint"}
+                💡 {t.tour.matchArtifactHint}
               </h3>
               <button 
                 onClick={() => setShowHintModal(false)}
@@ -647,7 +714,7 @@ export default function TourMatchPlayPage() {
               {stopHint(currentStop, locale) && (
                 <div className="bg-primary/5 border border-primary/10 rounded-lg p-2.5 space-y-0.5">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-primary">
-                    {locale === "vi" ? "Mẹo tìm kiếm:" : "Search tip:"}
+                    {t.tour.matchSearchTip}
                   </span>
                   <p className="text-[11px] text-foreground leading-relaxed">
                     {stopHint(currentStop, locale)}
@@ -659,7 +726,7 @@ export default function TourMatchPlayPage() {
               {currentStop.description && currentStop.description.trim() !== stopHint(currentStop, locale).trim() && (
                 <div className="space-y-0.5">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                    {locale === "vi" ? "Mô tả hiện vật:" : "Description:"}
+                    {t.tour.matchObjectDescription}
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-relaxed max-h-24 overflow-y-auto pr-1">
                     {currentStop.description}

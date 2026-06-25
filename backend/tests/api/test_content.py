@@ -5,6 +5,7 @@ import pytest
 
 from app.models.content_variant import ItemContentVariant
 from app.models.item import Item
+from app.modules.content.language_support import LANGUAGE_JA, LANGUAGE_ZH
 from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA
 from app.modules.content import router as content_router
 from app.modules.content.service import (
@@ -96,6 +97,115 @@ def test_adapted_item_content_is_preserved_before_persistence(
     assert result.content == long_text
     stored = db_session.query(ItemContentVariant).filter_by(item_id=item.id).one()
     assert stored.text_content == long_text
+
+
+def test_get_or_generate_regenerates_foreign_language_instead_of_adapting_vietnamese(
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    db_session.add(
+        ItemContentVariant(
+            item_id=item.id,
+            persona=DEFAULT_PERSONA,
+            language=DEFAULT_LANGUAGE,
+            text_content="Nội dung tiếng Việt gốc",
+            audio_data=None,
+            audio_mime=None,
+            content_hash=compute_content_hash(item.description),
+            status="ready",
+            source="generated",
+        )
+    )
+    db_session.commit()
+
+    generate_and_persist = Mock(
+        return_value=ItemContentResult(
+            item_id=item.id,
+            persona=DEFAULT_PERSONA,
+            language=LANGUAGE_JA,
+            content="日本語の説明",
+            has_audio=False,
+            audio_url=None,
+            audio_status="missing",
+            stored=False,
+            source="generated",
+        )
+    )
+    generate_adapted = Mock()
+    monkeypatch.setattr(
+        ItemContentService,
+        "generate_and_persist",
+        generate_and_persist,
+    )
+    monkeypatch.setattr(
+        ItemContentService,
+        "generate_adapted_variant",
+        generate_adapted,
+    )
+
+    result = ItemContentService().get_or_generate(
+        db_session,
+        item,
+        DEFAULT_PERSONA,
+        LANGUAGE_JA,
+    )
+
+    assert result.content == "日本語の説明"
+    generate_and_persist.assert_called_once()
+    generate_adapted.assert_not_called()
+
+
+def test_get_or_generate_ignores_stale_foreign_variant_copied_from_vietnamese(
+    db_session,
+    monkeypatch,
+):
+    item = _add_item(db_session)
+    vietnamese_text = "Nội dung tiếng Việt gốc"
+    for language in (DEFAULT_LANGUAGE, LANGUAGE_ZH):
+        db_session.add(
+            ItemContentVariant(
+                item_id=item.id,
+                persona=DEFAULT_PERSONA,
+                language=language,
+                text_content=vietnamese_text,
+                audio_data=None,
+                audio_mime=None,
+                content_hash=compute_content_hash(item.description),
+                status="ready",
+                source="generated",
+            )
+        )
+    db_session.commit()
+
+    generate_and_persist = Mock(
+        return_value=ItemContentResult(
+            item_id=item.id,
+            persona=DEFAULT_PERSONA,
+            language=LANGUAGE_ZH,
+            content="中文说明",
+            has_audio=False,
+            audio_url=None,
+            audio_status="missing",
+            stored=False,
+            source="generated",
+        )
+    )
+    monkeypatch.setattr(
+        ItemContentService,
+        "generate_and_persist",
+        generate_and_persist,
+    )
+
+    result = ItemContentService().get_or_generate(
+        db_session,
+        item,
+        DEFAULT_PERSONA,
+        LANGUAGE_ZH,
+    )
+
+    assert result.content == "中文说明"
+    generate_and_persist.assert_called_once()
 
 
 def test_adapted_variant_skips_llm_when_base_not_found(db_session, monkeypatch):

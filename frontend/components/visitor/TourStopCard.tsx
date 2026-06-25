@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { stopHint, TourStop } from "@/lib/tours";
+import type { VisitorLocale } from "@/lib/i18n";
 
 interface TourStopCardProps {
   stop: TourStop;
@@ -14,7 +15,7 @@ interface TourStopCardProps {
   hideDetailsLabel: string;
   noDescriptionLabel: string;
   noImageLabel: string;
-  locale: "vi" | "en";
+  locale: VisitorLocale;
 }
 
 export default function TourStopCard({

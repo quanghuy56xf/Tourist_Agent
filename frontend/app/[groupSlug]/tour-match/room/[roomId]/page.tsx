@@ -8,6 +8,13 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { groupPath } from "@/lib/groupSlug";
 import { loadTourById, ResolvedTour, tourTitle } from "@/lib/tours";
+import {
+  clearMatchMembership,
+  gameModeLabel,
+  normalizeMatchRoom,
+  writeMatchMembership,
+  type MatchRoomState,
+} from "@/lib/tourMatch";
 
 interface PlayerInfo {
   player_id: string;
@@ -21,17 +28,7 @@ interface PlayerInfo {
   status: string; // active or pending
 }
 
-interface RoomInfo {
-  room_id: string;
-  name: string;
-  description: string;
-  tour_id: string;
-  status: string;
-  winner_id: string | null;
-  winner_nickname: string | null;
-  players: PlayerInfo[];
-  is_locked: boolean;
-}
+interface RoomInfo extends MatchRoomState {}
 
 export default function TourMatchWaitingRoomPage() {
   const params = useParams();
@@ -39,7 +36,7 @@ export default function TourMatchWaitingRoomPage() {
   const groupSlug = useGroupSlug();
   const lobbyPath = useGroupPath("/tour-match");
   const roomId = String(params.roomId);
-  const { locale } = useVisitorLocale();
+  const { locale, t } = useVisitorLocale();
 
   const [playerId, setPlayerId] = useState<string>("");
   const [nickname, setNickname] = useState<string>("");
@@ -48,8 +45,11 @@ export default function TourMatchWaitingRoomPage() {
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("connecting");
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatBubbles, setChatBubbles] = useState<Record<string, { text: string; expiresAt: number }>>({});
 
   const wsRef = useRef<WebSocket | null>(null);
+  const chatTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // 1. Initial Authentication & Identity Check
   useEffect(() => {
@@ -79,6 +79,39 @@ export default function TourMatchWaitingRoomPage() {
         .catch((err) => console.error("Failed to load tour details:", err));
     }
   }, [room?.tour_id]);
+
+  useEffect(() => {
+    if (room?.status === "playing") {
+      router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+    }
+  }, [room?.status, roomId, groupSlug, router]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(chatTimersRef.current).forEach(clearTimeout);
+      chatTimersRef.current = {};
+    };
+  }, []);
+
+  const showChatBubble = (targetPlayerId: string, text: string) => {
+    const expiresAt = Date.now() + 6000;
+    setChatBubbles((prev) => ({
+      ...prev,
+      [targetPlayerId]: { text, expiresAt },
+    }));
+
+    if (chatTimersRef.current[targetPlayerId]) {
+      clearTimeout(chatTimersRef.current[targetPlayerId]);
+    }
+    chatTimersRef.current[targetPlayerId] = setTimeout(() => {
+      setChatBubbles((prev) => {
+        const next = { ...prev };
+        delete next[targetPlayerId];
+        return next;
+      });
+      delete chatTimersRef.current[targetPlayerId];
+    }, 6000);
+  };
 
   // 3. Establish WebSocket connection
   useEffect(() => {
@@ -111,6 +144,7 @@ export default function TourMatchWaitingRoomPage() {
     ws.onopen = () => {
       setWsStatus("connected");
       setErrorMsg(null);
+      writeMatchMembership({ groupSlug, roomId, playerId, nickname });
     };
 
     ws.onmessage = (event) => {
@@ -119,10 +153,17 @@ export default function TourMatchWaitingRoomPage() {
         console.log("Received WS message:", message);
 
         if (message.type === "room_state") {
-          setRoom(message.room);
+          const nextRoom = normalizeMatchRoom(message.room);
+          setRoom(nextRoom);
+          if (nextRoom.status === "playing") {
+            router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+          }
         } else if (message.type === "match_started") {
-          // Redirect everyone to the play page
-          router.push(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+          router.replace(groupPath(groupSlug, `/tour-match/room/${roomId}/play`));
+        } else if (message.type === "chat_bubble") {
+          if (message.player_id && message.text) {
+            showChatBubble(String(message.player_id), String(message.text));
+          }
         } else if (message.type === "error") {
           setErrorMsg(message.message);
         }
@@ -172,6 +213,11 @@ export default function TourMatchWaitingRoomPage() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "leave" }));
     }
+    clearMatchMembership();
+    router.push(lobbyPath);
+  };
+
+  const handleSoftExit = () => {
     router.push(lobbyPath);
   };
 
@@ -194,8 +240,19 @@ export default function TourMatchWaitingRoomPage() {
   };
 
   const handleKickPlayer = (targetId: string) => {
+    if (room?.status !== "waiting") return;
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "kick_player", target_id: targetId }));
+    }
+  };
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || room?.status !== "waiting") return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "chat", text }));
+      setChatInput("");
     }
   };
 
@@ -244,6 +301,7 @@ export default function TourMatchWaitingRoomPage() {
 
   const myState = room.players.find((p) => p.player_id === playerId);
   const isHost = myState?.is_host || false;
+  const isWaiting = room.status === "waiting";
 
   // Split active players from pending requests
   const activePlayers = room.players.filter((p) => p.status === "active");
@@ -282,12 +340,16 @@ export default function TourMatchWaitingRoomPage() {
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
-          <BackButton onClick={handleLeaveRoom} label="Rời phòng" />
+          <BackButton onClick={handleSoftExit} label="Tạm rời" />
         </div>
         <p className="artifact-section-label mb-1">
           Phòng chờ {wsStatus === "connected" ? "• Trực tuyến" : "• Đang kết nối..."}
         </p>
         <h1 className="font-display text-xl">{room.name}</h1>
+        <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+          {gameModeLabel(room.game_mode, locale)}
+          {room.with_map ? " · Bản đồ bật" : ""}
+        </p>
         {room.description && (
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
             {room.description}
@@ -303,7 +365,7 @@ export default function TourMatchWaitingRoomPage() {
               Mã phòng đấu:
             </span>
             <div className="flex items-center gap-2">
-              {isHost && (
+              {isHost && isWaiting && (
                 <button
                   onClick={handleToggleLock}
                   className="text-[10px] px-2 py-1 rounded-lg font-bold flex items-center gap-1 active:scale-95 transition-all outline-none"
@@ -372,7 +434,7 @@ export default function TourMatchWaitingRoomPage() {
         )}
 
         {/* Pending Requests Lobby for Host */}
-        {isHost && pendingPlayers.length > 0 && (
+        {isHost && isWaiting && pendingPlayers.length > 0 && (
           <div className="space-y-2">
             <h2 className="text-xs uppercase tracking-wider font-semibold text-yellow-400">
               Yêu cầu tham gia phòng ({pendingPlayers.length})
@@ -416,9 +478,35 @@ export default function TourMatchWaitingRoomPage() {
           <div className="space-y-2">
             {activePlayers.map((player) => {
               const isMe = player.player_id === playerId;
+              const bubble = chatBubbles[player.player_id];
               return (
+                <div key={player.player_id} className="relative">
+                  {bubble ? (
+                    <div
+                      className="absolute left-10 right-2 -top-2 z-20 -translate-y-full"
+                      aria-live="polite"
+                    >
+                      <div
+                        className="relative rounded-xl px-3 py-2 text-[11px] leading-snug shadow-lg"
+                        style={{
+                          background: "rgba(14, 11, 7, 0.92)",
+                          border: "1px solid rgba(201, 168, 76, 0.35)",
+                          color: "var(--foreground)",
+                        }}
+                      >
+                        {bubble.text}
+                        <span
+                          className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45"
+                          style={{
+                            background: "rgba(14, 11, 7, 0.92)",
+                            borderRight: "1px solid rgba(201, 168, 76, 0.35)",
+                            borderBottom: "1px solid rgba(201, 168, 76, 0.35)",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 <div
-                  key={player.player_id}
                   className="artifact-card p-3.5 flex items-center justify-between"
                   style={{
                     borderColor: isMe ? "var(--primary)" : "var(--border)",
@@ -440,8 +528,8 @@ export default function TourMatchWaitingRoomPage() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Host kick control */}
-                    {isHost && !player.is_host && (
+                    {/* Host kick control — chỉ khi phòng chờ */}
+                    {isHost && isWaiting && !player.is_host && (
                       <button
                         onClick={() => handleKickPlayer(player.player_id)}
                         className="text-[10px] px-2 py-1 rounded bg-red-950/40 border border-red-500/35 text-red-400 font-bold active:scale-95 transition-all hover:bg-red-900/40 mr-1.5"
@@ -465,42 +553,74 @@ export default function TourMatchWaitingRoomPage() {
                     )}
                   </div>
                 </div>
+                </div>
               );
             })}
           </div>
         </div>
 
+        {isWaiting ? (
+          <form onSubmit={handleSendChat} className="artifact-card p-3 flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              maxLength={200}
+              placeholder={t.tour.matchChatPlaceholder}
+              className="flex-1 rounded-xl px-3 py-2.5 text-xs outline-none"
+              style={{
+                background: "var(--secondary)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim()}
+              className="artifact-btn-secondary px-4 text-xs font-semibold shrink-0 disabled:opacity-40"
+            >
+              Gửi
+            </button>
+          </form>
+        ) : null}
+
         {/* Actions Button */}
         <div className="pt-4 space-y-3">
-          {isHost ? (
-            <div className="space-y-2">
+          {isWaiting ? (
+            isHost ? (
+              <div className="space-y-2">
+                <button
+                  onClick={handleStartMatch}
+                  disabled={!allReady}
+                  className="artifact-btn-primary w-full py-4 text-sm font-bold transition-all disabled:opacity-50"
+                >
+                  🚀 Bắt đầu cuộc đua!
+                </button>
+                {!allReady && (
+                  <p className="text-center text-[10px]" style={{ color: "var(--muted-foreground)" }}>
+                    {otherPlayers.length === 0
+                      ? "Cần ít nhất 2 người để bắt đầu tranh tài"
+                      : "Đang đợi tất cả người chơi khác Sẵn sàng..."}
+                  </p>
+                )}
+              </div>
+            ) : (
               <button
-                onClick={handleStartMatch}
-                disabled={!allReady}
-                className="artifact-btn-primary w-full py-4 text-sm font-bold transition-all disabled:opacity-50"
+                onClick={handleToggleReady}
+                className="w-full rounded-2xl py-4 text-sm font-bold transition-all"
+                style={{
+                  background: myState?.is_ready ? "var(--secondary)" : "var(--primary)",
+                  color: myState?.is_ready ? "var(--foreground)" : "var(--primary-foreground)",
+                  border: myState?.is_ready ? "1px solid var(--border)" : "none",
+                }}
               >
-                🚀 Bắt đầu cuộc đua!
+                {myState?.is_ready ? "⏳ Hủy Sẵn sàng" : "✓ Sẵn sàng!"}
               </button>
-              {!allReady && (
-                <p className="text-center text-[10px]" style={{ color: "var(--muted-foreground)" }}>
-                  {otherPlayers.length === 0
-                    ? "Cần ít nhất 2 người để bắt đầu tranh tài"
-                    : "Đang đợi tất cả người chơi khác Sẵn sàng..."}
-                </p>
-              )}
-            </div>
+            )
           ) : (
-            <button
-              onClick={handleToggleReady}
-              className="w-full rounded-2xl py-4 text-sm font-bold transition-all"
-              style={{
-                background: myState?.is_ready ? "var(--secondary)" : "var(--primary)",
-                color: myState?.is_ready ? "var(--foreground)" : "var(--primary-foreground)",
-                border: myState?.is_ready ? "1px solid var(--border)" : "none",
-              }}
-            >
-              {myState?.is_ready ? "⏳ Hủy Sẵn sàng" : "✓ Sẵn sàng!"}
-            </button>
+            <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+              Cuộc đua đã bắt đầu — đang chuyển vào trận...
+            </p>
           )}
 
           <button

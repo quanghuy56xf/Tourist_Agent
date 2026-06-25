@@ -940,10 +940,44 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
 
 
 
-export function toTtsLanguageCode(language: string): "vi" | "en" {
+export function toTtsLanguageCode(
+  language: string
+): "vi" | "en" | "fr" | "ja" | "ko" | "zh" {
   const normalized = language.trim().toLowerCase();
-  if (normalized === "tiếng việt" || normalized === "tieng viet" || normalized.startsWith("vi")) {
+  if (
+    normalized === "tiếng việt" ||
+    normalized === "tieng viet" ||
+    normalized.startsWith("vi")
+  ) {
     return "vi";
+  }
+  if (
+    normalized === "tiếng pháp" ||
+    normalized === "tieng phap" ||
+    normalized.startsWith("fr")
+  ) {
+    return "fr";
+  }
+  if (
+    normalized === "tiếng nhật" ||
+    normalized === "tieng nhat" ||
+    normalized.startsWith("ja")
+  ) {
+    return "ja";
+  }
+  if (
+    normalized === "tiếng hàn" ||
+    normalized === "tieng han" ||
+    normalized.startsWith("ko")
+  ) {
+    return "ko";
+  }
+  if (
+    normalized === "tiếng trung" ||
+    normalized === "tieng trung" ||
+    normalized.startsWith("zh")
+  ) {
+    return "zh";
   }
   return "en";
 }

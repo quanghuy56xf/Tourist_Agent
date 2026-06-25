@@ -187,6 +187,43 @@ def test_generate_adapted_variant_propagates_not_found_without_llm(db_session, m
     assert result.persona == "Gen Z Explorer"
 
 
+def test_evaluate_item_content_status_accepts_legacy_audio_mime(db_session):
+    group = Group(name="Legacy audio")
+    db_session.add(group)
+    db_session.flush()
+    item = Item(name="Chuông", description="Mô tả đủ dài về chuông", group_id=group.id)
+    db_session.add(item)
+    db_session.flush()
+
+    for persona in ("Mặc định", "Gen Z Explorer", "Family Visitor"):
+        for language in ("Tiếng Việt", "Tiếng Anh"):
+            db_session.add(
+                ItemContentVariant(
+                    item_id=item.id,
+                    persona=persona,
+                    language=language,
+                    text_content="Nội dung thuyết minh đủ dài.",
+                    audio_data=b"audio",
+                    audio_mime="audio/mpeg",
+                    content_hash=compute_content_hash(
+                        item.description,
+                        group_knowledge_version=group.knowledge_version,
+                        source="generated",
+                    ),
+                    status="ready",
+                    source="generated",
+                )
+            )
+    db_session.commit()
+
+    status = evaluate_item_content_status(
+        item,
+        db_session.query(ItemContentVariant).filter_by(item_id=item.id).all(),
+        group_knowledge_version=group.knowledge_version,
+    )
+    assert status["state"] == "synced"
+
+
 def test_group_sync_active_flag():
     mark_group_sync_started(99)
     mark_group_sync_started(99)

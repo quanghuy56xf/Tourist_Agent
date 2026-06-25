@@ -12,6 +12,7 @@ import {
   DEFAULT_LOCALE,
   readStoredLocale,
   translations,
+  type BackendLanguage,
   VisitorLocale,
   VisitorTranslations,
   writeStoredLocale,
@@ -19,7 +20,7 @@ import {
 
 type VisitorLocaleContextValue = {
   locale: VisitorLocale;
-  language: "Tiếng Việt" | "Tiếng Anh";
+  language: BackendLanguage;
   t: VisitorTranslations;
   ready: boolean;
   setLocale: (locale: VisitorLocale) => void;

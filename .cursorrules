@@ -1,0 +1,7 @@
+# Đã chuyển sang Cursor Rules
+
+Quy tắc dự án HERA nằm tại:
+
+`.cursor/rules/hera.mdc` (`alwaysApply: true`)
+
+File này giữ lại để tham chiếu; Cursor ưu tiên đọc từ `.cursor/rules/`.

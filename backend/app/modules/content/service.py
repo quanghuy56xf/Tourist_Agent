@@ -330,9 +330,24 @@ class ItemContentService:
         language = normalize_language(language)
         variant = self.get_valid_variant(db, item, persona, language)
         if variant is not None:
-            return self._variant_to_result(item.id, variant, stored=True)
+            if language != DEFAULT_LANGUAGE:
+                base_variant = self.get_valid_variant(
+                    db,
+                    item,
+                    DEFAULT_PERSONA,
+                    DEFAULT_LANGUAGE,
+                )
+                if (
+                    base_variant is not None
+                    and variant.text_content.strip() == base_variant.text_content.strip()
+                ):
+                    variant = None
+                else:
+                    return self._variant_to_result(item.id, variant, stored=True)
+            else:
+                return self._variant_to_result(item.id, variant, stored=True)
 
-        if persona != DEFAULT_PERSONA or language != DEFAULT_LANGUAGE:
+        if persona != DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
             base_variant = self.get_valid_variant(
                 db,
                 item,

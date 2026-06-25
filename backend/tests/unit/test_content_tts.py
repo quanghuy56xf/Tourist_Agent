@@ -27,7 +27,8 @@ def test_short_en_code_maps_to_jenny():
     assert language_to_edge_voice("en") == "en-US-JennyNeural"
 
 
-def test_stale_audio_mime_is_not_current():
-    assert not is_current_audio_mime("audio/mpeg")
+def test_audio_mime_validation():
+    assert is_current_audio_mime("audio/mpeg")
     assert is_current_audio_mime(build_audio_mime())
+    assert not is_current_audio_mime("audio/wav")
     assert TTS_ENGINE_ID in build_audio_mime()

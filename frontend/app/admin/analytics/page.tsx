@@ -14,6 +14,11 @@ import {
   YAxis,
 } from "recharts";
 import {
+  AdminDataTable,
+  formatShortDateTime,
+  TruncatedText,
+} from "@/components/admin/AdminDataTable";
+import {
   AdminAlert,
   AdminButton,
   AdminCard,
@@ -332,40 +337,53 @@ export default function AdminAnalyticsPage() {
             title="Thời gian tương tác theo IP & khu di tích"
             description="Tính từ sự kiện đầu tiên đến sự kiện cuối trong cùng phiên trình duyệt."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="py-2 pr-3 font-medium">Khu di tích</th>
-                    <th className="py-2 pr-3 font-medium">IP</th>
-                    <th className="py-2 pr-3 font-medium">Phiên</th>
-                    <th className="py-2 pr-3 font-medium">Thời lượng</th>
-                    <th className="py-2 pr-3 font-medium">Sự kiện</th>
-                    <th className="py-2 pr-3 font-medium">Lần cuối</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.session_durations.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="admin-muted py-6 text-center">
-                        Chưa có dữ liệu phiên.
-                      </td>
+            <AdminDataTable
+              rows={summary.session_durations}
+              emptyMessage="Chưa có dữ liệu phiên."
+              minWidth="680px"
+            >
+              {(pageRows) => (
+                <>
+                  <thead className="sticky top-0 z-10 bg-[#1a1510]">
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="max-w-[9rem] py-2 pr-3 font-medium">Khu di tích</th>
+                      <th className="max-w-[7rem] py-2 pr-3 font-medium">IP</th>
+                      <th className="max-w-[6rem] py-2 pr-3 font-medium">Phiên</th>
+                      <th className="py-2 pr-3 font-medium">Thời lượng</th>
+                      <th className="py-2 pr-3 font-medium">Sự kiện</th>
+                      <th className="max-w-[8.5rem] py-2 pr-3 font-medium">Lần cuối</th>
                     </tr>
-                  ) : (
-                    summary.session_durations.map((row) => (
-                      <tr key={`${row.session_id}-${row.group_id}-${row.client_ip}`} className="border-b border-white/5">
-                        <td className="py-2 pr-3">{row.group_name}</td>
-                        <td className="font-mono text-xs">{row.client_ip}</td>
-                        <td className="font-mono text-xs">{row.session_id.slice(0, 8)}…</td>
-                        <td>{formatDuration(row.duration_seconds)}</td>
-                        <td>{row.event_count}</td>
-                        <td>{new Date(row.last_seen).toLocaleString("vi-VN")}</td>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((row) => (
+                      <tr
+                        key={`${row.session_id}-${row.group_id}-${row.client_ip}`}
+                        className="border-b border-white/5"
+                      >
+                        <td className="max-w-[9rem] py-2 pr-3">
+                          <TruncatedText text={row.group_name} maxLen={22} />
+                        </td>
+                        <td className="max-w-[7rem] py-2 pr-3">
+                          <TruncatedText text={row.client_ip} maxLen={15} mono />
+                        </td>
+                        <td className="max-w-[6rem] py-2 pr-3">
+                          <TruncatedText text={row.session_id} maxLen={10} mono />
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-3">
+                          {formatDuration(row.duration_seconds)}
+                        </td>
+                        <td className="py-2 pr-3">{row.event_count}</td>
+                        <td className="max-w-[8.5rem] whitespace-nowrap py-2 pr-3">
+                          <span title={new Date(row.last_seen).toLocaleString("vi-VN")}>
+                            {formatShortDateTime(row.last_seen)}
+                          </span>
+                        </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </>
+              )}
+            </AdminDataTable>
           </AdminCard>
 
           <div className="grid gap-6 xl:grid-cols-2">
@@ -432,42 +450,50 @@ function ContentIssueTable({
   rows: ContentIssueRow[];
   emptyLabel: string;
 }) {
-  if (rows.length === 0) {
-    return <p className="admin-muted text-sm">{emptyLabel}</p>;
-  }
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-white/10 text-left">
-            <th className="py-2 pr-3 font-medium">Loại</th>
-            <th className="py-2 pr-3 font-medium">Thời gian</th>
-            <th className="py-2 pr-3 font-medium">Khu / hiện vật</th>
-            <th className="py-2 pr-3 font-medium">Persona</th>
-            <th className="py-2 pr-3 font-medium">Ngôn ngữ</th>
-            <th className="py-2 pr-3 font-medium">Chi tiết</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
-              <td className="py-2 pr-3">{contentEventLabel(row.event_type)}</td>
-              <td className="py-2 pr-3">
-                {new Date(row.created_at).toLocaleString("vi-VN")}
-              </td>
-              <td className="py-2 pr-3">
-                {row.group_name ?? "—"}
-                {row.item_name ? ` · ${row.item_name}` : ""}
-              </td>
-              <td className="py-2 pr-3">{row.persona ?? "—"}</td>
-              <td className="py-2 pr-3">{row.language ?? "—"}</td>
-              <td className="max-w-[220px] truncate py-2 pr-3">{row.error_detail ?? "—"}</td>
+    <AdminDataTable rows={rows} emptyMessage={emptyLabel} minWidth="720px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="py-2 pr-3 font-medium">Loại</th>
+              <th className="max-w-[8.5rem] py-2 pr-3 font-medium">Thời gian</th>
+              <th className="max-w-[11rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+              <th className="max-w-[7rem] py-2 pr-3 font-medium">Persona</th>
+              <th className="py-2 pr-3 font-medium">Ngôn ngữ</th>
+              <th className="max-w-[12rem] py-2 pr-3 font-medium">Chi tiết</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {pageRows.map((row, index) => (
+              <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
+                <td className="py-2 pr-3">{contentEventLabel(row.event_type)}</td>
+                <td className="max-w-[8.5rem] py-2 pr-3">
+                  <TruncatedText text={formatShortDateTime(row.created_at)} maxLen={18} />
+                </td>
+                <td className="max-w-[11rem] py-2 pr-3">
+                  <TruncatedText
+                    text={
+                      row.item_name
+                        ? `${row.group_name ?? "—"} · ${row.item_name}`
+                        : (row.group_name ?? "—")
+                    }
+                    maxLen={28}
+                  />
+                </td>
+                <td className="max-w-[7rem] py-2 pr-3">
+                  <TruncatedText text={row.persona} maxLen={16} />
+                </td>
+                <td className="py-2 pr-3">{row.language ?? "—"}</td>
+                <td className="max-w-[12rem] py-2 pr-3">
+                  <TruncatedText text={row.error_detail} maxLen={40} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
   );
 }
 
@@ -478,42 +504,54 @@ function IssueTable({
   rows: AnalyticsSummary["slow_events"];
   emptyLabel: string;
 }) {
-  if (rows.length === 0) {
-    return <p className="admin-muted text-sm">{emptyLabel}</p>;
-  }
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-white/10 text-left">
-            <th className="py-2 pr-3 font-medium">Loại</th>
-            <th className="py-2 pr-3 font-medium">Thời gian</th>
-            <th className="py-2 pr-3 font-medium">Khu / hiện vật</th>
-            <th className="py-2 pr-3 font-medium">IP</th>
-            <th className="py-2 pr-3 font-medium">Chi tiết</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
-              <td className="py-2 pr-3">{row.event_type}</td>
-              <td>
-                {row.duration_ms != null ? formatMs(row.duration_ms) : "—"}
-                <div className="admin-muted text-xs">
-                  {new Date(row.created_at).toLocaleString("vi-VN")}
-                </div>
-              </td>
-              <td>
-                {row.group_name ?? "—"}
-                {row.item_name ? ` · ${row.item_name}` : ""}
-              </td>
-              <td className="font-mono text-xs">{row.client_ip ?? "—"}</td>
-              <td className="max-w-[180px] truncate">{row.error_detail ?? "—"}</td>
+    <AdminDataTable rows={rows} emptyMessage={emptyLabel} minWidth="560px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="py-2 pr-3 font-medium">Loại</th>
+              <th className="max-w-[8rem] py-2 pr-3 font-medium">Thời gian</th>
+              <th className="max-w-[11rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+              <th className="max-w-[7rem] py-2 pr-3 font-medium">IP</th>
+              <th className="max-w-[12rem] py-2 pr-3 font-medium">Chi tiết</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {pageRows.map((row, index) => (
+              <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
+                <td className="py-2 pr-3">{row.event_type}</td>
+                <td className="max-w-[8rem] py-2 pr-3">
+                  <div className="whitespace-nowrap">
+                    {row.duration_ms != null ? formatMs(row.duration_ms) : "—"}
+                  </div>
+                  <TruncatedText
+                    text={formatShortDateTime(row.created_at)}
+                    maxLen={18}
+                    className="admin-muted text-xs"
+                  />
+                </td>
+                <td className="max-w-[11rem] py-2 pr-3">
+                  <TruncatedText
+                    text={
+                      row.item_name
+                        ? `${row.group_name ?? "—"} · ${row.item_name}`
+                        : (row.group_name ?? "—")
+                    }
+                    maxLen={28}
+                  />
+                </td>
+                <td className="max-w-[7rem] py-2 pr-3">
+                  <TruncatedText text={row.client_ip} maxLen={15} mono />
+                </td>
+                <td className="max-w-[12rem] py-2 pr-3">
+                  <TruncatedText text={row.error_detail} maxLen={36} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
   );
 }
