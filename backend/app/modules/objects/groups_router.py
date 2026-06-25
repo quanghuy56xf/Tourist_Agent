@@ -267,46 +267,25 @@ def list_group_items(
 
     item_ids = [item.id for item in items]
     variants = (
-        db.query(
-            ItemContentVariant.item_id,
-            ItemContentVariant.persona,
-            ItemContentVariant.language,
-            ItemContentVariant.text_content,
-            ItemContentVariant.status,
-            ItemContentVariant.source,
-            ItemContentVariant.content_hash,
-            ItemContentVariant.audio_data.isnot(None).label("has_audio"),
-        )
+        db.query(ItemContentVariant)
         .filter(ItemContentVariant.item_id.in_(item_ids))
         .all()
     )
+    
+    variants_by_item: dict[int, list[ItemContentVariant]] = {}
+    for variant in variants:
+        variants_by_item.setdefault(variant.item_id, []).append(variant)
 
-    variant_map = {
-        (v.item_id, v.persona, v.language): v
-        for v in variants
-    }
-    required_variants = all_variants()
+    from app.modules.content.sync_status import evaluate_item_content_status
 
     response_items = []
     for item in items:
-        state = "synced"
-        for persona, language in required_variants:
-            variant = variant_map.get((item.id, persona, language))
-            if variant is None:
-                state = "missing"
-                break
-            if not variant.has_audio or not variant.text_content.strip() or variant.status != "ready":
-                state = "missing"
-                break
-            expected_hash = compute_content_hash(
-                item.description,
-                group_knowledge_version=group.knowledge_version,
-                source=variant.source,
-            )
-            if variant.content_hash != expected_hash:
-                state = "outdated"
-        
-        response_items.append(item_to_response(item, sync_state=state))
+        status_dict = evaluate_item_content_status(
+            item,
+            variants_by_item.get(item.id, []),
+            group_knowledge_version=group.knowledge_version,
+        )
+        response_items.append(item_to_response(item, sync_state=status_dict["state"]))
 
     return GroupItemsResponse(
         group_id=group.id,
@@ -329,56 +308,16 @@ def get_group_sync_status(
     if not items:
         return GroupSyncStatusResponse(total_items=0, synced_items=0, is_fully_synced=True)
 
-    item_ids = [item.id for item in items]
-    variants = (
-        db.query(
-            ItemContentVariant.item_id,
-            ItemContentVariant.persona,
-            ItemContentVariant.language,
-            ItemContentVariant.text_content,
-            ItemContentVariant.status,
-            ItemContentVariant.source,
-            ItemContentVariant.content_hash,
-            ItemContentVariant.audio_data.isnot(None).label("has_audio"),
-        )
-        .filter(ItemContentVariant.item_id.in_(item_ids))
-        .all()
-    )
-
-    variant_map = {
-        (variant.item_id, variant.persona, variant.language): variant
-        for variant in variants
-    }
-    required_variants = all_variants()
-    synced_count = 0
-
-    for item in items:
-        item_is_synced = True
-        for persona, language in required_variants:
-            variant = variant_map.get((item.id, persona, language))
-            if variant is None:
-                item_is_synced = False
-                break
-            expected_hash = compute_content_hash(
-                item.description,
-                group_knowledge_version=group.knowledge_version,
-                source=variant.source,
-            )
-            if not (
-                variant.content_hash == expected_hash
-                and variant.status == "ready"
-                and variant.text_content.strip()
-                and variant.has_audio
-            ):
-                item_is_synced = False
-                break
-        if item_is_synced:
-            synced_count += 1
-
+    from app.modules.content.sync_status import evaluate_group_content_status
+    
+    status_dict = evaluate_group_content_status(db, group.id)
+    synced_count = status_dict["summary"]["synced"]
+    total_count = status_dict["summary"]["total"]
+    
     return GroupSyncStatusResponse(
-        total_items=len(items),
+        total_items=total_count,
         synced_items=synced_count,
-        is_fully_synced=synced_count == len(items),
+        is_fully_synced=synced_count == total_count,
     )
 
 
@@ -429,12 +368,12 @@ def sync_missing_group_content(
         return SyncMissingContentResponse(
             queued_count=0,
             queued_item_ids=[],
-            message="T?t c? hi?n v?t ?? c? ?? m? t? v? audio.",
+            message="Tất cả hiện vật đã có đủ mô tả và audio.",
         )
 
     background_tasks.add_task(sync_missing_items_task, group.id, item_ids)
     return SyncMissingContentResponse(
         queued_count=len(item_ids),
         queued_item_ids=item_ids,
-        message=f"?? x?p h?ng c?p nh?t {len(item_ids)} hi?n v?t.",
+        message=f"Đã xếp hàng cập nhật {len(item_ids)} hiện vật.",
     )

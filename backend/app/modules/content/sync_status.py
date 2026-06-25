@@ -11,48 +11,27 @@ from app.modules.content.service import compute_content_hash
 from app.modules.content.tts import is_current_audio_mime
 from app.modules.content.text_utils import is_no_information_content
 
-ItemContentState = Literal["synced", "partial", "missing", "syncing"]
+ItemContentState = Literal["synced", "outdated", "missing", "syncing"]
 
 _active_group_syncs: set[int] = set()
 _sync_lock = threading.Lock()
-
 
 def mark_group_sync_started(group_id: int) -> None:
     with _sync_lock:
         _active_group_syncs.add(group_id)
 
-
 def mark_group_sync_finished(group_id: int) -> None:
     with _sync_lock:
         _active_group_syncs.discard(group_id)
-
 
 def is_group_sync_active(group_id: int) -> bool:
     with _sync_lock:
         return group_id in _active_group_syncs
 
-
-def _variant_is_ready(item: Item, variant: ItemContentVariant | None) -> bool:
-    if variant is None:
-        return False
-    if variant.status != "ready":
-        return False
-    if not (variant.text_content or "").strip():
-        return False
-    if is_no_information_content(variant.text_content):
-        expected_hash = compute_content_hash(item.description, source=variant.source)
-        return variant.content_hash == expected_hash
-    if variant.audio_data is None:
-        return False
-    if not is_current_audio_mime(variant.audio_mime):
-        return False
-    expected_hash = compute_content_hash(item.description, source=variant.source)
-    return variant.content_hash == expected_hash
-
-
 def evaluate_item_content_status(
     item: Item,
     variants: list[ItemContentVariant],
+    group_knowledge_version: int,
     *,
     group_sync_active: bool = False,
 ) -> dict:
@@ -61,19 +40,48 @@ def evaluate_item_content_status(
     }
     required = all_variants()
     ready_count = 0
+    missing_any = False
+    outdated_any = False
+
     for persona, language in required:
-        if _variant_is_ready(item, variant_map.get((persona, language))):
-            ready_count += 1
+        variant = variant_map.get((persona, language))
+        if variant is None or variant.status != "ready":
+            missing_any = True
+            continue
+
+        if not (variant.text_content or "").strip():
+            missing_any = True
+            continue
+            
+        expected_hash = compute_content_hash(
+            item.description, 
+            group_knowledge_version=group_knowledge_version, 
+            source=variant.source
+        )
+
+        if not is_no_information_content(variant.text_content):
+            if variant.audio_data is None:
+                missing_any = True
+                continue
+            if not is_current_audio_mime(variant.audio_mime, persona):
+                outdated_any = True
+                continue
+        
+        if variant.content_hash != expected_hash:
+            outdated_any = True
+            continue
+
+        ready_count += 1
 
     total = len(required)
     needs_regeneration = ready_count < total
 
-    if ready_count == total:
-        state: ItemContentState = "synced"
-    elif ready_count == 0:
-        state = "missing"
+    if missing_any:
+        state: ItemContentState = "missing"
+    elif outdated_any:
+        state = "outdated"
     else:
-        state = "partial"
+        state = "synced"
 
     if group_sync_active and needs_regeneration:
         state = "syncing"
@@ -86,8 +94,11 @@ def evaluate_item_content_status(
         "needs_regeneration": needs_regeneration,
     }
 
-
 def evaluate_group_content_status(db: Session, group_id: int) -> dict:
+    from app.models.group import Group
+    group = db.query(Group).filter(Group.id == group_id).first()
+    group_knowledge_version = group.knowledge_version if group else 0
+
     items = db.query(Item).filter(Item.group_id == group_id).order_by(Item.id).all()
     if not items:
         return {
@@ -117,6 +128,7 @@ def evaluate_group_content_status(db: Session, group_id: int) -> dict:
         evaluate_item_content_status(
             item,
             variants_by_item.get(item.id, []),
+            group_knowledge_version=group_knowledge_version,
             group_sync_active=sync_active,
         )
         for item in items
