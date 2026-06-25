@@ -136,14 +136,14 @@ export default function TourMatchWaitingRoomPage() {
         if (details.status === "finished") {
           clearMatchMembership();
           setWsStatus("error");
-          setErrorMsg("Phòng đã kết thúc");
+          setErrorMsg(t.tour.matchErrRoomFinished);
           return;
         }
       } catch {
         if (cancelled) return;
         clearMatchMembership();
         setWsStatus("error");
-        setErrorMsg("Phòng không tồn tại hoặc cuộc đua đã bắt đầu");
+        setErrorMsg(t.tour.matchErrRoomUnavailable);
         return;
       }
 
@@ -202,7 +202,7 @@ export default function TourMatchWaitingRoomPage() {
       ws.onerror = (err) => {
         console.error("WebSocket error:", err);
         setWsStatus("error");
-        setErrorMsg("Lỗi kết nối máy chủ thi đấu");
+        setErrorMsg(t.tour.matchErrServerConnection);
       };
 
       ws.onclose = (event) => {
@@ -210,11 +210,11 @@ export default function TourMatchWaitingRoomPage() {
         setWsStatus("disconnected");
         if (event.code === 4003) {
           clearMatchMembership();
-          setErrorMsg("Phòng không tồn tại hoặc cuộc đua đã bắt đầu");
+          setErrorMsg(t.tour.matchErrRoomUnavailable);
         } else if (event.code === 4008) {
-          setErrorMsg("Bạn đã bị chủ phòng đuổi khỏi phòng đấu");
+          setErrorMsg(t.tour.matchErrKicked);
         } else if (event.code === 4009) {
-          setErrorMsg("Yêu cầu tham gia phòng của bạn đã bị từ chối");
+          setErrorMsg(t.tour.matchErrRejected);
         }
       };
     };
@@ -227,7 +227,7 @@ export default function TourMatchWaitingRoomPage() {
         ws.close();
       }
     };
-  }, [roomId, playerId, nickname, router, groupSlug]);
+  }, [roomId, playerId, nickname, router, groupSlug, t]);
 
   useEffect(() => {
     const notifyLeave = () => {
@@ -313,12 +313,12 @@ export default function TourMatchWaitingRoomPage() {
       <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-xs">
           <span className="text-4xl">⚠️</span>
-          <h2 className="text-md font-bold text-red-400">Không thể kết nối</h2>
+          <h2 className="text-md font-bold text-red-400">{t.tour.matchCannotConnect}</h2>
           <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
             {errorMsg}
           </p>
           <button onClick={() => router.push(lobbyPath)} className="artifact-btn-primary w-full text-xs py-2">
-            Quay lại Sảnh chờ
+            {t.tour.matchBackToLobby}
           </button>
         </div>
       </div>
@@ -334,7 +334,7 @@ export default function TourMatchWaitingRoomPage() {
             style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }}
           />
           <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-            Đang tải dữ liệu phòng chờ...
+            {t.tour.matchLoadingWaitingRoom}
           </span>
         </div>
       </div>
@@ -359,9 +359,9 @@ export default function TourMatchWaitingRoomPage() {
       <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-sm">
           <span className="text-4xl animate-pulse block">⏳</span>
-          <h2 className="text-md font-bold text-primary">Đang Chờ Phê Duyệt</h2>
+          <h2 className="text-md font-bold text-primary">{t.tour.matchPendingTitle}</h2>
           <p className="text-xs leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-            Phòng đấu này hiện đang được khóa bởi chủ phòng. Vui lòng giữ kết nối và đợi chủ phòng phê duyệt yêu cầu tham gia.
+            {t.tour.matchPendingHint}
           </p>
           <div className="flex justify-center py-2">
             <div
@@ -370,7 +370,7 @@ export default function TourMatchWaitingRoomPage() {
             />
           </div>
           <button onClick={handleLeaveRoom} className="artifact-btn-secondary w-full text-xs py-2.5">
-            Hủy yêu cầu & Rời phòng
+            {t.tour.matchCancelRequest}
           </button>
         </div>
       </div>
@@ -382,15 +382,15 @@ export default function TourMatchWaitingRoomPage() {
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
-          <BackButton onClick={handleSoftExit} label="Tạm rời" />
+          <BackButton onClick={handleSoftExit} label={t.tour.matchSoftExit} />
         </div>
         <p className="artifact-section-label mb-1">
-          Phòng chờ {wsStatus === "connected" ? "• Trực tuyến" : "• Đang kết nối..."}
+          {wsStatus === "connected" ? t.tour.matchWaitingOnline : t.tour.matchWaitingConnecting}
         </p>
         <h1 className="font-display text-xl">{room.name}</h1>
         <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
           {gameModeLabel(room.game_mode, locale)}
-          {room.with_map ? " · Bản đồ bật" : ""}
+          {room.with_map ? t.tour.matchMapOn : ""}
         </p>
         {room.description && (
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -404,7 +404,7 @@ export default function TourMatchWaitingRoomPage() {
         <div className="artifact-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              Mã phòng đấu:
+              {t.tour.matchRoomCodeBox}
             </span>
             <div className="flex items-center gap-2">
               {isHost && isWaiting && (
@@ -417,7 +417,7 @@ export default function TourMatchWaitingRoomPage() {
                     color: room.is_locked ? "#fca5a5" : "#86efac",
                   }}
                 >
-                  {room.is_locked ? "🔒 Khóa" : "🔓 Mở"}
+                  {room.is_locked ? t.tour.matchLock : t.tour.matchUnlock}
                 </button>
               )}
               <span className="text-md font-bold tracking-widest" style={{ color: "var(--primary)" }}>
@@ -431,7 +431,7 @@ export default function TourMatchWaitingRoomPage() {
           {/* Invite Link copy box */}
           <div className="space-y-1">
             <span className="text-[11px] block" style={{ color: "var(--muted-foreground)" }}>
-              Chia sẻ liên kết mời bạn bè:
+              {t.tour.matchShareInvite}
             </span>
             <div className="flex gap-2">
               <input
@@ -450,7 +450,7 @@ export default function TourMatchWaitingRoomPage() {
                 className="artifact-btn-secondary px-3 text-[11px] font-semibold shrink-0"
                 style={{ background: copied ? "var(--primary)" : "rgba(14, 11, 7, 0.75)", color: copied ? "var(--primary-foreground)" : "var(--foreground)" }}
               >
-                {copied ? "Đã chép!" : "Chép link"}
+                {copied ? t.tour.matchCopied : t.tour.matchCopyLink}
               </button>
             </div>
           </div>
@@ -464,11 +464,13 @@ export default function TourMatchWaitingRoomPage() {
           >
             <div className="space-y-0.5">
               <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-                Tour thi đấu được chọn:
+                {t.tour.matchSelectedTour}
               </p>
               <h3 className="text-sm font-bold">{tourTitle(tour, locale)}</h3>
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                Số lượng hiện vật: {tour.stops.length} stops
+                {t.tour.matchArtifactCount
+                  .replace("{count}", String(tour.stops.length))
+                  .replace("{stops}", t.tour.stops)}
               </p>
             </div>
             <span className="text-2xl">🏛️</span>
@@ -479,7 +481,7 @@ export default function TourMatchWaitingRoomPage() {
         {isHost && isWaiting && pendingPlayers.length > 0 && (
           <div className="space-y-2">
             <h2 className="text-xs uppercase tracking-wider font-semibold text-yellow-400">
-              Yêu cầu tham gia phòng ({pendingPlayers.length})
+              {t.tour.matchJoinRequests.replace("{count}", String(pendingPlayers.length))}
             </h2>
             <div className="space-y-2">
               {pendingPlayers.map((player) => (
@@ -496,13 +498,13 @@ export default function TourMatchWaitingRoomPage() {
                       onClick={() => handleApprovePlayer(player.player_id)}
                       className="text-[10px] font-bold px-2.5 py-1 rounded text-green-400 bg-green-950/40 border border-green-500/35 hover:bg-green-900/40"
                     >
-                      Duyệt
+                      {t.tour.matchApprove}
                     </button>
                     <button
                       onClick={() => handleRejectPlayer(player.player_id)}
                       className="text-[10px] font-bold px-2.5 py-1 rounded text-red-400 bg-red-950/40 border border-red-500/35 hover:bg-red-900/40"
                     >
-                      Từ chối
+                      {t.tour.matchReject}
                     </button>
                   </div>
                 </div>
@@ -514,7 +516,7 @@ export default function TourMatchWaitingRoomPage() {
         {/* Participants Lobby */}
         <div className="space-y-2">
           <h2 className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--muted-foreground)" }}>
-            Danh sách người chơi ({activePlayers.length})
+            {t.tour.matchPlayersList.replace("{count}", String(activePlayers.length))}
           </h2>
 
           <div className="space-y-2">
@@ -560,11 +562,11 @@ export default function TourMatchWaitingRoomPage() {
                       {player.is_host ? "👑" : "👤"}
                     </span>
                     <span className="text-xs font-semibold">
-                      {player.nickname} {isMe ? <span className="italic" style={{ color: "var(--muted-foreground)" }}>(Bạn)</span> : ""}
+                      {player.nickname} {isMe ? <span className="italic" style={{ color: "var(--muted-foreground)" }}>{t.tour.matchYou}</span> : ""}
                     </span>
                     {!player.is_online && (
                       <span className="text-[10px] font-semibold text-red-400">
-                        (Mất mạng)
+                        {t.tour.matchOffline}
                       </span>
                     )}
                   </div>
@@ -576,21 +578,21 @@ export default function TourMatchWaitingRoomPage() {
                         onClick={() => handleKickPlayer(player.player_id)}
                         className="text-[10px] px-2 py-1 rounded bg-red-950/40 border border-red-500/35 text-red-400 font-bold active:scale-95 transition-all hover:bg-red-900/40 mr-1.5"
                       >
-                        Đuổi
+                        {t.tour.matchKick}
                       </button>
                     )}
 
                     {player.is_host ? (
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>
-                        Chủ phòng
+                        {t.tour.matchHostBadge}
                       </span>
                     ) : player.is_ready ? (
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-green-400 bg-green-950/40 border border-green-500/35">
-                        Sẵn sàng
+                        {t.tour.matchReadyBadge}
                       </span>
                     ) : (
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-yellow-400 bg-yellow-950/40 border border-yellow-500/35">
-                        Chờ...
+                        {t.tour.matchWaitingBadge}
                       </span>
                     )}
                   </div>
@@ -621,7 +623,7 @@ export default function TourMatchWaitingRoomPage() {
               disabled={!chatInput.trim()}
               className="artifact-btn-secondary px-4 text-xs font-semibold shrink-0 disabled:opacity-40"
             >
-              Gửi
+              {t.tour.matchSend}
             </button>
           </form>
         ) : null}
@@ -636,13 +638,13 @@ export default function TourMatchWaitingRoomPage() {
                   disabled={!allReady}
                   className="artifact-btn-primary w-full py-4 text-sm font-bold transition-all disabled:opacity-50"
                 >
-                  🚀 Bắt đầu cuộc đua!
+                  {t.tour.matchStartRace}
                 </button>
                 {!allReady && (
                   <p className="text-center text-[10px]" style={{ color: "var(--muted-foreground)" }}>
                     {otherPlayers.length === 0
-                      ? "Cần ít nhất 2 người để bắt đầu tranh tài"
-                      : "Đang đợi tất cả người chơi khác Sẵn sàng..."}
+                      ? t.tour.matchNeedTwoPlayers
+                      : t.tour.matchWaitingForReady}
                   </p>
                 )}
               </div>
@@ -656,12 +658,12 @@ export default function TourMatchWaitingRoomPage() {
                   border: myState?.is_ready ? "1px solid var(--border)" : "none",
                 }}
               >
-                {myState?.is_ready ? "⏳ Hủy Sẵn sàng" : "✓ Sẵn sàng!"}
+                {myState?.is_ready ? t.tour.matchCancelReady : t.tour.matchReadyBtn}
               </button>
             )
           ) : (
             <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-              Cuộc đua đã bắt đầu — đang chuyển vào trận...
+              {t.tour.matchRaceStarting}
             </p>
           )}
 
@@ -670,7 +672,7 @@ export default function TourMatchWaitingRoomPage() {
             className="w-full text-center py-2.5 text-xs underline"
             style={{ color: "var(--muted-foreground)" }}
           >
-            Rời phòng đấu & Về sảnh chờ
+            {t.tour.matchLeaveRoom}
           </button>
         </div>
       </div>
