@@ -12,7 +12,15 @@ from app.modules.content.service import (
     ItemContentService,
     compute_content_hash,
 )
-from app.modules.content.tts import build_audio_mime
+from app.modules.content.tts import TTSResult, build_audio_mime
+
+
+def _tts_ok(audio: bytes = b"audio", mime: str = "audio/mpeg") -> TTSResult:
+    return TTSResult(ok=True, audio=audio, mime=mime)
+
+
+def _tts_fail(detail: str = "Text-to-speech synthesis failed") -> TTSResult:
+    return TTSResult(ok=False, error_code="edge_tts_error", error_detail=detail)
 
 
 def _add_item(db_session, **overrides) -> Item:
@@ -54,7 +62,7 @@ def test_generated_item_content_is_preserved_before_persistence(
     )
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: None,
+        lambda text, language: _tts_fail(),
     )
 
     result = ItemContentService().generate_and_persist(
@@ -90,12 +98,34 @@ def test_adapted_item_content_is_preserved_before_persistence(
     assert stored.text_content == long_text
 
 
+def test_adapted_variant_skips_llm_when_base_not_found(db_session, monkeypatch):
+    from app.modules.content.text_utils import document_not_found_message
+
+    item = _add_item(db_session)
+    adapt_content = Mock()
+    monkeypatch.setattr(
+        "app.modules.content.service.get_rag_generator",
+        lambda: Mock(adapt_content=adapt_content),
+    )
+
+    result = ItemContentService().generate_adapted_variant(
+        db_session,
+        item,
+        "Family Visitor",
+        "Tiếng Việt",
+        "Tôi không tìm thấy thông tin trong tài liệu.",
+    )
+
+    adapt_content.assert_not_called()
+    assert result.content == document_not_found_message("Tiếng Việt")
+
+
 def test_manual_content_is_not_truncated(db_session, monkeypatch):
     item = _add_item(db_session)
     long_text = " ".join(f"word{i}" for i in range(350))
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: None,
+        lambda text, language: _tts_fail(),
     )
 
     result = ItemContentService().update_content(
@@ -253,7 +283,7 @@ def test_get_or_generate_repairs_stored_variant_without_audio(
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: (b"repaired-audio", "audio/mpeg"),
+        lambda text, language: _tts_ok(b"repaired-audio", "audio/mpeg"),
     )
     service = ItemContentService()
 
@@ -355,7 +385,7 @@ def test_get_item_content_audio_generates_when_missing(client, db_session, monke
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: (b"generated-audio", "audio/mpeg"),
+        lambda text, language: _tts_ok(b"generated-audio", "audio/mpeg"),
     )
 
     response = client.get(
@@ -385,7 +415,7 @@ def test_ensure_audio_ignores_empty_tts_result(db_session, monkeypatch):
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: (b"", "audio/mpeg"),
+        lambda text, language: _tts_ok(b"", "audio/mpeg"),
     )
 
     variant = ItemContentService().ensure_audio(
@@ -430,7 +460,7 @@ def test_get_item_content_audio_streams_blob(client, db_session):
 def test_update_item_content_persists_text_and_audio(client, db_session, monkeypatch):
     item = _add_item(db_session)
 
-    fake_audio = (b"new-audio", "audio/mpeg")
+    fake_audio = _tts_ok(b"new-audio", "audio/mpeg")
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
         lambda text, language: fake_audio,
@@ -503,7 +533,7 @@ def test_update_item_content_regenerates_other_variants(
     )
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: (b"audio", "audio/mpeg"),
+        lambda text, language: _tts_ok(b"audio", "audio/mpeg"),
     )
 
     response = client.put(

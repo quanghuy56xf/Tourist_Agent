@@ -65,9 +65,13 @@ export default function ItemDetailPage() {
   const [introActive, setIntroActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
 
-  const stopGuidePlayback = () => {
+  const stopGuideIntro = () => {
     heraPanelRef.current?.stopPlayback();
     stopBrowserSpeech();
+  };
+
+  const stopGuidePlayback = () => {
+    stopGuideIntro();
     stopChatTts();
   };
 
@@ -165,9 +169,11 @@ export default function ItemDetailPage() {
       const assistantContent = res.content;
       setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
       if (autoSpeak && assistantContent.trim()) {
-        void playChatTts(assistantContent, language).catch(() => {
+        try {
+          await playChatTts(assistantContent, language);
+        } catch {
           /* ignore playback errors */
-        });
+        }
       }
     } catch {
       setChatHistory([
@@ -295,7 +301,7 @@ export default function ItemDetailPage() {
                   content={msg.content}
                   language={language}
                   speakLabel={t.item.speakAnswer}
-                  onBeforeSpeak={stopGuidePlayback}
+                  onBeforeSpeak={stopGuideIntro}
                 />
               )}
             </div>
@@ -357,9 +363,9 @@ export default function ItemDetailPage() {
             value={chatInput}
             onChange={(e) => {
               setChatInput(e.target.value);
-              if (e.target.value.trim()) stopGuidePlayback();
+              if (e.target.value.trim()) stopGuideIntro();
             }}
-            onFocus={stopGuidePlayback}
+            onFocus={stopGuideIntro}
             onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
             placeholder={t.item.chatPlaceholder}
             className="flex-1 rounded-full px-5 py-3 text-sm outline-none"

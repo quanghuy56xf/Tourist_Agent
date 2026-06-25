@@ -39,3 +39,31 @@ class BulkRegenerateContentResponse(BaseModel):
     skipped_count: int
     updated_item_ids: list[int]
     skipped_item_ids: list[int]
+
+
+class ItemContentSyncState(BaseModel):
+    item_id: int
+    state: str
+    variants_ready: int
+    variants_total: int
+    needs_regeneration: bool
+
+
+class GroupContentSyncSummary(BaseModel):
+    total: int
+    synced: int
+    needs_update: int
+    in_progress: int
+
+
+class GroupContentSyncStatusResponse(BaseModel):
+    group_id: int
+    is_sync_active: bool
+    summary: GroupContentSyncSummary
+    items: list[ItemContentSyncState]
+
+
+class SyncMissingContentResponse(BaseModel):
+    queued_count: int
+    queued_item_ids: list[int]
+    message: str

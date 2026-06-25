@@ -2,11 +2,16 @@ import pytest
 from langchain_core.documents import Document
 
 from app.modules.rag.service import (
+    ITEM_REGISTRATION_SECTION,
+    ITEM_REGISTRATION_SOURCE,
     build_chat_item_context,
+    build_chat_retrieval_query,
     build_item_context,
+    build_item_retrieval_query,
     build_verified_item_context,
     filter_group_docs_for_item,
     is_substantive_item_description,
+    is_vague_follow_up,
 )
 
 
@@ -55,6 +60,78 @@ class RuntimeFailureRetriever:
         raise RuntimeError("model out of memory")
 
 
+def test_retrieval_query_includes_registered_description():
+    retriever = GroupScopedRetriever()
+    build_item_context(
+        item_id=7,
+        item_name="Trống Văn Miếu",
+        item_description="Trống dùng trong nghi lễ khai giảng và báo giờ học.",
+        retriever=retriever,
+        group_id=1,
+    )
+
+    assert retriever.query == (
+        "Giới thiệu chi tiết về Trống Văn Miếu. "
+        "Trống dùng trong nghi lễ khai giảng và báo giờ học."
+    )
+
+
+def test_retrieval_query_uses_name_only_when_description_empty():
+    retriever = GroupScopedRetriever()
+    build_item_context(
+        item_id=7,
+        item_name="Trống Văn Miếu",
+        item_description="",
+        retriever=retriever,
+        group_id=1,
+    )
+
+    assert retriever.query == "Giới thiệu chi tiết về Trống Văn Miếu."
+
+
+def test_build_item_retrieval_query_normalizes_whitespace():
+    assert build_item_retrieval_query(
+        "  Trống  ",
+        "  Nghi lễ   khai giảng  ",
+    ) == "Giới thiệu chi tiết về Trống. Nghi lễ khai giảng"
+
+
+def test_is_vague_follow_up_detects_generic_requests():
+    assert is_vague_follow_up("cho biết thêm thông tin đi", "Bia Tiến sĩ") is True
+    assert is_vague_follow_up("còn thông tin nào thú vị nữa", "Văn Miếu") is True
+
+
+def test_is_vague_follow_up_allows_specific_questions():
+    assert (
+        is_vague_follow_up(
+            "Hoa văn trên bia tiến sĩ có ý nghĩa gì?",
+            "Bia Tiến sĩ",
+        )
+        is False
+    )
+
+
+def test_build_chat_retrieval_query_anchors_vague_follow_up_to_item():
+    assert build_chat_retrieval_query(
+        "Bia Tiến sĩ",
+        "82 tấm bia đá tại vườn bia thứ ba.",
+        "cho biết thêm thông tin đi",
+    ) == (
+        "Giới thiệu chi tiết về Bia Tiến sĩ. "
+        "82 tấm bia đá tại vườn bia thứ ba."
+    )
+
+
+def test_build_chat_retrieval_query_includes_specific_user_question():
+    query = build_chat_retrieval_query(
+        "Bia Tiến sĩ",
+        "82 tấm bia đá tại vườn bia thứ ba.",
+        "Ai là người khắc chữ trên bia?",
+    )
+    assert query.startswith("Giới thiệu chi tiết về Bia Tiến sĩ.")
+    assert "Câu hỏi của khách: Ai là người khắc chữ trên bia?" in query
+
+
 def test_item_description_is_always_grounding_context():
     docs = build_item_context(
         item_id=7,
@@ -64,7 +141,22 @@ def test_item_description_is_always_grounding_context():
     )
 
     assert docs[0].page_content == "Primary description"
-    assert docs[0].metadata == {"source": "item", "page": "item-7"}
+    assert docs[0].metadata == {
+        "source": ITEM_REGISTRATION_SOURCE,
+        "page": "item-7",
+        "section_title": ITEM_REGISTRATION_SECTION,
+    }
+
+
+def test_registration_document_is_reference_chunk():
+    from app.modules.rag.service import build_item_registration_document
+
+    doc = build_item_registration_document(
+        9,
+        "Cổng chính dẫn vào khu Văn Miếu, xây dưới triều Lý.",
+    )
+    assert doc.metadata["section_title"] == ITEM_REGISTRATION_SECTION
+    assert doc.metadata["source"] == ITEM_REGISTRATION_SOURCE
 
 
 def test_retrieval_documents_are_appended():
@@ -206,7 +298,7 @@ def test_verified_context_includes_retrieved_group_docs_for_substantive_descript
     )
 
     assert has_verified is True
-    assert [doc.metadata["source"] for doc in docs] == ["item", "group_doc"]
+    assert [doc.metadata["source"] for doc in docs] == [ITEM_REGISTRATION_SOURCE, "group_doc"]
 
 
 def test_chat_context_includes_query_aligned_docs_without_item_name():
@@ -235,9 +327,9 @@ def test_chat_context_includes_query_aligned_docs_without_item_name():
     )
 
     assert has_verified is True
-    assert chat_docs[0].metadata["source"] == "item"
-    assert len(chat_docs) == 3
-    assert "Quốc Tử Giám từng là trường đại học" in chat_docs[2].page_content
+    assert chat_docs[0].metadata["source"] == ITEM_REGISTRATION_SOURCE
+    assert len(chat_docs) == 2
+    assert "Văn Miếu được xây dựng năm 1070" in chat_docs[1].page_content
 
     verified_docs, _ = build_verified_item_context(
         item_id=3,

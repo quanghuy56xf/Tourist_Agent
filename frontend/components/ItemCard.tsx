@@ -1,6 +1,6 @@
 "use client";
 
-import { GroupItem, resolveImageUrl } from "@/lib/api";
+import { GroupItem, ItemContentSyncState, resolveImageUrl } from "@/lib/api";
 
 const ANGLE_LABELS: Record<string, string> = {
   front: "Mặt trước",
@@ -48,6 +48,7 @@ interface ItemCardProps {
   onLanguageChange: (value: string) => void;
   canEditStory: boolean;
   regenNotice: string | null;
+  contentSyncState?: ItemContentSyncState | null;
 }
 
 export default function ItemCard({
@@ -90,7 +91,9 @@ export default function ItemCard({
   onLanguageChange,
   canEditStory,
   regenNotice,
+  contentSyncState = null,
 }: ItemCardProps) {
+  const isContentSyncing = contentSyncState?.state === "syncing";
   return (
     <div className="admin-item-card">
       <button
@@ -118,7 +121,48 @@ export default function ItemCard({
           />
         )}
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{item.name}</p>
+          <p className="font-medium truncate flex items-center gap-2">
+            {item.name}
+            {isContentSyncing && (
+              <span
+                title="Đang sinh mô tả và audio"
+                className="inline-flex items-center gap-1 text-xs font-normal text-amber-600"
+              >
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Đang cập nhật
+                {contentSyncState
+                  ? ` (${contentSyncState.variants_ready}/${contentSyncState.variants_total})`
+                  : ""}
+              </span>
+            )}
+            {!isContentSyncing && contentSyncState?.state === "synced" && (
+              <span title="Đã đủ mô tả và audio" className="text-emerald-500 text-xs">
+                ✓
+              </span>
+            )}
+            {!isContentSyncing && contentSyncState?.state === "partial" && (
+              <span title="Thiếu một số biến thể mô tả/audio" className="text-amber-500 text-xs">
+                ⚠
+              </span>
+            )}
+            {!isContentSyncing && contentSyncState?.state === "missing" && (
+              <span title="Chưa có mô tả/audio" className="text-red-500 text-xs">
+                ✕
+              </span>
+            )}
+          </p>
           <p className="text-xs admin-muted truncate">
             {item.images.length} ảnh · ID {item.id}
           </p>

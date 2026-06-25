@@ -6,7 +6,7 @@ from app.core.config import CONTENT_REGEN_TOP_K
 from app.models.group_document import GroupDocument
 from app.models.item import Item
 from app.modules.rag.retriever import try_get_rag_retriever
-from app.modules.rag.service import text_mentions_item
+from app.modules.rag.service import build_item_retrieval_query, text_mentions_item
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def _item_has_changed_doc_in_top_k(
     if retriever is None or item.group_id is None:
         return False
 
-    query = f"Giới thiệu chi tiết về {item.name}. {item.description or ''}"
+    query = build_item_retrieval_query(item.name, item.description or "")
     try:
         docs = retriever.retrieve(query, top_k=top_k, group_id=item.group_id)
     except Exception:

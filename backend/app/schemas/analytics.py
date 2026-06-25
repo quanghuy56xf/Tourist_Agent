@@ -61,6 +61,16 @@ class SlowEventRow(BaseModel):
     created_at: str
 
 
+class ContentIssueRow(BaseModel):
+    event_type: str
+    group_name: str | None
+    item_name: str | None
+    persona: str | None
+    language: str | None
+    error_detail: str | None
+    created_at: str
+
+
 class AnalyticsSummaryResponse(BaseModel):
     range_days: int
     total_visits: int
@@ -72,3 +82,7 @@ class AnalyticsSummaryResponse(BaseModel):
     chat_timing: TimingStats
     slow_events: list[SlowEventRow]
     recent_errors: list[SlowEventRow]
+    content_no_information_count: int = 0
+    content_text_error_count: int = 0
+    content_audio_error_count: int = 0
+    content_issues: list[ContentIssueRow] = []

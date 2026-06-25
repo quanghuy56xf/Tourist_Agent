@@ -1,10 +1,16 @@
-import { fetchTTSAudio } from "@/lib/api";
+import { fetchTTSStreamResponse, fetchTTSAudio } from "@/lib/api";
+import {
+  canStreamMpegAudio,
+  playBlobResponse,
+  playMpegStreamResponse,
+} from "@/lib/ttsStreamPlayer";
 
 let audioRef: HTMLAudioElement | null = null;
 let objectUrlRef: string | null = null;
 let abortRef: AbortController | null = null;
+let playbackGeneration = 0;
 
-function cleanup() {
+function teardownPlaybackResources() {
   abortRef?.abort();
   abortRef = null;
 
@@ -13,6 +19,7 @@ function cleanup() {
     audioRef.currentTime = 0;
     audioRef.onended = null;
     audioRef.onerror = null;
+    audioRef.src = "";
     audioRef = null;
   }
 
@@ -23,7 +30,8 @@ function cleanup() {
 }
 
 export function stopChatTts() {
-  cleanup();
+  playbackGeneration += 1;
+  teardownPlaybackResources();
 }
 
 export async function playChatTts(
@@ -34,17 +42,50 @@ export async function playChatTts(
   const cleaned = text.trim();
   if (!cleaned) return;
 
-  cleanup();
+  const generation = ++playbackGeneration;
+  teardownPlaybackResources();
 
   const controller = new AbortController();
   abortRef = controller;
+  const isActive = () => generation === playbackGeneration;
 
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
 
+  const hooks = {
+    onAudio: (audio: HTMLAudioElement) => {
+      if (isActive()) {
+        audioRef = audio;
+      }
+    },
+    onObjectUrl: (url: string) => {
+      if (isActive()) {
+        objectUrlRef = url;
+      }
+    },
+  };
+
   try {
+    try {
+      const response = await fetchTTSStreamResponse(
+        cleaned,
+        language,
+        controller.signal
+      );
+      if (!isActive() || controller.signal.aborted) return;
+
+      if (canStreamMpegAudio()) {
+        await playMpegStreamResponse(response, controller.signal, hooks);
+      } else {
+        await playBlobResponse(response, controller.signal, hooks);
+      }
+      return;
+    } catch {
+      if (!isActive() || controller.signal.aborted) return;
+    }
+
     const url = await fetchTTSAudio(cleaned, language, controller.signal);
-    if (controller.signal.aborted) {
+    if (!isActive() || controller.signal.aborted) {
       URL.revokeObjectURL(url);
       return;
     }
@@ -60,6 +101,8 @@ export async function playChatTts(
     });
   } finally {
     signal?.removeEventListener("abort", onAbort);
-    cleanup();
+    if (isActive()) {
+      teardownPlaybackResources();
+    }
   }
 }

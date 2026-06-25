@@ -8,6 +8,7 @@ from app.core.config import RAG_CHAT_TOP_K
 from app.core.database import get_db
 from app.models.item import Item
 from app.modules.analytics.service import get_client_ip, record_event
+from app.modules.content.text_utils import polish_generated_text
 from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
@@ -87,6 +88,7 @@ def chat_with_ai(
             retrieved_docs=docs,
             persona=request.persona,
             language=request.language,
+            item_name=item.name,
         )
     except LLMServiceUnavailableError:
         duration_ms = int((time.perf_counter() - started) * 1000)
@@ -130,4 +132,4 @@ def chat_with_ai(
         duration_ms=duration_ms,
         success=True,
     )
-    return ChatResponse(content=content)
+    return ChatResponse(content=polish_generated_text(content))

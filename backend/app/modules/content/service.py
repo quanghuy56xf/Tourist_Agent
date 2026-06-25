@@ -17,14 +17,29 @@ from app.modules.content.personas import (
 )
 from app.modules.content.text_utils import (
     GENERATION_RULES_VERSION,
+    is_no_information_content,
+    polish_generated_text,
+    resolve_propagated_variant_content,
     strip_citations,
 )
+from app.modules.content.audio_backoff import (
+    clear_audio_backoff,
+    record_audio_failure,
+)
 from app.modules.content.tts import build_audio_mime, is_current_audio_mime, synthesize_speech
-from app.modules.llm.client import LLMServiceUnavailableError
+from app.modules.content.content_analytics import (
+    CONTENT_EVENT_AUDIO_ERROR,
+    CONTENT_EVENT_NO_INFORMATION,
+    CONTENT_EVENT_TEXT_ERROR,
+    record_content_issue,
+    should_record_audio_error,
+)
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.modules.rag.service import (
+    build_item_retrieval_query,
     build_verified_item_context,
+    is_substantive_item_description,
     no_item_knowledge_message,
 )
 
@@ -196,7 +211,7 @@ class ItemContentService:
         if not has_verified:
             return no_item_knowledge_message(language), "no_knowledge"
 
-        query = f"Giới thiệu chi tiết về {item.name}."
+        query = build_item_retrieval_query(item.name, item.description or "")
         try:
             content = get_rag_generator().generate_answer(
                 query=query,
@@ -204,7 +219,23 @@ class ItemContentService:
                 persona=persona,
                 language=language,
             )
-            return strip_citations(content), "generated"
+            content = polish_generated_text(content)
+            if (
+                is_substantive_item_description(item.description or "", item.name)
+                and is_no_information_content(content)
+            ):
+                if persona == DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
+                    content = item.description or ""
+                else:
+                    content = polish_generated_text(
+                        get_rag_generator().adapt_content(
+                            item.description or "",
+                            item.name,
+                            persona,
+                            language,
+                        )
+                    )
+            return content, "generated"
         except LLMServiceUnavailableError:
             raise
         except Exception:
@@ -240,6 +271,21 @@ class ItemContentService:
             audio_mime=None,
             source=resolved_source,
         )
+
+        if (
+            is_no_information_content(text_content)
+            and persona == DEFAULT_PERSONA
+            and language == DEFAULT_LANGUAGE
+        ):
+            record_content_issue(
+                event_type=CONTENT_EVENT_NO_INFORMATION,
+                item_id=item.id,
+                group_id=item.group_id,
+                persona=persona,
+                language=language,
+                error_detail=text_content[:500],
+                item_name=item.name,
+            )
 
         return self._variant_to_result(item.id, variant, stored=False)
 
@@ -315,13 +361,44 @@ class ItemContentService:
     ) -> ItemContentResult:
         persona = normalize_persona(persona)
         language = normalize_language(language)
-        adapted = get_rag_generator().adapt_content(
-            base_content,
-            item.name,
-            persona,
-            language,
-        )
-        text_content = strip_citations(adapted)
+        if is_no_information_content(base_content):
+            text_content, resolved_source = resolve_propagated_variant_content(
+                base_content,
+                language,
+                no_knowledge_message_for_language=no_item_knowledge_message,
+            )
+            variant = self.upsert_variant(
+                db,
+                item=item,
+                persona=persona,
+                language=language,
+                text_content=text_content,
+                audio_data=None,
+                audio_mime=None,
+                source=resolved_source,
+            )
+            return self._variant_to_result(item.id, variant, stored=False)
+
+        try:
+            adapted = get_rag_generator().adapt_content(
+                base_content,
+                item.name,
+                persona,
+                language,
+            )
+        except Exception as exc:
+            record_content_issue(
+                event_type=CONTENT_EVENT_TEXT_ERROR,
+                item_id=item.id,
+                group_id=item.group_id,
+                persona=persona,
+                language=language,
+                error_detail=str(exc)[:500],
+                item_name=item.name,
+            )
+            raise
+
+        text_content = polish_generated_text(adapted)
         variant = self.upsert_variant(
             db,
             item=item,
@@ -346,6 +423,8 @@ class ItemContentService:
         variant = self.get_valid_variant(db, item, persona, language)
         if variant is None or not variant.text_content.strip():
             return None
+        if is_no_information_content(variant.text_content):
+            return variant
         if (
             variant.audio_data is not None
             and variant.audio_mime is not None
@@ -353,17 +432,36 @@ class ItemContentService:
         ):
             return variant
 
-        audio_result = synthesize_speech(variant.text_content, language)
-        if audio_result is None or not audio_result[0]:
+        tts_result = synthesize_speech(variant.text_content, language)
+        if not tts_result.ok or not tts_result.audio:
+            target = (item.id, persona, language)
+            record_audio_failure(target)
+            if should_record_audio_error(
+                db,
+                item.id,
+                persona,
+                language,
+                variant.updated_at,
+            ):
+                record_content_issue(
+                    event_type=CONTENT_EVENT_AUDIO_ERROR,
+                    item_id=item.id,
+                    group_id=item.group_id,
+                    persona=persona,
+                    language=language,
+                    error_detail=tts_result.error_detail or "Text-to-speech synthesis failed",
+                    item_name=item.name,
+                )
             return variant
 
+        clear_audio_backoff((item.id, persona, language))
         return self.upsert_variant(
             db,
             item=item,
             persona=persona,
             language=language,
             text_content=variant.text_content,
-            audio_data=audio_result[0],
+            audio_data=tts_result.audio,
             audio_mime=build_audio_mime(),
             source=variant.source,
         )
@@ -375,7 +473,7 @@ class ItemContentService:
         language: str,
     ) -> str:
         text_content, _ = self.generate_text(item, persona, language)
-        return strip_citations(text_content)
+        return polish_generated_text(text_content)
 
     def regenerate_all_variants_from_rag(
         self,
@@ -432,7 +530,27 @@ class ItemContentService:
         if not base_content:
             return
 
-        generator = get_rag_generator()
+        if is_no_information_content(base_content):
+            for persona, language in all_variants():
+                if persona == DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
+                    continue
+                try:
+                    self.generate_adapted_variant(
+                        db,
+                        item,
+                        persona,
+                        language,
+                        base_content,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to propagate no-info variant for item %s (%s, %s)",
+                        item.id,
+                        persona,
+                        language,
+                    )
+            return
+
         for persona, language in all_variants():
             if persona == DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
                 continue

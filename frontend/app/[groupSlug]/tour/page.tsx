@@ -7,6 +7,7 @@ import HomeButton from "@/components/visitor/HomeButton";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
+import { readStoredGroupId } from "@/lib/visitorAnalytics";
 import {
   getTourProgress,
   loadSuggestedTours,
@@ -24,10 +25,11 @@ export default function TourListPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadSuggestedTours()
+    const groupId = readStoredGroupId() ?? undefined;
+    loadSuggestedTours(groupId)
       .then(setTours)
       .finally(() => setLoading(false));
-  }, []);
+  }, [groupSlug]);
 
   return (
     <div className="artifact-shell min-h-screen">

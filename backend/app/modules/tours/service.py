@@ -43,6 +43,18 @@ def _validate_stops(db: Session, stops: list[TourStopInput]) -> list[Item]:
             detail=f"Hiện vật không tồn tại: {', '.join(map(str, missing))}",
         )
 
+    group_ids = {item.group_id for item in items if item.group_id is not None}
+    if len(group_ids) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Tất cả hiện vật trong tour phải thuộc cùng một khu di tích",
+        )
+    if any(item.group_id is None for item in items):
+        raise HTTPException(
+            status_code=400,
+            detail="Hiện vật trong tour phải được gán vào một khu di tích",
+        )
+
     item_map = {item.id: item for item in items}
     return [item_map[item_id] for item_id in item_ids]
 
@@ -152,9 +164,29 @@ def delete_tour(db: Session, tour_id: int) -> None:
     db.commit()
 
 
-def list_tours(db: Session, *, published_only: bool) -> list[TourSummaryResponse]:
-    query = db.query(Tour).options(joinedload(Tour.stops)).order_by(Tour.created_at.desc())
+def list_tours(
+    db: Session,
+    *,
+    published_only: bool,
+    group_id: int | None = None,
+) -> list[TourSummaryResponse]:
+    query = (
+        db.query(Tour)
+        .options(joinedload(Tour.stops).joinedload(TourStop.item))
+        .order_by(Tour.created_at.desc())
+    )
     if published_only:
         query = query.filter(Tour.is_published.is_(True))
     tours = query.all()
-    return [tour_to_summary(tour) for tour in tours if len(tour.stops) >= 2]
+
+    summaries: list[TourSummaryResponse] = []
+    for tour in tours:
+        if len(tour.stops) < 2:
+            continue
+        if group_id is not None and not all(
+            stop.item is not None and stop.item.group_id == group_id
+            for stop in tour.stops
+        ):
+            continue
+        summaries.append(tour_to_summary(tour))
+    return summaries

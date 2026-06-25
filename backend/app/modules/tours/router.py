@@ -20,9 +20,10 @@ router = APIRouter(prefix="/api/tours", tags=["tours"])
 @router.get("", response_model=list[TourSummaryResponse])
 def get_tours(
     published_only: bool = Query(default=True),
+    group_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return list_tours(db, published_only=published_only)
+    return list_tours(db, published_only=published_only, group_id=group_id)
 
 
 @router.get("/{tour_id}", response_model=TourDetailResponse)
