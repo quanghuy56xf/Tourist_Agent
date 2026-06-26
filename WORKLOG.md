@@ -519,3 +519,32 @@ Các thay đổi:
 - **Sửa lỗi đè nút (Button Overwrite)**: Cập nhật luồng nhận SSE Events trong `CompanionChat.tsx`. Thay vì ghi đè toàn bộ mảng `actionButtons`, hệ thống giờ đây chỉ lọc và thay thế các nút dạng text (câu hỏi gợi ý), giữ nguyên các nút hệ thống như `open_camera` hay `rate_experience`.
 - **Sửa lỗi TTS đọc định dạng**: Can thiệp vào `chat_router.py` (luồng `tts_consumer`). Khi phát hiện ký tự `||Q:`, backend sẽ tự động cắt chuỗi và ngừng gửi nội dung còn lại tới engine Edge TTS, giúp âm thanh kết thúc mượt mà trước khi hiện câu hỏi gợi ý.
 - **Tinh chỉnh LLM Prompt**: Bổ sung yêu cầu khắt khe vào `generator.py` để LLM ưu tiên sinh các câu hỏi gợi ý liên quan trực tiếp đến hiện vật, khu di tích hoặc các sự thật lịch sử độc đáo.
+
+## 2026-06-27 - Cấu hình CI/CD toàn diện và Tinh chỉnh UI
+
+Bối cảnh:
+- Hệ thống cần được tự động hóa quy trình kiểm thử và triển khai (CI/CD) để đáp ứng chuẩn Production, thay vì phụ thuộc vào việc cấu hình thủ công trên server.
+- Nút chọn ngôn ngữ (`LanguageSelector`) hiển thị dạng `<select>` mặc định của trình duyệt gây lỗi UI (vỡ góc, menu sổ xuống bị vuông vức trên Windows) làm mất đi vẻ cao cấp.
+- Giới hạn phút chạy miễn phí của GitHub Org cản trở việc chạy các workflow.
+
+Các thay đổi:
+- **Kiến trúc Triển khai (Deployment):** Thiết lập rõ ràng luồng phân tán:
+  - Frontend: Được quản lý tự động bởi Railway thông qua nhánh `main`.
+  - Backend: Chạy trên Google Cloud VM với Docker Compose. Caddy tự động quản lý SSL/TLS.
+- **Thiết lập GitHub Actions (CI/CD):**
+  - Khởi tạo `.github/workflows/frontend-ci.yml` để Lint và Build kiểm tra frontend.
+  - Khởi tạo `.github/workflows/backend-ci.yml` sử dụng công cụ `uv` siêu tốc để chạy bộ test `pytest` cho backend.
+  - Khởi tạo `.github/workflows/backend-cd.yml` tự động SSH vào GCP VM và chạy `deploy.sh` mỗi khi có thay đổi trên `main`.
+  - Khắc phục giới hạn của GitHub Org bằng cách chuyển đổi sang máy chủ `self-hosted` do BTC cung cấp.
+  - Sửa lỗi nén cache `tar` trên các máy chủ `self-hosted` bằng cách tắt tính năng `cache: 'npm'`. Nâng version node lên 22 để tránh deprecation warning.
+- **Tối ưu hóa máy chủ (Zero-Downtime):**
+  - Tinh chỉnh `deploy.sh`: Loại bỏ lệnh `docker compose down` và `docker builder prune` để tránh sập app kéo dài và bảo tồn bộ đệm 3GB của PyTorch, giúp thời gian khởi động siêu nhanh.
+  - Cập nhật chi tiết tài liệu `DEPLOY.md`.
+- **Nâng cấp UI (Glassmorphism Dropdown):**
+  - Đập bỏ thẻ `<select>` truyền thống trong `frontend/components/LanguageSelector.tsx`.
+  - Xây dựng lại thành một Custom Dropdown Component bằng React state (`ul`, `li`), sử dụng các lớp Tailwind (bo tròn góc, kính mờ backdrop-blur, shadow, hiệu ứng hover, focus ring) để mang lại trải nghiệm tinh tế, hoàn toàn đồng bộ trên mọi nền tảng trình duyệt.
+
+Xác nhận:
+- Toàn bộ workflows CI/CD đã hoạt động trơn tru.
+- Component LanguageSelector hiển thị mượt mà.
+- Dự án sẵn sàng cho môi trường Production ổn định.
