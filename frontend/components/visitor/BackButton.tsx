@@ -25,7 +25,7 @@ export default function BackButton({
   const content = (
     <>
       <span aria-hidden="true">←</span>
-      <span className="text-xs">Quay lại</span>
+      <span className="text-xs">{label}</span>
     </>
   );
 

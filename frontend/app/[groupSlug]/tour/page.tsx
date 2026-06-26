@@ -57,7 +57,7 @@ export default function TourListPage() {
             minHeight: "0px",
           }}
         >
-          ⚔ Thi Đấu Trực Tuyến (Tạo Room)
+          {t.tour.matchLobbyBtn}
         </button>
 
         {loading ? (

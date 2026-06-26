@@ -148,17 +148,17 @@ export default function TourMatchPlayPage() {
 
     ws.onerror = (err) => {
       console.error("Play WebSocket error:", err);
-      setErrorMsg("Không thể kết nối tới máy chủ phòng đấu.");
+      setErrorMsg(t.tour.matchErrConnectServer);
     };
 
     ws.onclose = (event) => {
       console.log("Play WebSocket closed:", event.code, event.reason);
       if (event.code === 4003) {
-        setErrorMsg("Bạn không ở trong danh sách người chơi của phòng này.");
+        setErrorMsg(t.tour.matchErrNotInPlayers);
       } else if (event.code === 4008) {
-        setErrorMsg("Bạn đã bị chủ phòng đuổi khỏi phòng đấu.");
+        setErrorMsg(t.tour.matchErrKicked);
       } else {
-        setErrorMsg("Kết nối tới máy chủ thi đấu đã bị ngắt.");
+        setErrorMsg(t.tour.matchErrDisconnected);
       }
     };
 
@@ -167,7 +167,7 @@ export default function TourMatchPlayPage() {
         ws.close();
       }
     };
-  }, [roomId, playerId, nickname]);
+  }, [roomId, playerId, nickname, t]);
 
   // 3. Load Tour details
   useEffect(() => {
@@ -301,21 +301,18 @@ export default function TourMatchPlayPage() {
       if (gameMode === "free" && matchedId && myFoundIds.includes(matchedId)) {
         setErrorMsg(t.tour.matchAlreadyFound);
       } else if (best && expectedId !== null && Number(best.item_id) !== expectedId) {
-        if (locale === "vi") {
-          setErrorMsg(
-            `Chưa đúng hiện vật! Độ khớp với "${currentStop?.name ?? ""}" là ${matchPercent}% (yêu cầu >= 55%).`
-          );
-        } else {
-          setErrorMsg(
-            `Wrong item! Match with "${currentStop?.name ?? ""}" is only ${matchPercent}% (requires >= 55%).`
-          );
-        }
+        setErrorMsg(
+          t.tour.matchWrongObject
+            .replace("{name}", currentStop?.name ?? "")
+            .replace("{percent}", String(matchPercent))
+            .replace("{min}", "55")
+        );
       } else {
-        if (locale === "vi") {
-          setErrorMsg(`Không nhận diện được hiện vật (Độ khớp: ${matchPercent}%, yêu cầu >= 55%).`);
-        } else {
-          setErrorMsg(`Could not identify target object (Match: ${matchPercent}%, requires >= 55%).`);
-        }
+        setErrorMsg(
+          t.tour.matchScanUnrecognized
+            .replace("{percent}", String(matchPercent))
+            .replace("{min}", "55")
+        );
       }
 
       URL.revokeObjectURL(url);
@@ -352,12 +349,12 @@ export default function TourMatchPlayPage() {
       <div className="flex flex-1 min-h-[100dvh] flex-col justify-center items-center p-6 text-center w-full">
         <div className="artifact-card p-6 space-y-4 max-w-xs">
           <span className="text-4xl">⚠️</span>
-          <h2 className="text-md font-bold text-red-400">Không thể kết nối</h2>
+          <h2 className="text-md font-bold text-red-400">{t.tour.matchCannotConnect}</h2>
           <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
             {errorMsg}
           </p>
           <button onClick={() => router.push(lobbyPath)} className="artifact-btn-primary w-full text-xs py-2">
-            Quay lại Sảnh chờ
+            {t.tour.matchBackToLobby}
           </button>
         </div>
       </div>
@@ -424,10 +421,10 @@ export default function TourMatchPlayPage() {
       {/* Real-time Multiplayer Leaderboard */}
       <div className="bg-secondary/40 border-b border-border px-4 py-2.5 space-y-1.5 shrink-0">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Bảng xếp hạng thời gian thực</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">🏁 {totalStops} stops</span>
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{t.tour.matchLeaderboardLive}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">🏁 {totalStops} {t.tour.stops}</span>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex flex-wrap gap-2 pb-1">
           {sortedPlayers.map((p, idx) => {
             const isMe = p.player_id === playerId;
             const pct = Math.min((p.progress / totalStops) * 100, 100);
@@ -449,7 +446,7 @@ export default function TourMatchPlayPage() {
                   {p.is_host ? "👑 " : ""}{p.nickname}
                 </p>
                 <div className="flex items-center justify-between text-[9px] text-muted-foreground leading-none">
-                  <span>Tiến độ:</span>
+                  <span>{t.tour.matchProgressLabel}</span>
                   <span className="font-bold text-foreground">{p.progress}/{totalStops}</span>
                 </div>
                 
@@ -488,9 +485,9 @@ export default function TourMatchPlayPage() {
         {isFinished ? (
           <div className="artifact-card p-6 text-center max-w-xs space-y-4">
             <span className="text-4xl animate-bounce block">🏁</span>
-            <h2 className="text-md font-bold text-primary">Hoàn Thành Chặng Đua!</h2>
+            <h2 className="text-md font-bold text-primary">{t.tour.matchRaceCompleteTitle}</h2>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Bạn đã chụp thành công tất cả hiện vật! Đang đợi đối thủ hoặc kết quả chung cuộc từ trọng tài...
+              {t.tour.matchRaceCompleteHint}
             </p>
             <div className="flex justify-center">
               <div className="h-4 w-4 animate-spin rounded-full border border-t-transparent" style={{ borderColor: "var(--primary)", borderTopColor: "transparent" }} />
@@ -600,28 +597,28 @@ export default function TourMatchPlayPage() {
             <div className="space-y-1">
               <span className="text-5xl animate-bounce block">🏆</span>
               <h2 className="text-lg font-bold font-display text-primary uppercase tracking-wide">
-                Kết Quả Cuộc Đua
+                {t.tour.matchResultsTitle}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Tất cả các trạm khám phá đã được chinh phục!
+                {t.tour.matchResultsSubtitle}
               </p>
             </div>
 
             {/* Winner Spotlight Banner */}
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-primary font-bold">Người vô địch</p>
+              <p className="text-[10px] uppercase tracking-wider text-primary font-bold">{t.tour.matchChampionLabel}</p>
               <h3 className="text-lg font-extrabold text-foreground flex items-center justify-center gap-1.5">
                 👑 {room.winner_nickname}
               </h3>
               <p className="text-[11px] text-muted-foreground">
-                Đã về đích nhanh nhất và được vinh danh!
+                {t.tour.matchChampionHint}
               </p>
             </div>
 
             {/* Standings list */}
             <div className="space-y-2 text-left">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-1">
-                Bảng xếp hạng chung cuộc
+                {t.tour.matchFinalStandings}
               </p>
               <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 text-xs">
                 {sortedPlayers.map((p, index) => {
@@ -639,16 +636,16 @@ export default function TourMatchPlayPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-bold w-4">#{index + 1}</span>
                         <span className="font-semibold truncate max-w-[120px]">
-                          {p.nickname} {isMe ? "(Bạn)" : ""}
+                          {p.nickname} {isMe ? t.tour.matchYou : ""}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 text-muted-foreground">
                         {isWinner ? (
-                          <span className="text-yellow-400 font-bold">VÔ ĐỊCH 🥇</span>
+                          <span className="text-yellow-400 font-bold">{t.tour.matchChampionBadge}</span>
                         ) : p.completed_at ? (
-                          <span>Hoàn thành ✓</span>
+                          <span>{t.tour.matchCompletedBadge}</span>
                         ) : (
-                          <span>{p.progress}/{totalStops} stops</span>
+                          <span>{p.progress}/{totalStops} {t.tour.stops}</span>
                         )}
                       </div>
                     </div>
@@ -662,7 +659,7 @@ export default function TourMatchPlayPage() {
               onClick={handleLeaveMatch}
               className="artifact-btn-primary w-full py-3.5 text-xs font-bold"
             >
-              Quay lại Sảnh chờ
+              {t.tour.matchBackToLobby}
             </button>
           </div>
         </div>

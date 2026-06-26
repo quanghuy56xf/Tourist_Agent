@@ -133,7 +133,7 @@ export default function TourDetailPage() {
             minHeight: "0px",
           }}
         >
-          ⚔ Thi Đấu Tour Này (Tạo Room)
+          {t.tour.matchTourBtn}
         </button>
       </div>
     </main>

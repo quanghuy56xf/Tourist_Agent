@@ -65,7 +65,7 @@ export default function CompanionAvatar({
         {assetAvailable && (
           <img
             src={SOURCES[state]}
-            alt="Minh họa Lê Quý Đôn 18 tuổi"
+            alt={t.companion.avatarAlt}
             className="absolute inset-0 h-full w-full object-contain"
             onError={() => setAssetAvailable(false)}
           />
@@ -101,7 +101,7 @@ export default function CompanionAvatar({
       {assetAvailable ? (
         <img
           src={SOURCES[state]}
-          alt="Minh họa Lê Quý Đôn 18 tuổi"
+          alt={t.companion.avatarAlt}
           className={`absolute top-0 left-0 w-full aspect-square object-cover object-top transition-transform duration-500 ease-in-out ${
             !introMode && !collapsed ? "scale-[0.62] origin-top translate-y-[6%]" : "scale-100 origin-top translate-y-0"
           }`}
@@ -109,9 +109,9 @@ export default function CompanionAvatar({
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-amber-100">
-          <div className="text-6xl">Đôn</div>
+          <div className="text-6xl">{t.companion.avatarFallbackName}</div>
           <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-amber-300/70">
-            18 tuổi
+            {t.companion.avatarAgeLabel}
           </p>
         </div>
       )}

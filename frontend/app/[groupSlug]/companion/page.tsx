@@ -54,7 +54,7 @@ export default function CompanionPage() {
 
   return (
     <div className="flex min-h-[100dvh] w-full justify-center bg-[#050914]">
-      <main className="relative flex min-h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-[#0b1328] text-amber-50 shadow-[0_0_50px_rgba(0,0,0,0.5)] sm:border-x sm:border-amber-900/30">
+      <main className="relative flex min-h-[100dvh] w-full max-w-md flex-col overflow-x-hidden overflow-y-hidden bg-[#0b1328] text-amber-50 shadow-[0_0_50px_rgba(0,0,0,0.5)] sm:border-x sm:border-amber-900/30">
       <header className="absolute left-0 right-0 top-0 z-30 flex items-start justify-between bg-gradient-to-b from-[#0b1328]/90 via-[#0b1328]/50 to-transparent px-4 py-4 pt-6 pointer-events-none">
         <div className="pointer-events-auto">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400">

@@ -88,7 +88,7 @@ export default function MinimapModal({
                 <div
                   className="absolute -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${currentZone.x}%`, top: `${currentZone.y}%` }}
-                  aria-label={`Vị trí hiện tại: ${currentZone.zoneName}`}
+                  aria-label={t.minimap.currentLocationAria.replace("{name}", currentZone.zoneName)}
                 >
                   <span className="absolute -inset-2 animate-ping rounded-full bg-red-400/70" />
                   <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]" />
@@ -98,7 +98,7 @@ export default function MinimapModal({
                 <div
                   className="absolute -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${suggestedZone.x}%`, top: `${suggestedZone.y}%` }}
-                  aria-label={`Điểm được gợi ý: ${suggestedZone.zoneName}`}
+                  aria-label={t.minimap.suggestedLocationAria.replace("{name}", suggestedZone.zoneName)}
                 >
                   <span className="absolute -inset-3 animate-ping rounded-full bg-amber-300/60" />
                   <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]" />

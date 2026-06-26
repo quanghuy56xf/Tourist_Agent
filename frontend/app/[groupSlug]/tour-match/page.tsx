@@ -120,11 +120,11 @@ export default function TourMatchLobbyPage() {
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomName.trim()) {
-      setErrorMsg("Vui lòng nhập tên phòng");
+      setErrorMsg(t.tour.matchErrRoomName);
       return;
     }
     if (!selectedTourId) {
-      setErrorMsg("Vui lòng chọn một tour thi đấu");
+      setErrorMsg(t.tour.matchErrSelectTour);
       return;
     }
 
@@ -144,7 +144,7 @@ export default function TourMatchLobbyPage() {
       });
       router.push(groupPath(groupSlug, `/tour-match/room/${res.room_id}`));
     } catch (err: any) {
-      setErrorMsg(err.message || "Tạo phòng đấu thất bại");
+      setErrorMsg(err.message || t.tour.matchErrCreateFailed);
     } finally {
       setIsCreating(false);
     }
@@ -168,12 +168,12 @@ export default function TourMatchLobbyPage() {
       <header className="artifact-page-head" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="mb-4 flex items-center gap-2">
           <HomeButton />
-          <BackButton onClick={() => router.push(homePath)} label="Trang chủ" />
+          <BackButton onClick={() => router.push(homePath)} label={t.common.home} />
         </div>
-        <p className="artifact-section-label mb-1">Thi Đấu Trực Tuyến</p>
-        <h1 className="font-display text-xl">Sảnh Chờ Thi Đấu</h1>
+        <p className="artifact-section-label mb-1">{t.tour.matchOnlineTitle}</p>
+        <h1 className="font-display text-xl">{t.tour.matchLobbyTitle}</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
-          Giao lưu, tạo phòng và thử thách khả năng nhận diện di vật cùng bạn bè.
+          {t.tour.matchLobbySubtitle}
         </p>
       </header>
 
@@ -181,10 +181,10 @@ export default function TourMatchLobbyPage() {
         <div className="p-4 flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
           <form onSubmit={handleSaveNickname} className="artifact-card p-6 space-y-4">
             <h2 className="text-lg font-bold text-center" style={{ color: "var(--primary)" }}>
-              ✦ Nhập Biệt Danh ✦
+              {t.tour.matchNicknameTitle}
             </h2>
             <p className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
-              Bạn cần có một biệt danh để nhận dạng trong phòng đấu.
+              {t.tour.matchNicknameHint}
             </p>
             <div>
               <input
@@ -193,8 +193,8 @@ export default function TourMatchLobbyPage() {
                 required
                 value={nicknameInput}
                 onChange={(e) => setNicknameInput(e.target.value)}
-                placeholder="Ví dụ: Anh Hùng Sử Việt"
-                className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all text-center"
+                placeholder={t.tour.matchNicknamePlaceholder}
+                className="w-full rounded-xl px-4 py-3 text-base outline-none transition-all text-center"
                 style={{
                   background: "var(--secondary)",
                   border: "1px solid var(--border)",
@@ -203,7 +203,7 @@ export default function TourMatchLobbyPage() {
               />
             </div>
             <button type="submit" className="artifact-btn-primary w-full text-sm font-semibold">
-              Xác nhận & Vào sảnh
+              {t.tour.matchNicknameConfirm}
             </button>
           </form>
         </div>
@@ -218,7 +218,7 @@ export default function TourMatchLobbyPage() {
               <span className="text-2xl">👑</span>
               <div>
                 <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                  Biệt danh của bạn:
+                  {t.tour.matchYourNickname}
                 </p>
                 <p className="text-sm font-bold" style={{ color: "var(--primary)" }}>
                   {nickname}
@@ -230,7 +230,7 @@ export default function TourMatchLobbyPage() {
               className="text-xs underline"
               style={{ color: "var(--muted-foreground)" }}
             >
-              Đổi biệt danh
+              {t.tour.matchChangeNickname}
             </button>
           </div>
 
@@ -268,22 +268,22 @@ export default function TourMatchLobbyPage() {
           {/* Create Room Accordion/Form */}
           <div className="artifact-card p-5 space-y-4">
             <h2 className="text-md font-bold font-display" style={{ color: "var(--primary)" }}>
-              ✙ Tạo Phòng Thi Đấu Mới
+              {t.tour.matchCreateRoomTitle}
             </h2>
             <form onSubmit={handleCreateRoom} className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>
-                    Tên phòng
+                    {t.tour.matchRoomNameLabel}
                   </label>
                   <input
                     type="text"
                     required
                     maxLength={30}
-                    placeholder="Ví dụ: Đấu trường Lam Kinh"
+                    placeholder={t.tour.matchRoomNamePlaceholder}
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                    className="w-full rounded-xl px-3 py-2.5 text-base outline-none"
                     style={{
                       background: "var(--secondary)",
                       border: "1px solid var(--border)",
@@ -293,11 +293,11 @@ export default function TourMatchLobbyPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>
-                    Chọn Tour thi đấu
+                    {t.tour.matchSelectTourLabel}
                   </label>
                   {loadingTours ? (
                     <div className="text-xs py-2" style={{ color: "var(--muted-foreground)" }}>
-                      Đang tải danh sách tour...
+                      {t.tour.matchLoadingTours}
                     </div>
                   ) : (
                     <select
@@ -310,9 +310,9 @@ export default function TourMatchLobbyPage() {
                         color: "var(--foreground)",
                       }}
                     >
-                      {tours.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {tourTitle(t, locale)} ({t.stops.length} stop)
+                      {tours.map((tour) => (
+                        <option key={tour.id} value={tour.id}>
+                          {tourTitle(tour, locale)} ({tour.stops.length} {t.tour.stops})
                         </option>
                       ))}
                     </select>
@@ -368,15 +368,15 @@ export default function TourMatchLobbyPage() {
 
               <div>
                 <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>
-                  Mô tả phòng (không bắt buộc)
+                  {t.tour.matchRoomDescLabel}
                 </label>
                 <input
                   type="text"
                   maxLength={100}
-                  placeholder="Ví dụ: Ai chụp nhanh nhất sẽ thắng!"
+                  placeholder={t.tour.matchRoomDescPlaceholder}
                   value={roomDesc}
                   onChange={(e) => setRoomDesc(e.target.value)}
-                  className="w-full rounded-xl px-3 py-2.5 text-xs outline-none"
+                  className="w-full rounded-xl px-3 py-2.5 text-base outline-none"
                   style={{
                     background: "var(--secondary)",
                     border: "1px solid var(--border)",
@@ -390,7 +390,7 @@ export default function TourMatchLobbyPage() {
                 disabled={isCreating || loadingTours}
                 className="artifact-btn-primary w-full py-3 text-xs font-bold transition-all disabled:opacity-50"
               >
-                {isCreating ? "Đang tạo phòng..." : "Tạo Phòng Mới & Vào Chờ"}
+                {isCreating ? t.tour.matchCreatingRoom : t.tour.matchCreateRoomBtn}
               </button>
             </form>
           </div>
@@ -399,7 +399,7 @@ export default function TourMatchLobbyPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-md font-bold font-display" style={{ color: "var(--primary)" }}>
-                ⚔ Danh Sách Phòng Đang Chờ
+                {t.tour.matchWaitingListTitle}
               </h2>
               <button
                 onClick={refreshRooms}
@@ -410,7 +410,7 @@ export default function TourMatchLobbyPage() {
                   color: "var(--foreground)",
                 }}
               >
-                ⟳ Làm mới
+                {t.tour.matchRefresh}
               </button>
             </div>
 
@@ -423,7 +423,7 @@ export default function TourMatchLobbyPage() {
               </div>
             ) : rooms.length === 0 ? (
               <div className="artifact-card p-8 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-                Hiện không có phòng đấu nào đang chờ. Hãy tự tạo phòng đầu tiên!
+                {t.tour.matchNoWaitingRooms}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3">
@@ -438,7 +438,7 @@ export default function TourMatchLobbyPage() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ background: "var(--secondary)", color: "var(--primary)", border: "1px solid var(--border)" }}>
-                            Code: {room.room_id}
+                            {t.tour.matchRoomCodeShort} {room.room_id}
                           </span>
                           <span className="text-sm font-bold">{room.name}</span>
                         </div>
@@ -448,20 +448,21 @@ export default function TourMatchLobbyPage() {
                           </p>
                         )}
                         <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
-                          Tour: <span className="font-semibold" style={{ color: "var(--foreground)" }}>{displayTourTitle}</span>
+                          {t.tour.matchTourPrefix}{" "}
+                          <span className="font-semibold" style={{ color: "var(--foreground)" }}>{displayTourTitle}</span>
                         </p>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(201, 168, 76, 0.1)", border: "1px solid var(--border)" }}>
-                          👥 {room.player_count} người
+                          👥 {room.player_count} {t.tour.matchPlayersSuffix}
                         </span>
                         <button
                           onClick={() => handleJoinRoom(room.room_id)}
                           className="artifact-btn-primary py-2 px-4 text-xs font-bold rounded-xl active:scale-95"
                           style={{ minHeight: "0px" }}
                         >
-                          Vào phòng →
+                          {t.tour.matchJoinRoomBtn}
                         </button>
                       </div>
                     </div>

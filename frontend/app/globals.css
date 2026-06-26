@@ -20,7 +20,10 @@
 html {
   overflow-x: hidden;
   width: 100%;
+  max-width: 100%;
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior-x: none;
+  touch-action: manipulation;
 }
 
 body {
@@ -29,10 +32,27 @@ body {
   width: 100%;
   max-width: 100%;
   min-height: 100dvh;
+  overscroll-behavior-x: none;
+  touch-action: manipulation;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-lato), Lato, system-ui, sans-serif;
   scrollbar-gutter: stable;
+}
+
+/* iOS Safari zooms focused inputs below 16px — keep visitor + mobile forms readable */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.artifact-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.artifact-shell select,
+.artifact-shell textarea {
+  font-size: 16px;
 }
 
 .font-display {
@@ -50,6 +70,8 @@ html[lang="en"] .font-display {
 @layer components {
   .artifact-shell {
     @apply mx-auto box-border flex min-h-[100dvh] w-full max-w-phone flex-col overflow-x-hidden;
+    max-width: min(100vw, theme(maxWidth.phone));
+    overscroll-behavior-x: none;
   }
 
   .artifact-shell-pad {
