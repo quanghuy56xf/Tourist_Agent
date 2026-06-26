@@ -34,6 +34,7 @@ from app.modules.content.content_analytics import (
     record_content_issue,
     should_record_audio_error,
 )
+from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.modules.rag.service import (
@@ -270,7 +271,58 @@ class ItemContentService:
             raise
         except Exception:
             logger.exception("Story generation failed for item %s", item.id)
-            return item.description, "fallback_description"
+            return self._fallback_generated_text(item, persona, language)
+
+    def _fallback_generated_text(
+        self,
+        item: Item,
+        persona: str,
+        language: str,
+    ) -> tuple[str, str]:
+        language = normalize_language(language)
+        if language == DEFAULT_LANGUAGE:
+            return item.description or "", "fallback_description"
+
+        base = (item.description or "").strip()
+        if not base:
+            return no_item_knowledge_message(language), "no_knowledge"
+
+        try:
+            adapted = get_rag_generator().adapt_content(
+                base,
+                item.name,
+                persona,
+                language,
+            )
+            return polish_generated_text(adapted), "generated"
+        except LLMServiceUnavailableError:
+            raise
+        except Exception:
+            logger.exception(
+                "Adaptation fallback failed for item %s (%s)", item.id, language
+            )
+            raise LLMServiceUnavailableError("Content generation unavailable")
+
+    def _foreign_variant_is_stale(
+        self,
+        item: Item,
+        variant: ItemContentVariant,
+        base_variant: ItemContentVariant | None,
+    ) -> bool:
+        text = variant.text_content.strip()
+        if not text:
+            return True
+        if variant.source == "fallback_description":
+            return True
+        description = (item.description or "").strip()
+        if description and text == description:
+            return True
+        if (
+            base_variant is not None
+            and text == base_variant.text_content.strip()
+        ):
+            return True
+        return False
 
     def generate_and_persist(
         self,
@@ -328,32 +380,29 @@ class ItemContentService:
     ) -> ItemContentResult:
         persona = normalize_persona(persona)
         language = normalize_language(language)
+        base_variant = (
+            self.get_valid_variant(db, item, DEFAULT_PERSONA, DEFAULT_LANGUAGE)
+            if language != DEFAULT_LANGUAGE
+            else None
+        )
+
         variant = self.get_valid_variant(db, item, persona, language)
         if variant is not None:
-            if language != DEFAULT_LANGUAGE:
+            if language != DEFAULT_LANGUAGE and self._foreign_variant_is_stale(
+                item, variant, base_variant
+            ):
+                variant = None
+            else:
+                return self._variant_to_result(item.id, variant, stored=True)
+
+        if persona != DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
+            if base_variant is None:
                 base_variant = self.get_valid_variant(
                     db,
                     item,
                     DEFAULT_PERSONA,
                     DEFAULT_LANGUAGE,
                 )
-                if (
-                    base_variant is not None
-                    and variant.text_content.strip() == base_variant.text_content.strip()
-                ):
-                    variant = None
-                else:
-                    return self._variant_to_result(item.id, variant, stored=True)
-            else:
-                return self._variant_to_result(item.id, variant, stored=True)
-
-        if persona != DEFAULT_PERSONA and language == DEFAULT_LANGUAGE:
-            base_variant = self.get_valid_variant(
-                db,
-                item,
-                DEFAULT_PERSONA,
-                DEFAULT_LANGUAGE,
-            )
             if base_variant is not None and base_variant.text_content.strip():
                 try:
                     return self.generate_adapted_variant(
@@ -365,6 +414,22 @@ class ItemContentService:
                     )
                 except LLMServiceUnavailableError:
                     raise
+
+        if (
+            language != DEFAULT_LANGUAGE
+            and base_variant is not None
+            and base_variant.text_content.strip()
+        ):
+            try:
+                return self.generate_adapted_variant(
+                    db,
+                    item,
+                    persona,
+                    language,
+                    base_variant.text_content,
+                )
+            except LLMServiceUnavailableError:
+                raise
 
         return self.generate_and_persist(
             db,
