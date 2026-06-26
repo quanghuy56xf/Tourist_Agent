@@ -11,7 +11,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     # Optional: You can make this job wait for the 'Backend CI' workflow by using workflow_run,
     # but for simplicity it will just run when changes are pushed to main.
