@@ -13,6 +13,5 @@ docker compose -f docker-compose.prod.yml up -d --build
 # 4. Dọn dẹp image rác (Tránh việc build nhiều lần làm đầy ổ cứng máy ảo)
 echo "🧹 Đang dọn dẹp các bản build cũ..."
 docker image prune -f
-docker builder prune -f
 
 echo "✅ Hoàn tất! Hệ thống đã được cập nhật và đang chạy."
