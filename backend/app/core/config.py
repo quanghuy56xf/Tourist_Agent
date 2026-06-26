@@ -103,6 +103,9 @@ CONTENT_REGEN_MAX_WORKERS = int(os.getenv("CONTENT_REGEN_MAX_WORKERS", "4"))
 CONTENT_REGEN_TOP_K = int(os.getenv("CONTENT_REGEN_TOP_K", "3"))
 CONTENT_TTS_MAX_WORKERS = int(os.getenv("CONTENT_TTS_MAX_WORKERS", "4"))
 CONTENT_TTS_MIN_WORKERS = int(os.getenv("CONTENT_TTS_MIN_WORKERS", "2"))
+# When false, bulk content sync only synthesizes default persona/language audio;
+# the background audio sweep fills the remaining variants later.
+CONTENT_TTS_BULK_ALL_VARIANTS = _read_bool_env("CONTENT_TTS_BULK_ALL_VARIANTS", True)
 CONTENT_AUDIO_BACKOFF_FAILURES = int(os.getenv("CONTENT_AUDIO_BACKOFF_FAILURES", "3"))
 CONTENT_AUDIO_BACKOFF_SECONDS = int(os.getenv("CONTENT_AUDIO_BACKOFF_SECONDS", str(30 * 60)))
 CONTENT_AUDIO_FAILURE_WINDOW_SECONDS = int(

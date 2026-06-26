@@ -14,8 +14,8 @@ from app.models.item import Item
 from app.modules.analytics.service import get_client_ip, record_event
 from app.modules.content.text_utils import polish_generated_text
 from app.modules.content.tts import _synthesize_speech_async
-from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
+from app.modules.content.language_support import LANGUAGE_VI, normalize_language_label
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.schemas.generate import (
@@ -167,7 +167,12 @@ async def chat_with_companion_stream(
         )
         if not has_verified:
             async def generate_fallback():
-                fallback_msg = "Cái này ta chưa đọc đến, để tra lại sau!" if request.language == "Tiếng Việt" else "I haven't read about this yet, let me check it later!"
+                is_vi = normalize_language_label(request.language) == LANGUAGE_VI
+                fallback_msg = (
+                    "Cái này ta chưa đọc đến, để tra lại sau!"
+                    if is_vi
+                    else "I haven't read about this yet, let me check it later!"
+                )
                 yield f"event: chunk\ndata: {json.dumps({'text': fallback_msg})}\n\n"
                 yield "event: done\ndata: {}\n\n"
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
@@ -296,7 +301,8 @@ async def chat_with_companion_stream(
                 await event_queue.put(None)
 
         if "[SYSTEM_EVENT]: APP_OPENED" in request.message:
-            scan_label = "📸 Quét hiện vật gần nhất" if request.language == "Tiếng Việt" else "📸 Scan nearest object"
+            is_vi = normalize_language_label(request.language) == LANGUAGE_VI
+            scan_label = "📸 Quét hiện vật gần nhất" if is_vi else "📸 Scan nearest object"
             actions = {
                 "buttons": [
                     {
@@ -317,7 +323,7 @@ async def chat_with_companion_stream(
             yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
 
         if tour_completed:
-            restart_label = "🔄 Bắt đầu hành trình mới" if request.language == "Tiếng Việt" else "🔄 Start a new journey"
+            restart_label = "🔄 Bắt đầu hành trình mới" if is_vi else "🔄 Start a new journey"
             actions = {
                 "buttons": [
                     {

@@ -2,7 +2,6 @@
 import io
 import logging
 from collections.abc import AsyncIterator
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 
 import edge_tts
@@ -40,11 +39,14 @@ def build_audio_mime(persona: str | None = None) -> str:
 def is_current_audio_mime(stored_mime: str | None, persona: str | None = None) -> bool:
     if not stored_mime:
         return False
+    base = stored_mime.split(";")[0].strip()
+    if base != TTS_MEDIA_TYPE:
+        return False
     for part in stored_mime.split(";")[1:]:
         if part.strip().startswith("engine="):
             expected = COMPANION_TTS_ENGINE_ID if persona == "Companion" else TTS_ENGINE_ID
             return part.strip().split("=", 1)[1] == expected
-    return False
+    return True
 
 
 def response_audio_mime(stored_mime: str) -> str:
@@ -78,8 +80,15 @@ async def _synthesize_speech_async(
     return audio, "audio/mpeg"
 
 
-def _run_synthesis(text: str, language: str, persona: str | None = None) -> tuple[bytes, str]:
-    return asyncio.run(_synthesize_speech_async(text, language, persona))
+async def _synthesize_speech_with_timeout(
+    text: str,
+    language: str,
+    persona: str | None = None,
+) -> tuple[bytes, str]:
+    return await asyncio.wait_for(
+        _synthesize_speech_async(text, language, persona),
+        timeout=TTS_TIMEOUT_SECONDS,
+    )
 
 
 def synthesize_speech(
@@ -96,11 +105,11 @@ def synthesize_speech(
         )
 
     try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(_run_synthesis, cleaned, language, persona)
-            audio, mime = future.result(timeout=TTS_TIMEOUT_SECONDS)
+        audio, mime = asyncio.run(
+            _synthesize_speech_with_timeout(cleaned, language, persona)
+        )
         return TTSResult(ok=True, audio=audio, mime=mime)
-    except FuturesTimeoutError:
+    except TimeoutError:
         logger.warning("Text-to-speech synthesis timed out after %ss", TTS_TIMEOUT_SECONDS)
         return TTSResult(
             ok=False,

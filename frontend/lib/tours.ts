@@ -9,6 +9,8 @@ import {
   TourDetail,
 } from "@/lib/api";
 
+import type { VisitorLocale } from "@/lib/i18n";
+
 export type TourStop = {
   itemId: number;
   name: string;
@@ -196,15 +198,17 @@ export function markStopComplete(
   return { finished: progress.currentStep >= totalStops, progress };
 }
 
-export function tourTitle(tour: ResolvedTour, locale: "vi" | "en"): string {
-  return locale === "vi" ? tour.titleVi : tour.titleEn;
+export function tourTitle(tour: ResolvedTour, locale: VisitorLocale): string {
+  if (locale === "vi") return tour.titleVi;
+  return tour.titleEn;
 }
 
-export function tourDescription(tour: ResolvedTour, locale: "vi" | "en"): string {
-  return locale === "vi" ? tour.descriptionVi : tour.descriptionEn;
+export function tourDescription(tour: ResolvedTour, locale: VisitorLocale): string {
+  if (locale === "vi") return tour.descriptionVi;
+  return tour.descriptionEn;
 }
 
-export function stopHint(stop: TourStop, locale: "vi" | "en"): string {
+export function stopHint(stop: TourStop, locale: VisitorLocale): string {
   const hint = locale === "vi" ? stop.hintVi : stop.hintEn;
   if (hint.trim()) return hint;
   return stop.description;

@@ -1,14 +1,16 @@
-from concurrent.futures import TimeoutError as FuturesTimeoutError
+import asyncio
 from unittest.mock import patch
 
 from app.modules.content.tts import TTSResult, synthesize_speech
 
 
 def test_synthesize_speech_reports_timeout():
-    with patch("app.modules.content.tts.ThreadPoolExecutor") as executor_cls:
-        pool = executor_cls.return_value.__enter__.return_value
-        pool.submit.return_value.result.side_effect = FuturesTimeoutError()
-        result = synthesize_speech("Xin chào", "Tiếng Việt")
+    async def hang(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    with patch("app.modules.content.tts.TTS_TIMEOUT_SECONDS", 0.001):
+        with patch("app.modules.content.tts._synthesize_speech_async", side_effect=hang):
+            result = synthesize_speech("Xin chào", "Tiếng Việt")
 
     assert result.ok is False
     assert result.error_code == "timeout"

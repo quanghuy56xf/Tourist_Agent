@@ -14,7 +14,7 @@ import {
 import MinimapModal from "./MinimapModal";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
-export default function MinimapButton() {
+export default function MinimapButton({ elevated = false }: { elevated?: boolean }) {
   const { t } = useVisitorLocale();
   const groupSlug = useGroupSlug();
   const [open, setOpen] = useState(false);
@@ -67,11 +67,18 @@ export default function MinimapButton() {
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-phone px-4">
-        <button
-          type="button"
-          onClick={handleOpen}
-          className="pointer-events-auto relative grid h-12 w-12 place-items-center rounded-full border border-amber-300/40 bg-[#251b0e]/95 text-amber-300 shadow-lg shadow-black/40 backdrop-blur transition hover:scale-105 hover:bg-[#332614] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+      <div
+        className={`pointer-events-none fixed left-1/2 z-40 w-full max-w-phone -translate-x-1/2 px-4 ${
+          elevated
+            ? "bottom-[calc(8.75rem+env(safe-area-inset-bottom))]"
+            : "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+        }`}
+      >
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleOpen}
+            className="pointer-events-auto relative grid h-11 w-11 place-items-center rounded-full border border-amber-300/40 bg-[#251b0e]/95 text-amber-300 shadow-lg shadow-black/40 backdrop-blur transition hover:scale-105 hover:bg-[#332614] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
           aria-label={t.minimap.openMap}
           title={t.minimap.title}
         >
@@ -96,6 +103,7 @@ export default function MinimapButton() {
             />
           )}
         </button>
+        </div>
       </div>
       <MinimapModal
         open={open}

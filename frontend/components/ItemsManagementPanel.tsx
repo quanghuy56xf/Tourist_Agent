@@ -213,22 +213,28 @@ export default function ItemsManagementPanel({
         if (!active) return;
         setItemSyncStates(new Map(status.items.map((row) => [row.item_id, row])));
         const needsWork = status.summary.needs_update > 0;
-        if (status.is_sync_active || (contentSyncing && needsWork)) {
+        if (status.is_sync_active) {
           schedule();
-        } else {
-          if (contentSyncing) {
-            setContentSyncing(false);
-            loadItems();
-          } else {
-            setContentSyncing(false);
-          }
+        } else if (contentSyncing) {
+          setContentSyncing(false);
+          loadItems();
           if (
-            needsWork === false &&
+            !needsWork &&
             status.summary.total > 0 &&
             status.summary.synced === status.summary.total
           ) {
             setContentSyncMessage("Tất cả hiện vật đã có đủ mô tả và audio.");
+          } else if (needsWork) {
+            setContentSyncMessage(
+              `Đã xử lý xong. Còn ${status.summary.needs_update}/${status.summary.total} hiện vật chưa đủ mô tả & audio.`
+            );
           }
+        } else if (
+          !needsWork &&
+          status.summary.total > 0 &&
+          status.summary.synced === status.summary.total
+        ) {
+          setContentSyncMessage("Tất cả hiện vật đã có đủ mô tả và audio.");
         }
       } catch (pollError) {
         console.error("Failed to fetch content sync status", pollError);

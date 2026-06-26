@@ -3,6 +3,10 @@ from typing import Protocol
 
 from langchain_core.documents import Document
 
+from app.modules.content.language_support import (
+    no_item_knowledge_message as supported_no_item_knowledge_message,
+)
+
 logger = logging.getLogger(__name__)
 
 NO_ITEM_KNOWLEDGE_VI = (
@@ -102,9 +106,7 @@ def _group_documents(documents: list[Document]) -> list[Document]:
 
 
 def no_item_knowledge_message(language: str) -> str:
-    if language == "Tiếng Anh":
-        return NO_ITEM_KNOWLEDGE_EN
-    return NO_ITEM_KNOWLEDGE_VI
+    return supported_no_item_knowledge_message(language)
 
 
 def is_item_registration_document(document: Document) -> bool:

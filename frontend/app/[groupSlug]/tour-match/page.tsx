@@ -1,14 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import HomeButton from "@/components/visitor/HomeButton";
 import BackButton from "@/components/visitor/BackButton";
+import TourStopsPreview from "@/components/visitor/TourStopsPreview";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { groupPath } from "@/lib/groupSlug";
 import { readStoredGroupId } from "@/lib/visitorAnalytics";
 import { loadSuggestedTours, ResolvedTour, tourTitle } from "@/lib/tours";
+import {
+  clearMatchMembership,
+  ensurePlayerId,
+  gameModeLabel,
+  readMatchMembership,
+  type GameMode,
+} from "@/lib/tourMatch";
 import { fetchApi } from "@/lib/api";
 
 interface MatchRoomSummary {
@@ -16,6 +24,8 @@ interface MatchRoomSummary {
   name: string;
   description: string;
   tour_id: string;
+  game_mode: GameMode;
+  with_map: boolean;
   player_count: number;
   status: string;
 }
@@ -25,7 +35,7 @@ export default function TourMatchLobbyPage() {
   const searchParams = useSearchParams();
   const groupSlug = useGroupSlug();
   const homePath = useGroupPath("");
-  const { locale } = useVisitorLocale();
+  const { locale, t } = useVisitorLocale();
 
   const preselectedTour = searchParams ? searchParams.get("tour") || "" : "";
 
@@ -41,8 +51,15 @@ export default function TourMatchLobbyPage() {
   const [roomName, setRoomName] = useState("");
   const [roomDesc, setRoomDesc] = useState("");
   const [selectedTourId, setSelectedTourId] = useState("");
+  const [gameMode, setGameMode] = useState<GameMode>("sequential");
+  const [withMap, setWithMap] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const selectedTour = useMemo(
+    () => tours.find((tour) => tour.id === selectedTourId) ?? null,
+    [tours, selectedTourId]
+  );
 
   // Load nickname from local storage on mount
   useEffect(() => {
@@ -121,6 +138,8 @@ export default function TourMatchLobbyPage() {
           name: roomName.trim(),
           description: roomDesc.trim(),
           tour_id: selectedTourId,
+          game_mode: gameMode,
+          with_map: withMap,
         }),
       });
       router.push(groupPath(groupSlug, `/tour-match/room/${res.room_id}`));
@@ -132,8 +151,17 @@ export default function TourMatchLobbyPage() {
   };
 
   const handleJoinRoom = (roomId: string) => {
+    const existing = readMatchMembership();
+    if (existing && existing.groupSlug === groupSlug && existing.roomId !== roomId) {
+      const ok = window.confirm(t.tour.matchConfirmLeave);
+      if (!ok) return;
+      clearMatchMembership();
+    }
     router.push(groupPath(groupSlug, `/tour-match/room/${roomId}`));
   };
+
+  const savedMembership =
+    readMatchMembership()?.groupSlug === groupSlug ? readMatchMembership() : null;
 
   return (
     <main className="flex flex-1 flex-col w-full pb-8">
@@ -206,6 +234,24 @@ export default function TourMatchLobbyPage() {
             </button>
           </div>
 
+          {savedMembership && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  groupPath(groupSlug, `/tour-match/room/${savedMembership.roomId}`)
+                )
+              }
+              className="artifact-card w-full p-4 text-left transition hover:scale-[1.01]"
+              style={{ borderColor: "var(--primary)" }}
+            >
+              <p className="text-xs font-semibold" style={{ color: "var(--primary)" }}>
+                {t.tour.matchRejoin}
+              </p>
+              <p className="mt-1 text-sm font-bold">{savedMembership.roomId}</p>
+            </button>
+          )}
+
           {errorMsg && (
             <div
               className="rounded-xl px-4 py-3 text-center text-sm"
@@ -272,6 +318,52 @@ export default function TourMatchLobbyPage() {
                     </select>
                   )}
                 </div>
+              </div>
+
+              {selectedTour && !loadingTours ? (
+                <TourStopsPreview
+                  tour={selectedTour}
+                  title={t.tour.matchTourItems}
+                  emptyLabel={t.tour.empty}
+                />
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--muted-foreground)" }}>
+                    {t.tour.matchGameMode}
+                  </label>
+                  <select
+                    value={gameMode}
+                    onChange={(e) => setGameMode(e.target.value as GameMode)}
+                    className="w-full rounded-xl px-3 py-2.5 text-xs outline-none cursor-pointer"
+                    style={{
+                      background: "var(--secondary)",
+                      border: "1px solid var(--border)",
+                      color: "var(--foreground)",
+                    }}
+                  >
+                    <option value="sequential">{gameModeLabel("sequential", locale)}</option>
+                    <option value="sequential_random">
+                      {gameModeLabel("sequential_random", locale)}
+                    </option>
+                    <option value="free">{gameModeLabel("free", locale)}</option>
+                  </select>
+                </div>
+                <label className="artifact-card flex cursor-pointer items-start gap-3 p-3">
+                  <input
+                    type="checkbox"
+                    checked={withMap}
+                    onChange={(e) => setWithMap(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+                  />
+                  <span>
+                    <span className="block text-xs font-semibold">{t.tour.matchWithMap}</span>
+                    <span className="mt-1 block text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                      {t.tour.matchWithMapHint}
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div>

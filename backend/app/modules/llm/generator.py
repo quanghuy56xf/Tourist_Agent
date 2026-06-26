@@ -15,6 +15,12 @@ from app.core.config import (
     LLM_PROVIDER,
     LLM_TIMEOUT_SECONDS,
 )
+from app.modules.content.language_support import (
+    LANGUAGE_VI,
+    answer_language_instruction,
+    document_not_found_message,
+    write_language_instruction,
+)
 from app.modules.llm.client import extract_complete_text, invoke_llm
 
 _NATURAL_SPEECH_RULE = """KHÔNG mở đầu hoặc chen các cụm meta như "Dựa trên tài liệu được cung cấp",
@@ -69,11 +75,7 @@ class RAGGenerator:
         return "\n\n".join(formatted_docs)
 
     def _grounding_instructions(self, retrieved_docs: List[Document], language: str) -> str:
-        lang_instruction = (
-            "BẮT BUỘC trả lời bằng Tiếng Việt."
-            if language == "Tiếng Việt"
-            else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
-        )
+        lang_instruction = answer_language_instruction(language)
         has_registration = any(
             is_item_registration_document(doc) and (doc.page_content or "").strip()
             for doc in retrieved_docs
@@ -110,7 +112,7 @@ class RAGGenerator:
 
     def generate_answer(self, query: str, retrieved_docs: List[Document], persona: str = "Mặc định", language: str = "Tiếng Việt") -> str:
         if not retrieved_docs:
-            return "Tôi không tìm thấy thông tin nào liên quan đến câu hỏi này trong tài liệu."
+            return document_not_found_message(language)
 
         context = self._format_context(retrieved_docs)
 
@@ -161,11 +163,7 @@ Câu trả lời:"""
         persona: str = "Mặc định",
         language: str = "Tiếng Việt",
     ) -> str:
-        lang_instruction = (
-            "BẮT BUỘC viết bằng Tiếng Việt."
-            if language == "Tiếng Việt"
-            else "BẮT BUỘC viết bằng Tiếng Anh (MUST WRITE IN ENGLISH)."
-        )
+        lang_instruction = write_language_instruction(language)
 
         if persona == "Gen Z Explorer":
             persona_instructions = """Phong cách (Gen Z Explorer):
@@ -191,6 +189,7 @@ Không nhắc đến "tài liệu" hay "nguồn tham khảo"."""
         prompt = f"""Bạn là biên tập viên nội dung thuyết minh di tích.
 
 Viết lại mô tả về hiện vật "{item_name}" dựa trên nội dung gốc bên dưới.
+Nếu ngôn ngữ đích khác ngôn ngữ bản gốc, hãy DỊCH toàn bộ sang ngôn ngữ đích — không giữ nguyên tiếng Việt hay tiếng Anh trong bản trả lời.
 Giữ nguyên các thông tin chính xác, KHÔNG thêm chi tiết không có trong bản gốc.
 Nếu bản gốc cho biết không có đủ thông tin, hãy giữ nguyên ý đó (chỉ đổi phong cách/ngôn ngữ).
 {lang_instruction}
@@ -222,7 +221,7 @@ Mô tả đã viết lại:"""
         context = self._format_context(retrieved_docs) if retrieved_docs else "Không có ngữ cảnh bổ sung."
         artifact = " ".join((item_name or "").split()).strip() or "hiện vật đang xem"
 
-        lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt." if language == "Tiếng Việt" else "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+        lang_instruction = answer_language_instruction(language)
 
         base_instructions = f"""Nhiệm vụ của bạn:
 1. Bạn đang đóng vai trò một trợ lý ảo tư vấn về di tích lịch sử.
@@ -289,8 +288,8 @@ Tài liệu được cung cấp (Context):
             if retrieved_docs
             else "Không có ngữ cảnh xác thực bổ sung."
         )
-        if language == "Tiếng Anh":
-            lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Anh (MUST ANSWER IN ENGLISH)."
+        if language != "Tiếng Việt":
+            lang_instruction = answer_language_instruction(language)
             journey_str = ", ".join(visited_items) if visited_items else "No locations visited yet"
             current_item_str = current_item if current_item else "No specific object"
             next_item_str = f"Suggest the visitor to go to: {next_item_name}" if next_item_name else ""
@@ -328,7 +327,7 @@ Verified Context:
 {context}
 """
         else:
-            lang_instruction = "BẮT BUỘC trả lời bằng Tiếng Việt."
+            lang_instruction = answer_language_instruction(language)
             journey_str = ", ".join(visited_items) if visited_items else "Chưa có điểm nào"
             current_item_str = current_item if current_item else "Chưa có hiện vật cụ thể nào"
             next_item_str = f"Gợi ý du khách đi tới: {next_item_name}" if next_item_name else ""

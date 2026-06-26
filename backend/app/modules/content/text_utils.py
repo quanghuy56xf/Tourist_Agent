@@ -1,5 +1,9 @@
 import re
 
+from app.modules.content.language_support import (
+    document_not_found_message as supported_document_not_found_message,
+)
+
 GENERATION_RULES_VERSION = "llm-complete-rag-filter-v3"
 
 DOCUMENT_NOT_FOUND_VI = "Tôi không tìm thấy thông tin trong tài liệu."
@@ -93,9 +97,7 @@ def is_non_adaptable_content(text: str) -> bool:
 
 
 def document_not_found_message(language: str) -> str:
-    if language == "Tiếng Anh":
-        return DOCUMENT_NOT_FOUND_EN
-    return DOCUMENT_NOT_FOUND_VI
+    return supported_document_not_found_message(language)
 
 
 def is_no_knowledge_content(text: str) -> bool:

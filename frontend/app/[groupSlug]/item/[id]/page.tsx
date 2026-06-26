@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
 import { rememberMinimapItem } from "@/lib/minimapState";
+import MinimapButton from "@/components/visitor/MinimapButton";
 import { addVisitedItem } from "@/lib/companionState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
@@ -402,7 +403,7 @@ export default function ItemDetailPage() {
         </div>
       </div>
 
-
+      <MinimapButton elevated={inTour} />
     </main>
   );
 }
