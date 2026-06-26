@@ -4,6 +4,9 @@ const backendUrl =
 
 const nextConfig = {
   output: "standalone",
+  images: {
+    unoptimized: true,
+  },
   async rewrites() {
     return [
       {
