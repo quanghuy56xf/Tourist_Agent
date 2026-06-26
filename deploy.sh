@@ -6,11 +6,7 @@ echo "🚀 Bắt đầu quá trình cập nhật mã nguồn và khởi động 
 echo "📥 Đang tải code mới từ GitHub..."
 git pull origin main
 
-# 2. Tắt các container hiện tại (tùy chọn, thường up -d --build sẽ tự thay thế, nhưng down sẽ an toàn hơn nếu có đổi biến môi trường)
-echo "🛑 Đang tắt các dịch vụ cũ..."
-docker compose -f docker-compose.prod.yml down
-
-# 3. Build và khởi động lại
+# 2. Build và khởi động lại (Zero-downtime recreation)
 echo "⏳ Đang build và khởi động lại hệ thống..."
 docker compose -f docker-compose.prod.yml up -d --build
 
