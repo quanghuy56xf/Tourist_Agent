@@ -8,6 +8,7 @@ on:
       - 'docker-compose.prod.yml'
       - 'deploy.sh'
       - 'deploy/**'
+      - '.github/workflows/backend-cd.yml'
 
 jobs:
   deploy:
