@@ -14,6 +14,7 @@ from app.models.item import Item
 from app.modules.analytics.service import get_client_ip, record_event
 from app.modules.content.text_utils import polish_generated_text
 from app.modules.content.tts import _synthesize_speech_async
+from app.modules.llm.client import LLMServiceUnavailableError
 from app.modules.llm.generator import get_rag_generator
 from app.modules.content.language_support import LANGUAGE_VI, normalize_language_label
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
@@ -229,6 +230,7 @@ async def chat_with_companion_stream(
             tour_completed = True
 
     async def event_generator():
+        is_vi = normalize_language_label(request.language) == LANGUAGE_VI
         event_queue: asyncio.Queue[str | None] = asyncio.Queue()
         tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
@@ -301,7 +303,6 @@ async def chat_with_companion_stream(
                 await event_queue.put(None)
 
         if "[SYSTEM_EVENT]: APP_OPENED" in request.message:
-            is_vi = normalize_language_label(request.language) == LANGUAGE_VI
             scan_label = "📸 Quét hiện vật gần nhất" if is_vi else "📸 Scan nearest object"
             actions = {
                 "buttons": [

@@ -65,7 +65,8 @@ def test_upsert_item_document_replaces_existing_item_chunk(
         retriever_module.HybridRetriever
     )
     instance._index_lock = threading.RLock()
-    instance.vector_store = FakeVectorStore()
+    instance._dense_available = True
+    instance._vector_store = FakeVectorStore()
     instance.chunks = [
         Document(
             page_content="old",
@@ -80,8 +81,8 @@ def test_upsert_item_document_replaces_existing_item_chunk(
     instance.upsert_item_document(7, "new")
 
     persist_sparse_index.assert_called_once()
-    assert instance.vector_store.deleted_ids == ["item-7"]
-    assert instance.vector_store.added[0][1] == ["item-7"]
+    assert instance._vector_store.deleted_ids == ["item-7"]
+    assert instance._vector_store.added[0][1] == ["item-7"]
     assert [chunk.page_content for chunk in instance.chunks] == [
         "reference",
         "new",

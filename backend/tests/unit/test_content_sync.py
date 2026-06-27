@@ -3,7 +3,7 @@ from unittest.mock import Mock
 from app.models.content_variant import ItemContentVariant
 from app.models.group import Group
 from app.models.item import Item
-from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA
+from app.modules.content.personas import DEFAULT_LANGUAGE, DEFAULT_PERSONA, all_variants
 from app.modules.content.service import compute_content_hash
 from app.modules.content.sync_status import (
     evaluate_item_content_status,
@@ -31,8 +31,7 @@ def test_evaluate_item_content_status_synced_when_all_variants_ready(db_session)
     db_session.add(item)
     db_session.flush()
 
-    for persona in ("Mặc định", "Gen Z Explorer", "Family Visitor"):
-        for language in ("Tiếng Việt", "Tiếng Anh"):
+    for persona, language in all_variants():
             db_session.add(
                 ItemContentVariant(
                     item_id=item.id,
@@ -50,7 +49,7 @@ def test_evaluate_item_content_status_synced_when_all_variants_ready(db_session)
 
     status = evaluate_item_content_status(item, db_session.query(ItemContentVariant).filter_by(item_id=item.id).all())
     assert status["state"] == "synced"
-    assert status["variants_ready"] == 6
+    assert status["variants_ready"] == len(all_variants())
     assert status["needs_regeneration"] is False
 
 
@@ -65,8 +64,7 @@ def test_evaluate_item_content_status_synced_without_audio_for_no_information(db
     from app.modules.content.text_utils import document_not_found_message
 
     text = document_not_found_message("Tiếng Việt")
-    for persona in ("Mặc định", "Gen Z Explorer", "Family Visitor"):
-        for language in ("Tiếng Việt", "Tiếng Anh"):
+    for persona, language in all_variants():
             content = document_not_found_message(language)
             db_session.add(
                 ItemContentVariant(
@@ -195,8 +193,7 @@ def test_evaluate_item_content_status_accepts_legacy_audio_mime(db_session):
     db_session.add(item)
     db_session.flush()
 
-    for persona in ("Mặc định", "Gen Z Explorer", "Family Visitor"):
-        for language in ("Tiếng Việt", "Tiếng Anh"):
+    for persona, language in all_variants():
             db_session.add(
                 ItemContentVariant(
                     item_id=item.id,

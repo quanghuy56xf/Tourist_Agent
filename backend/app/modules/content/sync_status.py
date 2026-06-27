@@ -31,7 +31,7 @@ def is_group_sync_active(group_id: int) -> bool:
 def evaluate_item_content_status(
     item: Item,
     variants: list[ItemContentVariant],
-    group_knowledge_version: int,
+    group_knowledge_version: int = 0,
     *,
     group_sync_active: bool = False,
 ) -> dict:
@@ -60,7 +60,10 @@ def evaluate_item_content_status(
         )
 
         if not is_no_information_content(variant.text_content):
-            if variant.audio_data is None:
+            has_audio = getattr(variant, "has_audio", None)
+            if has_audio is None:
+                has_audio = variant.audio_data is not None
+            if not has_audio:
                 missing_any = True
                 continue
             if not is_current_audio_mime(variant.audio_mime, persona):
@@ -115,7 +118,17 @@ def evaluate_group_content_status(db: Session, group_id: int) -> dict:
 
     item_ids = [item.id for item in items]
     variants = (
-        db.query(ItemContentVariant)
+        db.query(
+            ItemContentVariant.item_id,
+            ItemContentVariant.persona,
+            ItemContentVariant.language,
+            ItemContentVariant.text_content,
+            ItemContentVariant.audio_mime,
+            ItemContentVariant.status,
+            ItemContentVariant.source,
+            ItemContentVariant.content_hash,
+            ItemContentVariant.audio_data.isnot(None).label("has_audio"),
+        )
         .filter(ItemContentVariant.item_id.in_(item_ids))
         .all()
     )

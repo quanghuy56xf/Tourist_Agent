@@ -79,6 +79,10 @@ _NO_INFORMATION_MARKERS = (
     "there is not enough verified information",
     "please add a description or heritage-site documents",
     "i could not find information about this in the documents",
+    "je n'ai pas trouvé d'informations",
+    "資料の中にその情報は見つかりませんでした",
+    "문서에서 해당 정보를 찾을 수 없습니다",
+    "我在资料中没有找到相关信息",
 )
 
 

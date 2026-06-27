@@ -55,9 +55,9 @@ class ItemContentResult:
     content: str
     has_audio: bool
     audio_url: str | None
-    audio_status: str
     stored: bool
     source: str
+    audio_status: str = "pending"
 
 
 def compute_content_hash(

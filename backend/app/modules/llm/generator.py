@@ -319,6 +319,7 @@ Communication style:
 {lang_instruction}
 {suggestion_prompt}
 
+Current object: {current_item_str}
 Visitor has visited: {journey_str}
 {next_item_str}
 {tour_completion_prompt}
@@ -357,6 +358,7 @@ Phong cách giao tiếp:
 {lang_instruction}
 {suggestion_prompt}
 
+Hiện vật hiện tại: {current_item_str}
 Du khách đã tham quan: {journey_str}
 {next_item_str}
 {tour_completion_prompt}

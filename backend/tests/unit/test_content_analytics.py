@@ -87,7 +87,7 @@ def test_should_record_audio_error_dedupes_same_variant_revision(db_session):
     db_session.add(item)
     db_session.commit()
 
-    variant_updated_at = datetime.utcnow()
+    variant_updated_at = datetime.utcnow() - timedelta(seconds=5)
     variant = ItemContentVariant(
         item_id=item.id,
         persona="Mặc định",
