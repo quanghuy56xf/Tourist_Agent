@@ -1,3 +1,32 @@
+## 2026-06-28 - Tối ưu Streaming TTS cho Companion
+
+Bối cảnh:
+- Luồng Companion streaming đã chạy theo mô hình Producer-Consumer + SSE nhưng khách vẫn cảm thấy chờ lâu trước câu nói đầu tiên và giữa các đoạn audio.
+
+Các thay đổi:
+- Thêm cached acknowledgement audio cho Companion để phản hồi bằng giọng nói gần như ngay khi khách gửi tin nhắn.
+- Thêm early phrase chunking để gửi đoạn đầu sang TTS trước khi LLM kết thúc cả câu dài.
+- Chuyển TTS Companion sang 2 workers synthesize song song, giữ đúng thứ tự phát bằng `seq` và `audio_orderer`.
+- Frontend giữ trạng thái speaking thêm một khoảng ngắn giữa các đoạn để giảm cảm giác audio bị khựng.
+- Phạm vi chỉ áp dụng cho `/api/companion/chat/stream`, không thay đổi luồng TTS trang thông tin hiện vật.
+
+Xác nhận:
+- `uv --project backend run pytest backend/tests/unit/test_companion_streaming_tts.py backend/tests/api/test_companion.py`: 12 passed.
+- `npm.cmd --prefix frontend run build`: thành công, chỉ còn cảnh báo `<img>` đã có từ trước.
+- `git diff --check`: không có lỗi whitespace.
+
+## 2026-06-27 - Cải thiện bảo mật Prompt Injection và chuẩn bị tính năng Góc nhìn lịch sử
+
+Bối cảnh:
+- Cần gia cố bảo vệ hệ thống tránh rò rỉ API Key và ngăn ngừa kẻ tấn công sử dụng các chiêu trò jailbreak (như hóa thân thành hacker hoặc yêu cầu xuất code Python).
+- Chuẩn bị phát triển tính năng Góc nhìn Lịch sử (Before/After) nhằm nâng cao trải nghiệm thị giác cho khách tham quan.
+
+Các thay đổi:
+- Đã triển khai "Shield Clause" (Luật bảo vệ) mạnh mẽ vào `base_instructions` và `system_prompt` trong `generator.py` cho cả hai luồng Hướng dẫn viên (Artifact) và Trợ lý ảo (Companion).
+- Chạy các script benchmark kiểm thử (`test_prompt_injection.py`) và ghi nhận tỉ lệ phòng thủ thành công 100% trước các Prompt Injection phổ biến mà không làm ảnh hưởng đến khả năng kể chuyện của Persona.
+- Lên 3 phương án ý tưởng thiết kế tính năng Góc nhìn lịch sử: Trượt ngang (Slider), Kính lúp xuyên thấu (X-Ray Lens), và Cuộn theo dòng thời gian (Time-lapse Scroll) để người dùng lựa chọn.
+- Phân tích và báo cáo nhanh về cơ chế Tour Khám phá (Guided Tour) và Game Quét ảnh (Tour Match) đang có trong hệ thống.
+
 ## 2026-06-17 - Khám phá nhóm triển lãm cho Khách tham quan
 
 Bối cảnh:

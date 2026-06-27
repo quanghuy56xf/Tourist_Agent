@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import logging
 import re
 import time
@@ -28,6 +29,98 @@ from app.schemas.generate import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+TTS_WORKER_COUNT = 2
+FIRST_SEGMENT_SOFT_LIMIT = 45
+NORMAL_SEGMENT_SOFT_LIMIT = 90
+SEGMENT_HARD_LIMIT = 150
+MIN_SEGMENT_LENGTH = 24
+TTS_STOP_MARKERS = ("||Q:", "||Action:")
+_ACK_AUDIO_CACHE: dict[tuple[str, str], bytes] = {}
+_ACK_AUDIO_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
+
+
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _companion_ack_text(language: str) -> str:
+    is_vi = normalize_language_label(language) == LANGUAGE_VI
+    return "Ừm, để Đôn xem nào." if is_vi else "Let me think for a moment."
+
+
+async def _get_companion_ack_audio(language: str) -> bytes:
+    text = _companion_ack_text(language)
+    key = (normalize_language_label(language), text)
+    cached = _ACK_AUDIO_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    lock = _ACK_AUDIO_LOCKS.setdefault(key, asyncio.Lock())
+    async with lock:
+        cached = _ACK_AUDIO_CACHE.get(key)
+        if cached is not None:
+            return cached
+        audio_bytes, _ = await _synthesize_speech_async(text, language, "Companion")
+        _ACK_AUDIO_CACHE[key] = audio_bytes
+        return audio_bytes
+
+
+def _find_stop_marker(text: str) -> int | None:
+    indexes = [idx for marker in TTS_STOP_MARKERS if (idx := text.find(marker)) >= 0]
+    return min(indexes) if indexes else None
+
+
+def _split_at(text: str, end: int, *, min_length: int = MIN_SEGMENT_LENGTH) -> tuple[str | None, str]:
+    segment = text[:end].strip()
+    remaining = text[end:].lstrip()
+    if len(segment) < min_length:
+        return None, text
+    return segment, remaining
+
+
+def _extract_tts_segments(buffer: str, *, first_segment: bool) -> tuple[list[str], str, bool]:
+    stop_tts = False
+    marker_idx = _find_stop_marker(buffer)
+    if marker_idx is not None:
+        buffer = buffer[:marker_idx]
+        stop_tts = True
+
+    segments: list[str] = []
+    while True:
+        sentence_match = re.search(r"(?<=[.?!。])\s+|\n+", buffer)
+        if sentence_match:
+            segment, buffer = _split_at(buffer, sentence_match.start() + 1, min_length=1)
+            if segment:
+                segments.append(segment)
+                first_segment = False
+                continue
+            break
+
+        soft_limit = FIRST_SEGMENT_SOFT_LIMIT if first_segment else NORMAL_SEGMENT_SOFT_LIMIT
+        if len(buffer) >= soft_limit:
+            soft_breaks = [match.end() for match in re.finditer(r"[,;:—–-]\s+", buffer)]
+            soft_breaks = [idx for idx in soft_breaks if idx >= MIN_SEGMENT_LENGTH]
+            if soft_breaks:
+                segment, buffer = _split_at(buffer, soft_breaks[-1])
+                if segment:
+                    segments.append(segment)
+                    first_segment = False
+                    continue
+
+        if len(buffer) >= SEGMENT_HARD_LIMIT:
+            cut = buffer.rfind(" ", MIN_SEGMENT_LENGTH, SEGMENT_HARD_LIMIT)
+            if cut < MIN_SEGMENT_LENGTH:
+                cut = SEGMENT_HARD_LIMIT
+            segment, buffer = _split_at(buffer, cut)
+            if segment:
+                segments.append(segment)
+                first_segment = False
+                continue
+
+        break
+
+    return segments, buffer, stop_tts
 
 
 def _record_chat(
@@ -145,8 +238,6 @@ def chat_with_ai(
     return ChatResponse(content=polish_generated_text(content))
 
 
-import json
-
 @router.post("/companion/chat/stream")
 async def chat_with_companion_stream(
     request: CompanionChatRequest,
@@ -231,12 +322,21 @@ async def chat_with_companion_stream(
 
     async def event_generator():
         is_vi = normalize_language_label(request.language) == LANGUAGE_VI
+        started = time.perf_counter()
         event_queue: asyncio.Queue[str | None] = asyncio.Queue()
-        tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        tts_queue: asyncio.Queue[tuple[int, str] | None] = asyncio.Queue()
+        tts_result_queue: asyncio.Queue[tuple[int, str, bytes | None] | None] = asyncio.Queue()
+
+        def elapsed_ms() -> int:
+            return int((time.perf_counter() - started) * 1000)
 
         async def llm_producer():
             current_sentence = ""
             stop_tts = False
+            has_sent_tts_segment = False
+            next_tts_seq = 0
+            first_chunk_ms: int | None = None
+            first_segment_ms: int | None = None
             try:
                 stream = get_rag_generator().generate_companion_chat_stream(
                     message=request.message,
@@ -248,58 +348,115 @@ async def chat_with_companion_stream(
                     language=request.language,
                 )
                 async for chunk in stream:
-                    await event_queue.put(
-                        f"event: chunk\ndata: {json.dumps({'text': chunk})}\n\n"
-                    )
+                    if first_chunk_ms is None:
+                        first_chunk_ms = elapsed_ms()
+                    await event_queue.put(_sse_event("chunk", {"text": chunk}))
                     if stop_tts:
                         continue
 
                     current_sentence += chunk
-                    
-                    if "||Q:" in current_sentence:
-                        idx = current_sentence.find("||Q:")
-                        current_sentence = current_sentence[:idx]
+                    segments, current_sentence, should_stop = _extract_tts_segments(
+                        current_sentence,
+                        first_segment=not has_sent_tts_segment,
+                    )
+                    for segment in segments:
+                        if first_segment_ms is None:
+                            first_segment_ms = elapsed_ms()
+                        await tts_queue.put((next_tts_seq, segment))
+                        next_tts_seq += 1
+                        has_sent_tts_segment = True
+                    if should_stop:
                         stop_tts = True
-                        
-                    while match := re.search(r"(?<=[.?!])\s+|\n\n", current_sentence):
-                        sentence = current_sentence[: match.start()].strip()
-                        current_sentence = current_sentence[match.end() :]
-                        if sentence:
-                            await tts_queue.put(sentence)
 
                 remaining_text = current_sentence.strip()
-                if remaining_text:
-                    await tts_queue.put(remaining_text)
+                if remaining_text and not stop_tts:
+                    if first_segment_ms is None:
+                        first_segment_ms = elapsed_ms()
+                    await tts_queue.put((next_tts_seq, remaining_text))
             except Exception:
                 logger.exception("Companion chat streaming failed")
-                await event_queue.put(
-                    f"event: error\ndata: {json.dumps({'detail': 'Lỗi sinh nội dung'})}\n\n"
-                )
+                await event_queue.put(_sse_event("error", {"detail": "Lỗi sinh nội dung"}))
             finally:
-                await tts_queue.put(None)
+                for _ in range(TTS_WORKER_COUNT):
+                    await tts_queue.put(None)
+                logger.info(
+                    "Companion stream text latency session=%s item=%s first_chunk_ms=%s first_segment_ms=%s",
+                    request.session_id,
+                    request.item_id,
+                    first_chunk_ms,
+                    first_segment_ms,
+                )
 
-        async def tts_consumer():
-            try:
-                while True:
-                    sentence = await tts_queue.get()
-                    if sentence is None:
-                        break
+        async def tts_worker(worker_id: int):
+            while True:
+                item = await tts_queue.get()
+                if item is None:
+                    await tts_result_queue.put(None)
+                    break
+                seq, text = item
+                tts_started_ms = elapsed_ms()
+                try:
                     audio_bytes, _ = await _synthesize_speech_async(
-                        sentence,
+                        text,
                         request.language,
                         "Companion",
                     )
-                    audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
-                    await event_queue.put(
-                        "event: audio\n"
-                        f"data: {json.dumps({'audio_base64': audio_base64})}\n\n"
+                    logger.debug(
+                        "Companion TTS segment worker=%s seq=%s start_ms=%s done_ms=%s chars=%s",
+                        worker_id,
+                        seq,
+                        tts_started_ms,
+                        elapsed_ms(),
+                        len(text),
                     )
+                    await tts_result_queue.put((seq, text, audio_bytes))
+                except Exception:
+                    logger.exception("Companion TTS segment failed seq=%s", seq)
+                    await tts_result_queue.put((seq, text, None))
+
+        async def audio_orderer():
+            next_seq_to_send = 0
+            pending: dict[int, tuple[str, bytes | None]] = {}
+            finished_workers = 0
+            first_audio_sent_ms: int | None = None
+            try:
+                while finished_workers < TTS_WORKER_COUNT:
+                    result = await tts_result_queue.get()
+                    if result is None:
+                        finished_workers += 1
+                        continue
+
+                    seq, text, audio_bytes = result
+                    pending[seq] = (text, audio_bytes)
+                    while next_seq_to_send in pending:
+                        ordered_text, ordered_audio = pending.pop(next_seq_to_send)
+                        if ordered_audio:
+                            audio_base64 = base64.b64encode(ordered_audio).decode("ascii")
+                            if first_audio_sent_ms is None:
+                                first_audio_sent_ms = elapsed_ms()
+                            await event_queue.put(
+                                _sse_event(
+                                    "audio",
+                                    {
+                                        "seq": next_seq_to_send,
+                                        "kind": "content",
+                                        "text": ordered_text,
+                                        "audio_base64": audio_base64,
+                                    },
+                                )
+                            )
+                        next_seq_to_send += 1
             except Exception:
-                logger.exception("Companion text-to-speech streaming failed")
-                await event_queue.put(
-                    f"event: error\ndata: {json.dumps({'detail': 'Lỗi sinh nội dung'})}\n\n"
-                )
+                logger.exception("Companion audio ordering failed")
+                await event_queue.put(_sse_event("error", {"detail": "Lỗi sinh nội dung"}))
             finally:
+                logger.info(
+                    "Companion stream audio latency session=%s item=%s first_audio_sent_ms=%s done_ms=%s",
+                    request.session_id,
+                    request.item_id,
+                    first_audio_sent_ms,
+                    elapsed_ms(),
+                )
                 await event_queue.put(None)
 
         if "[SYSTEM_EVENT]: APP_OPENED" in request.message:
@@ -335,8 +492,32 @@ async def chat_with_companion_stream(
             }
             yield f"event: actions\ndata: {json.dumps(actions)}\n\n"
 
+        async def ack_producer():
+            if "[SYSTEM_EVENT]:" in request.message:
+                return
+            try:
+                ack_audio = await _get_companion_ack_audio(request.language)
+                await event_queue.put(
+                    _sse_event(
+                        "audio",
+                        {
+                            "seq": -1,
+                            "kind": "ack",
+                            "audio_base64": base64.b64encode(ack_audio).decode("ascii"),
+                        },
+                    )
+                )
+            except Exception:
+                logger.exception("Companion acknowledgement TTS failed")
+
+        ack_task = asyncio.create_task(ack_producer())
         producer_task = asyncio.create_task(llm_producer())
-        consumer_task = asyncio.create_task(tts_consumer())
+        worker_tasks = [
+            asyncio.create_task(tts_worker(worker_id))
+            for worker_id in range(TTS_WORKER_COUNT)
+        ]
+        orderer_task = asyncio.create_task(audio_orderer())
+        tasks = [ack_task, producer_task, *worker_tasks, orderer_task]
         try:
             while True:
                 event = await event_queue.get()
@@ -345,8 +526,8 @@ async def chat_with_companion_stream(
                     break
                 yield event
         finally:
-            for task in (producer_task, consumer_task):
+            for task in tasks:
                 if not task.done():
                     task.cancel()
-            await asyncio.gather(producer_task, consumer_task, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
     return StreamingResponse(event_generator(), media_type="text/event-stream")
