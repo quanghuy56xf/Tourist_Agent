@@ -11,6 +11,7 @@ from app.core.database import get_db
 import app.main as main_module
 from app.main import app
 from app.models.item import Base
+from app.models.analytics_event import AnalyticsEvent  # noqa: F401
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
 from app.models.tour import Tour, TourStop  # noqa: F401
@@ -25,14 +26,29 @@ def disable_admin_auth_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def db_session() -> Generator[Session, None, None]:
+def db_session(monkeypatch: pytest.MonkeyPatch) -> Generator[Session, None, None]:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    session = sessionmaker(bind=engine)()
+    test_session_local = sessionmaker(
+        bind=engine,
+        autocommit=False,
+        autoflush=False,
+    )
+    monkeypatch.setattr("app.core.database.SessionLocal", test_session_local)
+    monkeypatch.setattr("app.modules.content.audio_jobs.SessionLocal", test_session_local)
+    monkeypatch.setattr("app.modules.content.bulk_update.SessionLocal", test_session_local)
+    monkeypatch.setattr(
+        "app.modules.content.content_analytics.SessionLocal",
+        test_session_local,
+    )
+    monkeypatch.setattr("app.modules.content.prewarm.SessionLocal", test_session_local)
+    monkeypatch.setattr("app.modules.content.router.SessionLocal", test_session_local)
+
+    session = test_session_local()
     try:
         yield session
     finally:
@@ -49,15 +65,8 @@ def client(
     def override_get_db():
         yield db_session
 
-    test_session_local = sessionmaker(
-        bind=db_session.get_bind(),
-        autocommit=False,
-        autoflush=False,
-    )
     monkeypatch.setattr(embedding, "warmup", Mock())
     monkeypatch.setattr(main_module, "init_db", Mock())
-    monkeypatch.setattr("app.core.database.SessionLocal", test_session_local)
-    monkeypatch.setattr("app.modules.content.prewarm.SessionLocal", test_session_local)
     app.dependency_overrides[get_db] = override_get_db
     try:
         with TestClient(app) as test_client:

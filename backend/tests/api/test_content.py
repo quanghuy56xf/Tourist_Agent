@@ -682,7 +682,11 @@ def test_update_item_content_persists_text_and_audio(client, db_session, monkeyp
     fake_audio = _tts_ok(b"new-audio", "audio/mpeg")
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: fake_audio,
+        lambda text, language, persona=None: fake_audio,
+    )
+    monkeypatch.setattr(
+        "app.modules.content.router._regenerate_other_variants_task",
+        lambda *args, **kwargs: None,
     )
 
     response = client.put(
