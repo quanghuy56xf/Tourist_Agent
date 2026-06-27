@@ -52,7 +52,7 @@ def test_generated_item_content_is_preserved_before_persistence(
     monkeypatch,
 ):
     item = _add_item(db_session)
-    long_text = " ".join(f"word{i}" for i in range(301))
+    long_text = "Word0 " + " ".join(f"word{i}" for i in range(1, 301))
     monkeypatch.setattr(
         "app.modules.content.service.get_rag_generator",
         lambda: Mock(generate_answer=Mock(return_value=long_text)),
@@ -63,7 +63,7 @@ def test_generated_item_content_is_preserved_before_persistence(
     )
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_fail(),
+        lambda text, language, persona=None: _tts_fail(),
     )
 
     result = ItemContentService().generate_and_persist(
@@ -80,7 +80,7 @@ def test_adapted_item_content_is_preserved_before_persistence(
     monkeypatch,
 ):
     item = _add_item(db_session)
-    long_text = " ".join(f"word{i}" for i in range(301))
+    long_text = "Word0 " + " ".join(f"word{i}" for i in range(1, 301))
     monkeypatch.setattr(
         "app.modules.content.service.get_rag_generator",
         lambda: Mock(adapt_content=Mock(return_value=long_text)),
@@ -344,7 +344,7 @@ def test_manual_content_is_not_truncated(db_session, monkeypatch):
     long_text = " ".join(f"word{i}" for i in range(350))
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_fail(),
+        lambda text, language, persona=None: _tts_fail(),
     )
 
     result = ItemContentService().update_content(
@@ -502,7 +502,7 @@ def test_get_or_generate_repairs_stored_variant_without_audio(
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_ok(b"repaired-audio", "audio/mpeg"),
+        lambda text, language, persona=None: _tts_ok(b"repaired-audio", "audio/mpeg"),
     )
     service = ItemContentService()
 
@@ -604,7 +604,7 @@ def test_get_item_content_audio_generates_when_missing(client, db_session, monke
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_ok(b"generated-audio", "audio/mpeg"),
+        lambda text, language, persona=None: _tts_ok(b"generated-audio", "audio/mpeg"),
     )
 
     response = client.get(
@@ -634,7 +634,7 @@ def test_ensure_audio_ignores_empty_tts_result(db_session, monkeypatch):
     db_session.commit()
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_ok(b"", "audio/mpeg"),
+        lambda text, language, persona=None: _tts_ok(b"", "audio/mpeg"),
     )
 
     variant = ItemContentService().ensure_audio(
@@ -752,7 +752,7 @@ def test_update_item_content_regenerates_other_variants(
     )
     monkeypatch.setattr(
         "app.modules.content.service.synthesize_speech",
-        lambda text, language: _tts_ok(b"audio", "audio/mpeg"),
+        lambda text, language, persona=None: _tts_ok(b"audio", "audio/mpeg"),
     )
 
     response = client.put(

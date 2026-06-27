@@ -101,7 +101,7 @@ def test_group_sync_status_requires_every_persona_language_variant(
     response = client.get(f"/api/groups/{group.id}/sync-status")
 
     assert response.status_code == 200
-    assert len(all_variants()) == 6
+    assert len(all_variants()) == 18
     assert response.json() == {
         "total_items": 1,
         "synced_items": 0,

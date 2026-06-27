@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+from langchain_core.documents import Document
 
 from app.models.group import Group
 from app.models.item import Item
@@ -121,6 +122,10 @@ def test_title_only_document_update_invalidates_all_content_variants(
         lambda: retriever,
     )
     monkeypatch.setattr(
+        "app.modules.content.relevance.try_get_rag_retriever",
+        lambda: retriever,
+    )
+    monkeypatch.setattr(
         "app.modules.rag.group_documents_router.regenerate_related_items_task",
         lambda *args, **kwargs: None,
     )
@@ -130,6 +135,18 @@ def test_title_only_document_update_invalidates_all_content_variants(
         data={"title": "Original", "text": "Reference content."},
     )
     assert created.status_code == 201
+
+    document_id = created.json()["id"]
+    retriever.retrieve.return_value = [
+        Document(
+            page_content="Reference content.",
+            metadata={
+                "source": "group_doc",
+                "group_id": group.id,
+                "document_id": document_id,
+            },
+        )
+    ]
 
     for item in (first, second):
         db_session.add(
@@ -146,7 +163,7 @@ def test_title_only_document_update_invalidates_all_content_variants(
     db_session.commit()
 
     response = client.put(
-        f"/api/groups/{group.id}/documents/{created.json()['id']}",
+        f"/api/groups/{group.id}/documents/{document_id}",
         data={"title": "Renamed"},
     )
 

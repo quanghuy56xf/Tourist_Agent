@@ -15,7 +15,13 @@ from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
 from app.models.tour import Tour, TourStop  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.modules.auth import dependencies as auth_dependencies
 from app.modules.vision import embedding
+
+
+@pytest.fixture(autouse=True)
+def disable_admin_auth_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(auth_dependencies, "ADMIN_AUTH_ENABLED", False)
 
 
 @pytest.fixture

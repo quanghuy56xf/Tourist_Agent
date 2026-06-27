@@ -13,7 +13,7 @@ def _clear_manager_rooms() -> None:
         if not task.done():
             task.cancel()
     manager._cleanup_tasks.clear()
-    _clear_manager_rooms()
+    manager.rooms.clear()
 
 
 def _seed_group_tour(db_session):
@@ -45,13 +45,18 @@ def test_create_and_list_rooms(client: TestClient, db_session):
     data = response.json()
     room_id = data["room_id"]
 
-    response = client.get("/api/tour-match/rooms")
-    assert response.status_code == 200
-    rooms = response.json()
-    assert len(rooms) == 1
-    assert rooms[0]["room_id"] == room_id
-    assert rooms[0]["game_mode"] == "sequential_random"
-    assert rooms[0]["with_map"] is True
+    with client.websocket_connect(
+        f"/api/tour-match/ws/{room_id}/host_player?nickname=Alice"
+    ) as ws_host:
+        ws_host.receive_json()
+        response = client.get("/api/tour-match/rooms")
+        assert response.status_code == 200
+        rooms = response.json()
+        assert len(rooms) == 1
+        assert rooms[0]["room_id"] == room_id
+        assert rooms[0]["game_mode"] == "sequential_random"
+        assert rooms[0]["with_map"] is True
+
 
     response = client.get(f"/api/tour-match/rooms/{room_id}")
     assert response.status_code == 200
@@ -109,7 +114,7 @@ def test_websocket_multiplayer_flow(client: TestClient, db_session):
             assert win_host["type"] == "match_finished"
 
 
-def test_sequential_random_assigns_unique_orders(client: TestClient, db_session):
+def test_sequential_random_assigns_unique_orders(client: TestClient, db_session, monkeypatch):
     _clear_manager_rooms()
     tour_id = _seed_group_tour(db_session)
     room_id = client.post(
@@ -121,6 +126,18 @@ def test_sequential_random_assigns_unique_orders(client: TestClient, db_session)
             "game_mode": "sequential_random",
         },
     ).json()["room_id"]
+
+    shuffle_calls = 0
+
+    def deterministic_shuffle(item_ids):
+        nonlocal shuffle_calls
+        shuffle_calls += 1
+        return list(reversed(item_ids)) if shuffle_calls % 2 == 0 else list(item_ids)
+
+    monkeypatch.setattr(
+        "app.modules.tour_match.manager._shuffle_item_ids",
+        deterministic_shuffle,
+    )
 
     with client.websocket_connect(
         f"/api/tour-match/ws/{room_id}/host_player?nickname=Alice"
@@ -143,7 +160,7 @@ def test_sequential_random_assigns_unique_orders(client: TestClient, db_session)
                 if player["status"] == "active"
             ]
             assert len(orders) == 2
-            assert orders[0] != orders[1] or len(set(orders[0])) < 2
+            assert orders[0] != orders[1]
 
 
 def test_websocket_host_controls(client: TestClient, db_session):
@@ -259,11 +276,11 @@ def test_kick_blocked_after_match_starts(client: TestClient, db_session):
             ws_host.receive_json()
             ws_bob.receive_json()
 
-            ws_host.send_json({"type": "kick_player", "target_id": "bob_id"})
-            # No kick: room should still contain bob
-            msg = ws_host.receive_json()
-            assert msg["type"] == "room_state"
-            assert any(p["player_id"] == "bob_id" for p in msg["room"]["players"])
+            asyncio.run(manager.kick_player(room_id, "host_id", "bob_id"))
+            # No kick: room should still contain bob after the match starts.
+            room = manager.get_room(room_id)
+            assert room is not None
+            assert "bob_id" in room.players
 
 
 def test_waiting_room_chat_broadcast(client: TestClient, db_session):

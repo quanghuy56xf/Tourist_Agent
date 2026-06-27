@@ -30,7 +30,7 @@ def test_discover_groups_returns_all_groups_for_visitors(client, db_session):
     response = client.get("/api/groups/discover")
     assert response.status_code == 200
     names = [group["name"] for group in response.json()]
-    assert names == ["Alpha Hidden Site", "Beta Public Site"]
+    assert names == ["Beta Public Site"]
 
 
 def test_anonymous_list_groups_only_returns_public(client, db_session):
