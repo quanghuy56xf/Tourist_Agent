@@ -198,6 +198,10 @@ export default function CompanionChat({
   }, []);
 
   const stopAllAudio = () => {
+    if (speakingGraceTimer.current) {
+      window.clearTimeout(speakingGraceTimer.current);
+      speakingGraceTimer.current = null;
+    }
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current.currentTime = 0;
@@ -205,6 +209,8 @@ export default function CompanionChat({
     }
     audioQueue.current = [];
     isPlayingAudio.current = false;
+    streamDoneRef.current = true;
+    setIsSpeaking(false);
   };
 
   useEffect(() => {
@@ -216,18 +222,25 @@ export default function CompanionChat({
 
   const isPlayingAudio = useRef(false);
   const audioQueue = useRef<string[]>([]);
-  
+  const streamDoneRef = useRef(true);
+  const speakingGraceTimer = useRef<number | null>(null);
+
   const processAudioQueue = async () => {
     if (isPlayingAudio.current) return;
+    if (speakingGraceTimer.current) {
+      window.clearTimeout(speakingGraceTimer.current);
+      speakingGraceTimer.current = null;
+    }
     isPlayingAudio.current = true;
     while (audioQueue.current.length > 0) {
       const url = audioQueue.current.shift();
       if (url) {
         setIsSpeaking(true);
         try {
-          await new Promise<void>((resolve, reject) => {
+          await new Promise<void>((resolve) => {
             const audio = persistentAudioRef.current;
             if (!audio) {
+              URL.revokeObjectURL(url);
               resolve();
               return;
             }
@@ -241,15 +254,27 @@ export default function CompanionChat({
               URL.revokeObjectURL(url);
               resolve(); // Continue on error
             };
-            audio.play().catch(() => resolve());
+            audio.play().catch(() => {
+              URL.revokeObjectURL(url);
+              resolve();
+            });
           });
         } finally {
           currentAudioRef.current = null;
-          setIsSpeaking(false);
         }
       }
     }
     isPlayingAudio.current = false;
+    if (!streamDoneRef.current) {
+      speakingGraceTimer.current = window.setTimeout(() => {
+        speakingGraceTimer.current = null;
+        if (!isPlayingAudio.current && audioQueue.current.length === 0) {
+          setIsSpeaking(false);
+        }
+      }, 400);
+    } else {
+      setIsSpeaking(false);
+    }
   };
 
   const enqueueAudioBlob = (url: string) => {
@@ -263,7 +288,8 @@ export default function CompanionChat({
     
     audioQueue.current = [];
     stopAllAudio();
-    
+    streamDoneRef.current = false;
+
     if (!isSystemEvent) {
       setSuggestedNextPoint(null);
       setActionButtons([]);
@@ -332,11 +358,16 @@ export default function CompanionChat({
             });
           }
         } else if (chunk.type === "audio") {
-          const bytes = Uint8Array.from(atob(chunk.data.audio_base64), c => c.charCodeAt(0));
-          const blob = new Blob([bytes], { type: 'audio/mpeg' });
-          enqueueAudioBlob(URL.createObjectURL(blob));
+          const audioBase64 = chunk.data.audio_base64;
+          if (audioBase64) {
+            const bytes = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
+            const blob = new Blob([bytes], { type: 'audio/mpeg' });
+            enqueueAudioBlob(URL.createObjectURL(blob));
+          }
         }
       }
+      streamDoneRef.current = true;
+      processAudioQueue();
 
       if (nextItemId !== null && nextItemName && onSuggestNextPoint) {
         setSuggestedNextPoint({ id: nextItemId, name: nextItemName });
@@ -364,6 +395,8 @@ export default function CompanionChat({
         return newHistory;
       });
     } finally {
+      streamDoneRef.current = true;
+      processAudioQueue();
       setIsLoading(false);
     }
   };

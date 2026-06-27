@@ -1,6 +1,6 @@
 # PROJECT STATUS: HERA - AI Heritage Guide V2
 
-**Cập nhật gần nhất:** 2026-06-24
+**Cập nhật gần nhất:** 2026-06-28
 Tài liệu này là ảnh chụp ngắn gọn về trạng thái hiện tại của dự án, dành cho AI Agent và developer mới. Lịch sử triển khai chi tiết được lưu tại `WORKLOG.md`.
 
 ## 1. Tổng quan
@@ -36,6 +36,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Cấu hình môi trường đã được chuẩn hóa về một file `.env` duy nhất tại thư mục gốc.
 - Visitor có thể khám phá các Group qua `GET /api/groups/discover`.
 - Luồng nhận diện ảnh, truy xuất RAG, sinh nội dung, chat và TTS đã hoạt động xuyên suốt.
+- Hệ thống phòng thủ Prompt Injection (Shield Clause) đã được gia cố hoàn chỉnh cho cả hai luồng Hướng dẫn viên và Companion.
 - RAG đã được cải thiện để chấp nhận từ khóa chính và tận dụng tài liệu thuộc đúng Group.
 - TTS được tạo theo yêu cầu, tránh gọi trùng; frontend chỉ gửi 10 tin nhắn gần nhất lên API chat.
 - Giao diện mobile sử dụng chiều cao động `100dvh` và wrapper chung để giảm layout shift.
@@ -58,7 +59,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - `POST /api/companion/chat` xác minh hiện vật, lịch sử tham quan và phạm vi Group trước khi sinh câu trả lời.
 - Voice input dùng `getUserMedia` và `MediaRecorder`; audio được gửi tới `POST /api/stt` để Gemini chép thành tiếng Việt.
 - Companion chủ động chào hỏi, yêu cầu khách quét hiện vật, có thể mở camera ngay trong giao diện chat và đề xuất điểm đến tiếp theo.
-- Nội dung chat được truyền trực tiếp (Streaming) qua kiến trúc Backend-Driven Pipeline: Backend xử lý song song Text Generation và TTS, đẩy trực tiếp audio Base64 qua một EventStream duy nhất giúp giảm thiểu độ trễ Time-to-First-Audio.
+- Nội dung chat được truyền trực tiếp (Streaming) qua Backend-Driven Pipeline; đã tối ưu thêm cached acknowledgement audio, early phrase chunking và 2 TTS workers để giảm độ trễ câu nói đầu tiên và khoảng lặng giữa các đoạn.
 - Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
 - UX cơ bản đã hoàn thiện (collapsible avatar, floating scanner, smart idle timer). Tính năng hỗ trợ Tiếng Anh (i18n) đã được triển khai hoàn tất với giọng đọc `en-US-GuyNeural` và các luồng UI được dịch đầy đủ.
 

@@ -1,3 +1,7 @@
+import asyncio
+import json
+import re
+
 from langchain_core.documents import Document
 
 from app.models.item import Item
@@ -189,3 +193,108 @@ def test_companion_stream_emits_tour_completed_when_no_next_item(
     assert '"tour_completed": true' in response.text
     assert "event: actions" in response.text
     assert '"type": "restart_tour"' in response.text
+
+
+def _audio_events(response_text: str):
+    return [
+        json.loads(match)
+        for match in re.findall(r"event: audio\ndata: (.+)", response_text)
+    ]
+
+
+def test_companion_stream_emits_ack_audio_for_user_message(
+    client,
+    db_session,
+    monkeypatch,
+):
+    current = Item(name="Trống Văn Miếu", description="Primary", group_id=1)
+    db_session.add(current)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        chat_router,
+        "build_chat_item_context",
+        lambda **kwargs: ([Document(page_content="Verified")], True),
+    )
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(
+        chat_router,
+        "get_rag_generator",
+        lambda: FakeStreamingCompanionGenerator(),
+    )
+    monkeypatch.setattr(
+        chat_router,
+        "_synthesize_speech_async",
+        fake_synthesize_speech_async,
+    )
+    chat_router._ACK_AUDIO_CACHE.clear()
+
+    response = client.post(
+        "/api/companion/chat/stream",
+        json={
+            "item_id": current.id,
+            "message": "Kể ta nghe về hiện vật này",
+            "history": [],
+            "visited_item_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    audio_events = _audio_events(response.text)
+    assert audio_events[0]["kind"] == "ack"
+    assert audio_events[0]["seq"] == -1
+
+
+def test_companion_stream_keeps_parallel_tts_audio_order(
+    client,
+    db_session,
+    monkeypatch,
+):
+    current = Item(name="Trống Văn Miếu", description="Primary", group_id=1)
+    db_session.add(current)
+    db_session.commit()
+
+    class MultiSegmentGenerator:
+        async def generate_companion_chat_stream(self, **kwargs):
+            yield "Đây là đoạn đầu tiên, "
+            yield "tiếp theo là đoạn thứ hai. "
+            yield "Và đây là đoạn cuối cùng."
+
+    async def synthesize_with_out_of_order_completion(text, *args, **kwargs):
+        if "đoạn đầu tiên" in text:
+            await asyncio.sleep(0.02)
+        return f"audio:{text}".encode(), "audio/mpeg"
+
+    monkeypatch.setattr(
+        chat_router,
+        "build_chat_item_context",
+        lambda **kwargs: ([Document(page_content="Verified")], True),
+    )
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(chat_router, "get_rag_generator", lambda: MultiSegmentGenerator())
+    monkeypatch.setattr(
+        chat_router,
+        "_synthesize_speech_async",
+        synthesize_with_out_of_order_completion,
+    )
+    chat_router._ACK_AUDIO_CACHE.clear()
+
+    response = client.post(
+        "/api/companion/chat/stream",
+        json={
+            "item_id": current.id,
+            "message": "Kể tiếp",
+            "history": [],
+            "visited_item_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    content_audio = [
+        event for event in _audio_events(response.text)
+        if event.get("kind") == "content"
+    ]
+    assert [event["seq"] for event in content_audio] == sorted(
+        event["seq"] for event in content_audio
+    )
+    assert len(content_audio) >= 2
