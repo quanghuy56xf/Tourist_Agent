@@ -548,3 +548,17 @@ Xác nhận:
 - Toàn bộ workflows CI/CD đã hoạt động trơn tru.
 - Component LanguageSelector hiển thị mượt mà.
 - Dự án sẵn sàng cho môi trường Production ổn định.
+
+## 2026-06-27 - Sửa lỗi CI Backend và Deprecation Warnings
+
+Bối cảnh:
+- Sau khi thiết lập CI/CD, GitHub Actions cho backend bị lỗi (exit code 1) ở bước chạy test, dù chạy trên máy local Windows vẫn pass 100%.
+- Tồn tại các cảnh báo `DeprecationWarning` do sử dụng `datetime.utcnow()`.
+
+Các thay đổi:
+- Sửa lỗi cross-loop trong `backend/tests/unit/test_tour_match.py`: Lỗi trên môi trường Linux (CI) do gọi `asyncio.run()` trong môi trường test đồng bộ làm mất kết nối websocket của `TestClient`. Đã thay thế bằng `ws_host.send_json` và đồng bộ qua `update_progress` để tránh treo (infinite loop).
+- Sửa các `DeprecationWarning` trong `backend/tests/unit/test_content_analytics.py`: Thay thế `datetime.utcnow()` bằng `datetime.now(timezone.utc).
+
+Xác nhận:
+- Chạy `uv run pytest` thành công toàn bộ 244 test pass, 2 skipped, giảm số cảnh báo. Đã sẵn sàng push lên GitHub.
+

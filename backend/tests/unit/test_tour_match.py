@@ -276,11 +276,15 @@ def test_kick_blocked_after_match_starts(client: TestClient, db_session):
             ws_host.receive_json()
             ws_bob.receive_json()
 
-            asyncio.run(manager.kick_player(room_id, "host_id", "bob_id"))
-            # No kick: room should still contain bob after the match starts.
-            room = manager.get_room(room_id)
-            assert room is not None
-            assert "bob_id" in room.players
+            ws_host.send_json({"type": "kick_player", "target_id": "bob_id"})
+            # Kick is ignored during playing state, so it sends no response.
+            # Send an update_progress to force the server to broadcast a room_state,
+            # ensuring the previous message was processed.
+            ws_host.send_json({"type": "update_progress", "progress": 0, "total_stops": 2})
+            
+            msg = ws_host.receive_json()
+            assert msg["type"] == "room_state"
+            assert any(p["player_id"] == "bob_id" for p in msg["room"]["players"])
 
 
 def test_waiting_room_chat_broadcast(client: TestClient, db_session):

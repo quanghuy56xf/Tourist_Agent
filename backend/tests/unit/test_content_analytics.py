@@ -78,7 +78,7 @@ def test_record_content_issue_persists_event(db_session):
 
 
 def test_should_record_audio_error_dedupes_same_variant_revision(db_session):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from app.models.content_variant import ItemContentVariant
     from app.modules.analytics.service import record_event
@@ -87,7 +87,7 @@ def test_should_record_audio_error_dedupes_same_variant_revision(db_session):
     db_session.add(item)
     db_session.commit()
 
-    variant_updated_at = datetime.utcnow() - timedelta(seconds=5)
+    variant_updated_at = datetime.now(timezone.utc) - timedelta(seconds=5)
     variant = ItemContentVariant(
         item_id=item.id,
         persona="Mặc định",
@@ -126,7 +126,7 @@ def test_should_record_audio_error_dedupes_same_variant_revision(db_session):
         is False
     )
 
-    variant.updated_at = datetime.utcnow() + timedelta(seconds=5)
+    variant.updated_at = datetime.now(timezone.utc) + timedelta(seconds=5)
     db_session.commit()
 
     assert (
