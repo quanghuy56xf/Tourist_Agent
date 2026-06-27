@@ -4,7 +4,8 @@ echo "🚀 Bắt đầu quá trình cập nhật mã nguồn và khởi động 
 
 # 1. Kéo code mới nhất từ git
 echo "📥 Đang tải code mới từ GitHub..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 # 2. Build và khởi động lại (Zero-downtime recreation)
 echo "⏳ Đang build và khởi động lại hệ thống..."
