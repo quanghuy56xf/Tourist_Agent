@@ -1,3 +1,21 @@
+## 2026-06-28 - Hoàn thiện MVP Companion Quest Phase 1
+
+Bối cảnh:
+- Cần biến Companion thành trải nghiệm phiêu lưu lịch sử có onboarding, bait scan, chọn quest, câu đố và phần thưởng.
+- UI tracking quest ban đầu quá lớn, chiếm diện tích chat trên mobile.
+
+Các thay đổi:
+- Thêm 2 quest MVP cho Văn Miếu, dùng tên hiện vật mới và match theo `bestMatch.name`/keyword thay vì phụ thuộc `item_id`.
+- Hoàn thiện luồng onboarding: Đôn mời tìm bí mật, bait scan Cổng chính/Khuê Văn Các, mở quest cards, chọn quest, scan từng điểm, trả lời câu đố và nhận reward card.
+- Refactor quest progress thành HUD compact dưới avatar, có inline detail và tự thu sau 5 giây.
+- Giảm duplicate action buttons trong chat; điều khiển scan/đổi quest nằm trong HUD.
+- Sắp xếp lại Quest 1 theo tuyến gần đến xa từ Cổng chính: Giếng Thiên Quang → Bia Tiến sĩ → Trống. Quest 2 giữ: Cổng chính → Đại Trung Môn → Khuê Văn Các.
+- Lưu plan Phase 2 Hybrid Guided Hidden Gems vào tài liệu triển khai để làm sau.
+
+Xác nhận:
+- `npm --prefix frontend run lint`: pass, còn warning `<img>` cũ.
+- `npm --prefix frontend run build`: pass, còn warning `<img>` cũ.
+
 ## 2026-06-28 - Tối ưu Streaming TTS cho Companion
 
 Bối cảnh:

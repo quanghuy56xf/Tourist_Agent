@@ -62,6 +62,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Nội dung chat được truyền trực tiếp (Streaming) qua Backend-Driven Pipeline; đã tối ưu thêm cached acknowledgement audio, early phrase chunking và 2 TTS workers để giảm độ trễ câu nói đầu tiên và khoảng lặng giữa các đoạn.
 - Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
 - UX cơ bản đã hoàn thiện (collapsible avatar, floating scanner, smart idle timer). Tính năng hỗ trợ Tiếng Anh (i18n) đã được triển khai hoàn tất với giọng đọc `en-US-GuyNeural` và các luồng UI được dịch đầy đủ.
+- Companion Quest MVP đã có onboarding/bait scan, 2 quest, HUD compact dưới avatar, câu đố theo điểm dừng và reward; Phase 2 Hidden Gems đã được lưu plan để triển khai sau.
 
 ### Định hướng giao diện Companion
 
@@ -87,7 +88,6 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 
 ## 6. Tài liệu liên quan
 
-- Product requirements: `docs/prd/PRD_v2.md`
-- Architecture: `docs/architecture/architecture_v2.md`
-- AI context ngắn: `AI_CONTEXT.md`
+- Product requirements: `docs/prd/PRD_v3.md`
+- Architecture: `docs/architecture/architecture_v3.md`
 - Nhật ký triển khai: `WORKLOG.md`
