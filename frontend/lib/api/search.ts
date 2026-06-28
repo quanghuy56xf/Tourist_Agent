@@ -6,12 +6,18 @@ const NGROK_HEADERS: HeadersInit = API_URL.includes("ngrok")
   ? { "ngrok-skip-browser-warning": "true" }
   : {};
 
+export interface SearchImage {
+  angle: string;
+  url: string;
+}
+
 export interface SearchMatch {
   item_id: number;
   name: string;
   description: string;
   similarity: number;
   image_url: string | null;
+  images?: SearchImage[];
 }
 
 export interface SearchResponse {

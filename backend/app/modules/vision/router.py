@@ -101,6 +101,7 @@ async def search_object(
                     description=item.description,
                     similarity=round(match.similarity, 4),
                     image_url=image_url,
+                    images=images,
                 )
             )
 

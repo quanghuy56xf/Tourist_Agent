@@ -14,6 +14,7 @@ import {
   stopRecording,
 } from "@/lib/voiceInput";
 import CompanionAvatar from "./CompanionAvatar";
+import CompanionDiscoveryCard, { DiscoveryImage } from "./CompanionDiscoveryCard";
 import CameraCapture from "@/components/CameraCapture";
 import ScanViewfinderFrame from "./ScanViewfinderFrame";
 import { useObjectSearch } from "@/lib/useObjectSearch";
@@ -27,6 +28,47 @@ interface CompanionChatProps {
   showIntro?: boolean;
   onCompleteIntro?: () => void;
   onSuggestNextPoint?: (itemId: number, itemName?: string) => void;
+}
+
+type DiscoveryState = {
+  itemId: number;
+  itemName: string;
+  description?: string | null;
+  confidence?: number | null;
+  images: DiscoveryImage[];
+  hook: string;
+};
+
+function buildDiscoveryImages(match: SearchMatch): DiscoveryImage[] {
+  const images = match.images?.length
+    ? match.images.map((image) => ({
+        url: image.url,
+        alt: `${match.name} - ${image.angle}`,
+      }))
+    : [];
+
+  if (images.length > 0) return images;
+  return match.image_url ? [{ url: match.image_url, alt: match.name }] : [];
+}
+
+function buildDiscoveryHook(match: SearchMatch, fallback: string): string {
+  const firstSentence = match.description
+    ?.split(/[.!?。]/)[0]
+    ?.replace(/\s+/g, " ")
+    .trim();
+  if (!firstSentence) return fallback;
+  return firstSentence.length > 120 ? `${firstSentence.slice(0, 112).trim()}…` : firstSentence;
+}
+
+function makeDiscoveryState(match: SearchMatch, fallbackHook: string): DiscoveryState {
+  return {
+    itemId: match.item_id,
+    itemName: match.name,
+    description: match.description,
+    confidence: match.similarity,
+    images: buildDiscoveryImages(match),
+    hook: buildDiscoveryHook(match, fallbackHook),
+  };
 }
 
 function useStreamingText(text: string): string {
@@ -124,14 +166,17 @@ export default function CompanionChat({
   const [scanErrorMsg, setScanErrorMsg] = useState<string | null>(null);
   const [fallbackSuggestions, setFallbackSuggestions] = useState<SearchMatch[] | null>(null);
   const [suggestedNextPoint, setSuggestedNextPoint] = useState<{ id: number; name: string } | null>(null);
-  const [actionButtons, setActionButtons] = useState<{ type: string; label: string }[]>([]);
+  const [actionButtons, setActionButtons] = useState<{ type: string; label: string; payload?: string }[]>([]);
+  const [discovery, setDiscovery] = useState<DiscoveryState | null>(null);
+  const [lastScannedDiscovery, setLastScannedDiscovery] = useState<DiscoveryState | null>(null);
+  const [awaitingQuizAnswer, setAwaitingQuizAnswer] = useState(false);
   const [activeItemId, setActiveItemId] = useState<number | null>(itemId || null);
   useEffect(() => {
     if (itemId !== undefined) setActiveItemId(itemId || null);
   }, [itemId]);
 
   useEffect(() => {
-    if (isLoading || isSpeaking || isRecording || isTranscribing || showInlineCamera || scanPhase !== "idle" || history.length === 0 || suggestedNextPoint !== null || actionButtons.length > 0) {
+    if (isLoading || isSpeaking || isRecording || isTranscribing || showInlineCamera || discovery || scanPhase !== "idle" || history.length === 0 || suggestedNextPoint !== null || actionButtons.length > 0) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -141,7 +186,7 @@ export default function CompanionChat({
       });
     }, 30000);
     return () => window.clearTimeout(timer);
-  }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, scanPhase, history.length, suggestedNextPoint, actionButtons.length, t.companion.scanMore]);
+  }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, discovery, scanPhase, history.length, suggestedNextPoint, actionButtons.length, t.companion.scanMore]);
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -320,6 +365,7 @@ export default function CompanionChat({
       let lastSpokenIndex = 0;
       let nextItemId = null;
       let nextItemName = null;
+      const isMiniChallengeRequest = cleaned.includes("[SYSTEM_EVENT]: MINI_CHALLENGE");
 
       for await (const chunk of stream) {
         if (chunk.type === "metadata") {
@@ -353,6 +399,7 @@ export default function CompanionChat({
 
           if (questions.length > 0) {
             setActionButtons((prev) => {
+              if (isMiniChallengeRequest) return questions;
               const nonTextButtons = prev.filter((b) => b.type !== "text");
               return [...nonTextButtons, ...questions];
             });
@@ -448,11 +495,11 @@ export default function CompanionChat({
         rememberMinimapItem(groupSlug, bestMatch.item_id);
         
         setTimeout(() => {
+          const nextDiscovery = makeDiscoveryState(bestMatch, t.companion.discoveryDefaultHook);
           setShowInlineCamera(false);
           setActiveItemId(bestMatch.item_id);
-          // Let AI know about the scanned item and request next suggestion
-          const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${bestMatch.item_id}`;
-          void send(scanMessage, true, true, bestMatch.item_id);
+          setLastScannedDiscovery(nextDiscovery);
+          setDiscovery(nextDiscovery);
         }, 900);
         return;
       }
@@ -506,11 +553,38 @@ export default function CompanionChat({
     rememberMinimapItem(groupSlug, match.item_id);
     
     setTimeout(() => {
+      const nextDiscovery = makeDiscoveryState(match, t.companion.discoveryDefaultHook);
       setShowInlineCamera(false);
       setActiveItemId(match.item_id);
-      const scanMessage = `[SYSTEM_EVENT]: SCANNED_ITEM_ID=${match.item_id}`;
-      void send(scanMessage, true, true, match.item_id);
+      setLastScannedDiscovery(nextDiscovery);
+      setDiscovery(nextDiscovery);
     }, 900);
+  };
+
+  const tellStoryForDiscovery = (currentDiscovery: DiscoveryState) => {
+    setAwaitingQuizAnswer(false);
+    setActionButtons([]);
+    setDiscovery(null);
+    setActiveItemId(currentDiscovery.itemId);
+    const scanMessage = `[SYSTEM_EVENT]: SCAN_SUCCESS\nHiện vật vừa nhận diện: ${currentDiscovery.itemName}. Hãy chào mừng thật ngắn gọn, kể điểm thú vị nhất, rồi mời khách hỏi tiếp.`;
+    void send(scanMessage, true, true, currentDiscovery.itemId);
+  };
+
+  const handleTellStoryFromDiscovery = () => {
+    if (!discovery) return;
+    tellStoryForDiscovery(discovery);
+  };
+
+  const handleStartChallengeFromDiscovery = () => {
+    if (!discovery) return;
+    const currentDiscovery = discovery;
+    setDiscovery(null);
+    setActiveItemId(currentDiscovery.itemId);
+    setSuggestedNextPoint(null);
+    setActionButtons([]);
+    setAwaitingQuizAnswer(true);
+    const challengeMessage = `[SYSTEM_EVENT]: MINI_CHALLENGE\nHiện vật vừa nhận diện: ${currentDiscovery.itemName}. Hãy tạo một câu đố trắc nghiệm ngắn có đúng 3 lựa chọn, liên quan trực tiếp đến hiện vật. Không tiết lộ đáp án. Kết thúc bằng đúng 3 nút lựa chọn theo định dạng ||Q: A. ...|| ||Q: B. ...|| ||Q: C. ...||.`;
+    void send(challengeMessage, true, false, currentDiscovery.itemId);
   };
 
   const handleAppOpened = () => {
@@ -674,7 +748,7 @@ export default function CompanionChat({
               {isLoading && <p className="text-sm text-amber-200/60">{t.companion.thinking}</p>}
               
               {/* Proactive Action Buttons */}
-              {!isLoading && (suggestedNextPoint || actionButtons.length > 0) && (
+              {!isLoading && ((!awaitingQuizAnswer && suggestedNextPoint) || actionButtons.length > 0) && (
                 <div className="flex flex-wrap gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
                   {actionButtons.map((btn, idx) => {
                     if (btn.type === "open_camera") {
@@ -729,14 +803,43 @@ export default function CompanionChat({
                           <span>{t.companion.btnFeedback}</span>
                         </button>
                       );
+                    } else if (btn.type === "tell_story") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const target = lastScannedDiscovery;
+                            if (target) tellStoryForDiscovery(target);
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
+                        >
+                          <span className="text-amber-400">🎧</span>
+                          <span>{btn.label}</span>
+                        </button>
+                      );
                     } else if (btn.type === "text") {
                       return (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => {
+                            const payload = btn.payload || btn.label;
                             setActionButtons([]);
-                            void send((btn as any).payload || btn.label);
+                            if (awaitingQuizAnswer) {
+                              setAwaitingQuizAnswer(false);
+                              void (async () => {
+                                await send(
+                                  `[SYSTEM_EVENT]: QUIZ_ANSWER\nKhách chọn: ${payload}. Hãy phản hồi đúng/sai dựa trên câu đố vừa hỏi, giải thích trong 1-2 câu rồi mời khách nghe câu chuyện đầy đủ.`,
+                                  true,
+                                  false,
+                                  activeItemId ?? undefined
+                                );
+                                setActionButtons([{ type: "tell_story", label: t.companion.discoveryTellStory }]);
+                              })();
+                              return;
+                            }
+                            void send(payload);
                           }}
                           className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 px-3 py-1.5 rounded-full transition-colors text-amber-100 text-sm font-medium shadow-sm"
                         >
@@ -980,6 +1083,38 @@ export default function CompanionChat({
           )}
         </div>
       </div>
+
+      {discovery && (
+        <CompanionDiscoveryCard
+          open={Boolean(discovery)}
+          itemName={discovery.itemName}
+          confidence={discovery.confidence}
+          description={discovery.description}
+          images={discovery.images}
+          hook={discovery.hook}
+          labels={{
+            found: t.companion.discoveryFound,
+            confidenceHigh: t.companion.discoveryConfidenceHigh,
+            confidenceMedium: t.companion.discoveryConfidenceMedium,
+            tellStory: t.companion.discoveryTellStory,
+            challenge: t.companion.discoveryChallenge,
+            slideshow: t.companion.discoverySlideshow,
+            showMap: t.companion.discoveryShowMap,
+            close: t.common.close,
+            imageAlt: t.companion.discoveryImageAlt,
+          }}
+          onTellStory={handleTellStoryFromDiscovery}
+          onStartChallenge={handleStartChallengeFromDiscovery}
+          onShowMap={() => {
+            const currentDiscovery = discovery;
+            setDiscovery(null);
+            if (onSuggestNextPoint) {
+              onSuggestNextPoint(currentDiscovery.itemId, currentDiscovery.itemName);
+            }
+          }}
+          onClose={() => setDiscovery(null)}
+        />
+      )}
 
       {showInlineCamera && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">

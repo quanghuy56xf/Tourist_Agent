@@ -1,4 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class SearchImage(BaseModel):
+    angle: str
+    url: str
 
 
 class SearchMatch(BaseModel):
@@ -7,6 +12,7 @@ class SearchMatch(BaseModel):
     description: str
     similarity: float
     image_url: str | None = None
+    images: list[SearchImage] = Field(default_factory=list)
 
 
 class SearchResponse(BaseModel):
