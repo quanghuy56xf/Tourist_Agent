@@ -177,3 +177,44 @@ def test_search_cleans_stale_chroma_item(
     assert response.status_code == 200
     assert response.json()["found"] is False
     delete_embeddings.assert_called_once_with(999)
+
+
+def test_search_returns_all_item_images_without_changing_primary_image_url(
+    client,
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    item = Item(name="Item", description="Description", main_image_url="/uploads/1/front.jpg")
+    db_session.add(item)
+    db_session.commit()
+    db_session.refresh(item)
+
+    images = [
+        {"angle": "front", "url": "/uploads/1/front.jpg?v=1"},
+        {"angle": "side", "url": "/uploads/1/side.jpg?v=1"},
+        {"angle": "back", "url": "/uploads/1/back.jpg?v=1"},
+    ]
+
+    monkeypatch.setattr(
+        search_router.embedding,
+        "extract_vectors_augmented",
+        lambda *args, **kwargs: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(
+        search_router.chroma,
+        "search_top_items",
+        lambda *args, **kwargs: [
+            chroma.SearchResult(item_id=item.id, angle="front", similarity=0.99)
+        ],
+    )
+    monkeypatch.setattr(search_router.storage, "list_item_images", lambda _: images)
+
+    response = client.post(
+        "/api/search",
+        files={"search_image": ("query.jpg", b"image", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["image_url"] == "/uploads/1/front.jpg?v=1"
+    assert result["images"] == images

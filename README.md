@@ -6,6 +6,17 @@ HERA (AI Heritage Guide) là nền tảng quản trị và hướng dẫn viên 
 
 ---
 
+## ✨ Tính Năng Nổi Bật
+
+- **🤖 AI Historical Companion:** Người bạn đồng hành lịch sử ảo tương tác thời gian thực qua giọng nói và chat (Ví dụ: Lê Quý Đôn), xưng hô chuẩn xác theo ngữ cảnh và Persona chuyên biệt.
+- **👁️ Nhận diện Hiện vật Siêu Tốc:** Dùng camera quét hiện vật, AI cục bộ (Local Vision) nhận diện ngay lập tức độ trễ thấp thông qua mô hình DINOv2.
+- **📚 Hybrid RAG Tự Chủ:** Trả lời chính xác mọi câu hỏi lịch sử dựa trên kho tài liệu nội bộ, loại bỏ hoàn toàn rủi ro AI bịa đặt thông tin (Hallucination).
+- **🗺️ Bản đồ Động (Dynamic Minimap):** Hệ thống bản đồ dẫn đường thông minh, tự động lưu vết các điểm đã tham quan, highlight vị trí và gợi ý điểm đến tiếp theo.
+- **🎙️ Streaming TTS Đa Ngôn Ngữ:** Tự động phát giọng đọc thuyết minh và đàm thoại thời gian thực siêu mượt (Hỗ trợ giọng bản xứ Tiếng Việt, Tiếng Anh).
+- **🎮 Gamification & Quests:** Hệ thống nhiệm vụ, giải đố tương tác và phần thưởng, biến việc đi bảo tàng/di tích thành một chuyến phiêu lưu kỳ thú.
+- **⚙️ Quản trị Nền tảng (Admin Panel):** Giao diện quản trị Multi-tenant cho phép tạo vô số không gian triển lãm (Groups), tự tải ảnh huấn luyện AI và tài liệu RAG một cách trực quan.
+
+---
 ## 🚀 Công Nghệ Sử Dụng
 
 - **Frontend**: Next.js 14 App Router, TypeScript, Tailwind CSS (Hỗ trợ PWA).
@@ -154,7 +165,7 @@ curl -X POST "http://localhost:8000/api/llm/chat" \
 
 ## 📄 Tài Liệu Liên Quan
 
-- **Tài liệu Yêu cầu (PRD)**: [docs/prd/PRD_v2.md](docs/prd/PRD_v2.md)
-- **Kiến trúc V2**: [docs/architecture/architecture_v2.md](docs/architecture/architecture_v2.md)
+- **Tài liệu Yêu cầu (PRD V3)**: [docs/prd/PRD_v3.md](docs/prd/PRD_v3.md)
+- **Kiến trúc V3**: [docs/architecture/architecture_v3.md](docs/architecture/architecture_v3.md)
 - **Hướng dẫn chạy chi tiết**: [manual_run.md](manual_run.md)
 - **Hướng dẫn triển khai**: [DEPLOY.md](DEPLOY.md)
