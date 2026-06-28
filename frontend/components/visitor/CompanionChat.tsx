@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
 import { playChatTts } from "@/lib/chatTts";
-import { getVisitedItemIds } from "@/lib/companionState";
+import {
+  addVisitedItem,
+  advanceCompanionQuest,
+  getCompanionQuestState,
+  getVisitedItemIds,
+  setCompanionQuestState,
+  startCompanionQuest,
+  unlockCompanionQuests,
+} from "@/lib/companionState";
 import { rememberMinimapSuggestion, rememberMinimapItem } from "@/lib/minimapState";
 import { getVisitorSessionId } from "@/lib/visitorAnalytics";
 import { useGroupSlug } from "@/lib/useGroupPath";
@@ -15,6 +23,17 @@ import {
 } from "@/lib/voiceInput";
 import CompanionAvatar from "./CompanionAvatar";
 import CompanionDiscoveryCard, { DiscoveryImage } from "./CompanionDiscoveryCard";
+import CompanionQuestCards from "./CompanionQuestCards";
+import CompanionQuestProgress from "./CompanionQuestProgress";
+import CompanionQuestReward from "./CompanionQuestReward";
+import {
+  COMPANION_QUESTS,
+  CompanionQuest,
+  CompanionQuestStop,
+  getQuestById,
+  isQuestBaitTarget,
+  matchQuestStopTarget,
+} from "@/lib/companionQuests";
 import CameraCapture from "@/components/CameraCapture";
 import ScanViewfinderFrame from "./ScanViewfinderFrame";
 import { useObjectSearch } from "@/lib/useObjectSearch";
@@ -37,6 +56,15 @@ type DiscoveryState = {
   confidence?: number | null;
   images: DiscoveryImage[];
   hook: string;
+};
+
+type ActionButton = {
+  type: string;
+  label: string;
+  payload?: string;
+  questId?: string;
+  stopId?: string;
+  choiceId?: "A" | "B" | "C";
 };
 
 function buildDiscoveryImages(match: SearchMatch): DiscoveryImage[] {
@@ -166,7 +194,13 @@ export default function CompanionChat({
   const [scanErrorMsg, setScanErrorMsg] = useState<string | null>(null);
   const [fallbackSuggestions, setFallbackSuggestions] = useState<SearchMatch[] | null>(null);
   const [suggestedNextPoint, setSuggestedNextPoint] = useState<{ id: number; name: string } | null>(null);
-  const [actionButtons, setActionButtons] = useState<{ type: string; label: string; payload?: string }[]>([]);
+  const [actionButtons, setActionButtons] = useState<ActionButton[]>([]);
+  const [cameraMode, setCameraMode] = useState<"normal" | "bait" | "quest">("normal");
+  const [showQuestCards, setShowQuestCards] = useState(false);
+  const [activeQuestId, setActiveQuestId] = useState<string | null>(null);
+  const [activeQuestStopIndex, setActiveQuestStopIndex] = useState(0);
+  const [completedQuestId, setCompletedQuestId] = useState<string | null>(null);
+  const [questDetailExpanded, setQuestDetailExpanded] = useState(false);
   const [discovery, setDiscovery] = useState<DiscoveryState | null>(null);
   const [lastScannedDiscovery, setLastScannedDiscovery] = useState<DiscoveryState | null>(null);
   const [awaitingQuizAnswer, setAwaitingQuizAnswer] = useState(false);
@@ -208,6 +242,18 @@ export default function CompanionChat({
     }, 80);
   };
 
+  const openInlineCamera = (mode: "normal" | "bait" | "quest" = "normal") => {
+    setCameraMode(mode);
+    setFrozen(false);
+    if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+    setCapturedUrl(null);
+    setScanPhase("idle");
+    setScanProgress(0);
+    setScanErrorMsg(null);
+    setFallbackSuggestions(null);
+    setShowInlineCamera(true);
+  };
+
   useEffect(() => () => stopProgress(), []);
 
   const endRef = useRef<HTMLDivElement>(null);
@@ -217,6 +263,16 @@ export default function CompanionChat({
   );
   const streamedAssistant = useStreamingText(latestAssistant);
   const micSupported = isVoiceInputSupported();
+  const activeQuest = getQuestById(activeQuestId ?? undefined);
+  const activeQuestStop = activeQuest?.stops[activeQuestStopIndex] ?? null;
+  const completedQuest = getQuestById(completedQuestId ?? undefined);
+
+  useEffect(() => {
+    if (!questDetailExpanded || !activeQuest) return;
+    const timer = window.setTimeout(() => setQuestDetailExpanded(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [questDetailExpanded, activeQuestId, activeQuestStopIndex, activeQuest]);
+
   useEffect(() => {
     if (!initialNarration.trim()) return;
     setHistory((current) => {
@@ -469,9 +525,111 @@ export default function CompanionChat({
     };
   });
 
+  const unlockQuestCards = () => {
+    setShowQuestCards(true);
+    setActiveQuestId(null);
+    setQuestDetailExpanded(false);
+    setCompletedQuestId(null);
+    setSuggestedNextPoint(null);
+    setActionButtons([]);
+    unlockCompanionQuests(window.localStorage);
+  };
+
+  const handleNormalTour = () => {
+    setShowQuestCards(false);
+    setActiveQuestId(null);
+    setQuestDetailExpanded(false);
+    setCompletedQuestId(null);
+    setActionButtons([]);
+    void send(t.companion.questNormalTourPrompt);
+  };
+
+  const showQuestStepPrompt = (quest: CompanionQuest, stopIndex: number) => {
+    const stop = quest.stops[stopIndex];
+    if (!stop) return;
+    const text = `${t.companion.questSelected.replace("{name}", quest.title)}\n\nĐiểm ${stopIndex + 1}/${quest.stops.length}: ${stop.title}. ${stop.hint}`;
+    setHistory((current) => [...current, { role: "assistant", content: text }]);
+    setActionButtons([]);
+    setQuestDetailExpanded(true);
+    void speak(text);
+  };
+
+  const handleSelectQuest = (quest: CompanionQuest) => {
+    setShowQuestCards(false);
+    setCompletedQuestId(null);
+    startCompanionQuest(window.localStorage, quest.id);
+    setActiveQuestId(quest.id);
+    setActiveQuestStopIndex(0);
+    setSuggestedNextPoint(null);
+    showQuestStepPrompt(quest, 0);
+  };
+
+  const showQuestCardsAgain = () => {
+    setShowQuestCards(true);
+    setActiveQuestId(null);
+    setQuestDetailExpanded(false);
+    setCompletedQuestId(null);
+    setActionButtons([]);
+    unlockCompanionQuests(window.localStorage);
+  };
+
+  const completeQuest = (quest: CompanionQuest, finalLine: string) => {
+    setActiveQuestId(null);
+    setQuestDetailExpanded(false);
+    setCompletedQuestId(quest.id);
+    setActionButtons([]);
+    const text = `${finalLine}\n\nBạn đã hoàn thành ${quest.title}! Thẻ Lưu Niệm độc quyền của bạn là: ${quest.reward}.`;
+    setHistory((current) => [...current, { role: "assistant", content: text }]);
+    setCompanionQuestState(window.localStorage, {
+      status: "quest_completed",
+      selectedQuestId: quest.id,
+      currentStopIndex: quest.stops.length,
+      completedStopIds: quest.stops.map((stop) => stop.id),
+      answeredStopIds: quest.stops.map((stop) => stop.id),
+    });
+    void speak(text);
+  };
+
+  const advanceQuestAfterAnswer = (quest: CompanionQuest, stop: CompanionQuestStop, choiceId?: "A" | "B" | "C") => {
+    const isCorrect = choiceId === stop.correctChoiceId;
+    const nextState = advanceCompanionQuest(window.localStorage, stop.id, quest.stops.length);
+    const prefix = isCorrect ? t.companion.questCorrectAnswer : t.companion.questWrongAnswer;
+    const nextStop = quest.stops[nextState.currentStopIndex ?? quest.stops.length];
+
+    if (!nextStop) {
+      completeQuest(quest, `${prefix} ${stop.successLine}\n\n${stop.explanation}`);
+      return;
+    }
+
+    setActiveQuestId(quest.id);
+    setActiveQuestStopIndex(nextState.currentStopIndex ?? 0);
+    const text = `${prefix} ${stop.successLine}\n\n${stop.explanation}\n\n${t.companion.questNextStop}: ${nextStop.title}. ${nextStop.hint}`;
+    setHistory((current) => [...current, { role: "assistant", content: text }]);
+    setActionButtons([]);
+    setQuestDetailExpanded(true);
+    void speak(text);
+  };
+
+  const showQuestRiddle = (quest: CompanionQuest, stop: CompanionQuestStop) => {
+    const text = `${t.companion.questFoundTarget.replace("{name}", stop.title)}\n\n${stop.riddle}`;
+    setHistory((current) => [...current, { role: "assistant", content: text }]);
+    setActionButtons(
+      stop.choices.map((choice) => ({
+        type: "quest_answer",
+        label: choice.label,
+        questId: quest.id,
+        stopId: stop.id,
+        choiceId: choice.id,
+      }))
+    );
+    void speak(text);
+  };
+
   const handleCapture = async (blob: Blob) => {
     const url = URL.createObjectURL(blob);
+    const previousCapturedUrl = capturedUrl;
     setCapturedUrl(url);
+    if (previousCapturedUrl) URL.revokeObjectURL(previousCapturedUrl);
     setFrozen(true);
     setScanPhase("scanning");
     setScanErrorMsg(null);
@@ -485,15 +643,74 @@ export default function CompanionChat({
       if (response.found && response.results.length > 0) {
         setScanPhase("found");
         const bestMatch = response.results[0];
-        
-        // Add to visited items
-        const currentVisited = getVisitedItemIds(window.localStorage);
-        if (!currentVisited.includes(bestMatch.item_id)) {
-          currentVisited.push(bestMatch.item_id);
-          window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
-        }
+
+        addVisitedItem(window.localStorage, bestMatch.item_id);
         rememberMinimapItem(groupSlug, bestMatch.item_id);
-        
+
+        if (cameraMode === "bait") {
+          if (!isQuestBaitTarget(bestMatch.name)) {
+            setTimeout(() => {
+              setFrozen(false);
+              URL.revokeObjectURL(url);
+              setCapturedUrl(null);
+              setScanPhase("idle");
+              setScanProgress(0);
+              setScanErrorMsg(t.companion.questBaitWrongTarget.replace("{name}", bestMatch.name));
+            }, 700);
+            return;
+          }
+
+          setTimeout(() => {
+            setShowInlineCamera(false);
+            setCameraMode("normal");
+            setActiveItemId(bestMatch.item_id);
+            const text = t.companion.questBaitSuccess;
+            setHistory((current) => [...current, { role: "assistant", content: text }]);
+            unlockQuestCards();
+            void speak(text);
+          }, 900);
+          return;
+        }
+
+        if (cameraMode === "quest") {
+          const quest = activeQuest;
+          const stop = activeQuestStop;
+          if (!quest || !stop) {
+            setCameraMode("normal");
+            setShowInlineCamera(false);
+            return;
+          }
+
+          if (!matchQuestStopTarget(bestMatch.name, stop)) {
+            setTimeout(() => {
+              setFrozen(false);
+              URL.revokeObjectURL(url);
+              setCapturedUrl(null);
+              setScanPhase("idle");
+              setScanProgress(0);
+              setScanErrorMsg(
+                t.companion.questWrongTarget
+                  .replace("{name}", bestMatch.name)
+                  .replace("{target}", stop.title)
+              );
+              setActionButtons([
+                { type: "quest_scan_stop", label: t.companion.questScanStop, questId: quest.id, stopId: stop.id },
+                { type: "tell_story", label: t.companion.discoveryTellStory },
+              ]);
+              setLastScannedDiscovery(makeDiscoveryState(bestMatch, t.companion.discoveryDefaultHook));
+            }, 700);
+            return;
+          }
+
+          setTimeout(() => {
+            setShowInlineCamera(false);
+            setCameraMode("normal");
+            setActiveItemId(bestMatch.item_id);
+            showQuestRiddle(quest, stop);
+          }, 900);
+          return;
+        }
+
         setTimeout(() => {
           const nextDiscovery = makeDiscoveryState(bestMatch, t.companion.discoveryDefaultHook);
           setShowInlineCamera(false);
@@ -545,11 +762,7 @@ export default function CompanionChat({
     setFallbackSuggestions(null);
     setScanPhase("found");
     
-    const currentVisited = getVisitedItemIds(window.localStorage);
-    if (!currentVisited.includes(match.item_id)) {
-      currentVisited.push(match.item_id);
-      window.localStorage.setItem("visited_item_ids", JSON.stringify(currentVisited));
-    }
+    addVisitedItem(window.localStorage, match.item_id);
     rememberMinimapItem(groupSlug, match.item_id);
     
     setTimeout(() => {
@@ -603,7 +816,36 @@ export default function CompanionChat({
       if ((window as any).__companionAppOpenedFired) return;
       (window as any).__companionAppOpenedFired = true;
       appOpenedFired.current = true;
-      void send("[SYSTEM_EVENT]: APP_OPENED", true);
+
+      const questState = getCompanionQuestState(window.localStorage);
+      if (questState.status === "quests_unlocked") {
+        setShowQuestCards(true);
+        return;
+      }
+      if (questState.status === "quest_active" && questState.selectedQuestId) {
+        const quest = getQuestById(questState.selectedQuestId);
+        if (quest) {
+          const stopIndex = Math.min(questState.currentStopIndex ?? 0, quest.stops.length - 1);
+          setActiveQuestId(quest.id);
+          setActiveQuestStopIndex(stopIndex);
+          setShowQuestCards(false);
+          showQuestStepPrompt(quest, stopIndex);
+          return;
+        }
+      }
+      if (questState.status === "quest_completed" && questState.selectedQuestId) {
+        setCompletedQuestId(questState.selectedQuestId);
+        return;
+      }
+
+      const text = t.companion.questIntroText;
+      setHistory([{ role: "assistant", content: text }]);
+      setActionButtons([
+        { type: "quest_open_camera", label: t.companion.questOpenCamera },
+        { type: "normal_tour", label: t.companion.questNormalTour },
+      ]);
+      setCompanionQuestState(window.localStorage, { status: "bait_prompted" });
+      void speak(text);
     }
   };
 
@@ -643,7 +885,7 @@ export default function CompanionChat({
   }, [avatarCollapsed]);
 
   // Calculate the exact gap created by the clip-path so the chat UI can sit perfectly below the curve
-  const gapMargin = (!compact && !showIntro && !avatarCollapsed) ? "max(-13.5%, -54px)" : "0px";
+  const gapMargin = (!compact && !showIntro && !avatarCollapsed && !activeQuest) ? "max(-13.5%, -54px)" : "0px";
 
   return (
     <section className="flex min-h-0 flex-1 flex-col relative">
@@ -667,6 +909,20 @@ export default function CompanionChat({
           />
         )}
       </div>
+
+      {!showIntro && activeQuest && (
+        <CompanionQuestProgress
+          quest={activeQuest}
+          stop={activeQuestStop}
+          currentStopIndex={activeQuestStopIndex}
+          expanded={questDetailExpanded}
+          scanLabel={t.companion.questScanStop}
+          switchLabel={t.companion.questChooseAnother}
+          onToggleExpanded={() => setQuestDetailExpanded((current) => !current)}
+          onScanStop={() => openInlineCamera("quest")}
+          onShowCards={showQuestCardsAgain}
+        />
+      )}
 
       <div className="relative min-h-0 flex-1 flex flex-col z-10" style={{ marginTop: gapMargin }}>
         {/* Intro Text Overlay */}
@@ -757,20 +1013,37 @@ export default function CompanionChat({
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => {
-                            setFrozen(false);
-                            if (capturedUrl) URL.revokeObjectURL(capturedUrl);
-                            setCapturedUrl(null);
-                            setScanPhase("idle");
-                            setScanProgress(0);
-                            setScanErrorMsg(null);
-                            setFallbackSuggestions(null);
-                            setShowInlineCamera(true);
-                          }}
+                          onClick={() => openInlineCamera("normal")}
                           className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 px-3 py-1.5 rounded-full transition-colors text-emerald-100 text-sm font-medium shadow-sm"
                         >
                           <span className="text-emerald-400">📸</span>
                           <span>{btn.label.replace("📸 ", "")}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "quest_open_camera") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setActionButtons([]);
+                            openInlineCamera("bait");
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-3 text-base font-black text-black shadow-[0_0_28px_rgba(245,158,11,0.55)] ring-2 ring-amber-200/40 transition-all hover:scale-[1.02] active:scale-95 animate-pulse"
+                        >
+                          <span>📸</span>
+                          <span>{btn.label.replace("📸 ", "")}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "normal_tour") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={handleNormalTour}
+                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-medium text-amber-100/80 transition-colors hover:bg-white/[0.1]"
+                        >
+                          {btn.label}
                         </button>
                       );
                     } else if (btn.type === "restart_tour") {
@@ -801,6 +1074,50 @@ export default function CompanionChat({
                         >
                           <span className="text-amber-500">🌟</span>
                           <span>{t.companion.btnFeedback}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "quest_scan_stop") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setActionButtons([]);
+                            openInlineCamera("quest");
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-3 text-sm font-black text-black shadow-[0_0_24px_rgba(245,158,11,0.35)] transition-transform hover:scale-[1.01] active:scale-95"
+                        >
+                          <span>📸</span>
+                          <span>{btn.label.replace("📸 ", "")}</span>
+                        </button>
+                      );
+                    } else if (btn.type === "quest_show_cards") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={showQuestCardsAgain}
+                          className="inline-flex w-full items-center justify-center rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-medium text-amber-100/75 transition-colors hover:bg-white/[0.1]"
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    } else if (btn.type === "quest_answer") {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const quest = getQuestById(btn.questId);
+                            const stop = quest?.stops.find((entry) => entry.id === btn.stopId);
+                            if (!quest || !stop) return;
+                            setActionButtons([]);
+                            advanceQuestAfterAnswer(quest, stop, btn.choiceId);
+                          }}
+                          className="inline-flex w-full items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition-colors hover:bg-amber-500/20"
+                        >
+                          <span className="text-amber-400">✦</span>
+                          <span>{btn.label}</span>
                         </button>
                       );
                     } else if (btn.type === "tell_story") {
@@ -879,14 +1196,7 @@ export default function CompanionChat({
                       <button
                         type="button"
                         onClick={() => {
-                          setFrozen(false);
-                          if (capturedUrl) URL.revokeObjectURL(capturedUrl);
-                          setCapturedUrl(null);
-                          setScanPhase("idle");
-                          setScanProgress(0);
-                          setScanErrorMsg(null);
-                          setFallbackSuggestions(null);
-                          setShowInlineCamera(true);
+                          openInlineCamera("normal");
                         }}
                         className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 px-3 py-1.5 rounded-full transition-colors text-emerald-100 text-sm font-medium shadow-sm"
                       >
@@ -896,6 +1206,26 @@ export default function CompanionChat({
                     </>
                   )}
                 </div>
+              )}
+
+              {showQuestCards && (
+                <CompanionQuestCards
+                  title={t.companion.questUnlockedTitle}
+                  startLabel={t.companion.questStart}
+                  quests={COMPANION_QUESTS}
+                  onSelectQuest={handleSelectQuest}
+                />
+              )}
+
+
+              {completedQuest && (
+                <CompanionQuestReward
+                  quest={completedQuest}
+                  chooseAnotherLabel={t.companion.questChooseAnother}
+                  continueLabel={t.companion.questContinueTour}
+                  onChooseAnother={showQuestCardsAgain}
+                  onContinueTour={handleNormalTour}
+                />
               )}
 
               {history.length === 0 && (
@@ -999,14 +1329,7 @@ export default function CompanionChat({
               <button
                 type="button"
                 onClick={() => {
-                  setFrozen(false);
-                  if (capturedUrl) URL.revokeObjectURL(capturedUrl);
-                  setCapturedUrl(null);
-                  setScanPhase("idle");
-                  setScanProgress(0);
-                  setScanErrorMsg(null);
-                  setFallbackSuggestions(null);
-                  setShowInlineCamera(true);
+                  openInlineCamera("normal");
                 }}
                 className="flex h-10 w-10 mx-auto shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-all hover:scale-105 active:scale-95 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
                 aria-label={t.companion.openCameraLabel}
@@ -1119,9 +1442,23 @@ export default function CompanionChat({
       {showInlineCamera && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">
           {!fallbackSuggestions ? (
-            <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4">
-              {t.companion.cameraInstruction}
-            </p>
+            <div className="mb-4 flex flex-col items-center gap-3 px-4 text-center">
+              <p className="text-sm font-bold text-amber-100">
+                {cameraMode === "bait"
+                  ? t.companion.questBaitHint
+                  : cameraMode === "quest" && activeQuestStop
+                  ? activeQuestStop.hint
+                  : t.companion.cameraInstruction}
+              </p>
+              {cameraMode === "bait" && (
+                <div className="rounded-2xl border border-amber-300/30 bg-amber-500/10 px-4 py-3 shadow-[0_0_22px_rgba(245,158,11,0.18)]">
+                  <div className="mx-auto mb-2 flex h-16 w-24 items-end justify-center rounded-t-full border-4 border-amber-200/60 border-b-0 bg-black/35 opacity-70 shadow-inner">
+                    <div className="mb-0 h-8 w-9 rounded-t-full border-2 border-amber-100/70 border-b-0" />
+                  </div>
+                  <p className="text-xs font-medium text-amber-100/80">{t.companion.questBaitSilhouette}</p>
+                </div>
+              )}
+            </div>
           ) : (
             <p className="text-amber-100 font-bold mb-4 text-center text-sm px-4 animate-pulse">
               🤔 {t.companion.uncertain}
@@ -1195,6 +1532,7 @@ export default function CompanionChat({
             type="button"
             onClick={() => {
               setShowInlineCamera(false);
+              setCameraMode("normal");
               setScanPhase("idle");
               setFallbackSuggestions(null);
               setFrozen(false);
