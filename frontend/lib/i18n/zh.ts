@@ -260,6 +260,7 @@ export const zh: VisitorTranslations = {
     "scanning": "扫描中...",
     "identified": "已识别！",
     "captureNow": "立即拍摄",
+    "uploadImage": "上传图片",
     "introTitle": "我是黎贵惇",
     "introSubtitle": "我今年18岁，正在准备殿试。在大日子之前，让我带你参观吧！",
     "introStart": "开始旅程",

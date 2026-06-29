@@ -1,30 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import CompanionChat from "@/components/visitor/CompanionChat";
 import HomeButton from "@/components/visitor/HomeButton";
+import MuteButton from "@/components/visitor/MuteButton";
+import SpeedButton from "@/components/visitor/SpeedButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
 import {
   enableCompanionMode,
   hasSeenCompanionIntro,
   markCompanionIntroSeen,
 } from "@/lib/companionState";
-import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
+import { useGroupSlug } from "@/lib/useGroupPath";
 import { getDynamicMinimapConfig, type MinimapConfig } from "@/lib/api";
 import { VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function CompanionPage() {
-  const router = useRouter();
   const groupSlug = useGroupSlug();
-  const scanPath = useGroupPath("/scan");
   const { t } = useVisitorLocale();
   const [showIntro, setShowIntro] = useState(false);
   const [ready, setReady] = useState(false);
   const [minimapSuggestedId, setMinimapSuggestedId] = useState<number | null>(null);
   const [minimapSuggestedName, setMinimapSuggestedName] = useState<string | null>(null);
   const [config, setConfig] = useState<MinimapConfig | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
 
   useEffect(() => {
     enableCompanionMode(window.sessionStorage);
@@ -64,24 +65,24 @@ export default function CompanionPage() {
             {t.companion.name}
           </h1>
         </div>
-        <div className="flex gap-2 pointer-events-auto">
+        <div className="flex flex-col gap-2 pointer-events-auto">
           <HomeButton />
-          {/* <button
-            type="button"
-            onClick={() => router.push(scanPath)}
-            className="flex h-10 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 px-4 text-sm font-semibold text-amber-400 backdrop-blur-md transition-transform active:scale-95"
-          >
-            📸 Quét
-          </button> */}
+          <MuteButton isMuted={isMuted} onToggle={() => setIsMuted((prev) => !prev)} />
+          <SpeedButton
+            speed={playbackRate}
+            onToggle={() => setPlaybackRate((current) => (current === 1 ? 1.5 : current === 1.5 ? 2 : 1))}
+          />
         </div>
       </header>
-      <CompanionChat 
-        showIntro={showIntro} 
-        onCompleteIntro={completeIntro} 
+      <CompanionChat
+        showIntro={showIntro}
+        onCompleteIntro={completeIntro}
         onSuggestNextPoint={(id, name) => {
           setMinimapSuggestedId(id);
           if (name) setMinimapSuggestedName(name);
         }}
+        isMuted={isMuted}
+        playbackRate={playbackRate}
       />
 
       <MinimapModal

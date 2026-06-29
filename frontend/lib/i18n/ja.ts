@@ -260,6 +260,7 @@ export const ja: VisitorTranslations = {
     "scanning": "スキャン中...",
     "identified": "識別しました！",
     "captureNow": "今すぐ撮影",
+    "uploadImage": "画像をアップロード",
     "introTitle": "私はレ・クイ・ドンです",
     "introSubtitle": "今年18歳、殿試に備えています。大切な日の前に、ご案内しましょう！",
     "introStart": "旅を始める",

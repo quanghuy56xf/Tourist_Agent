@@ -267,6 +267,7 @@ export const en: DeepStringShape<typeof vi> = {
     scanning: "Scanning...",
     identified: "Identified!",
     captureNow: "Capture now",
+    uploadImage: "Upload image",
     introTitle: "I am Lê Quý Đôn",
     introSubtitle: "I am 18 this year, preparing for the Đình exam. Let me show you around before my big day!",
     introStart: "Start journey",

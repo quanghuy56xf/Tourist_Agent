@@ -260,6 +260,7 @@ export const ko: VisitorTranslations = {
     "scanning": "스캔 중...",
     "identified": "식별됨!",
     "captureNow": "지금 촬영",
+    "uploadImage": "이미지 업로드",
     "introTitle": "저는 레 쿠이 돈입니다",
     "introSubtitle": "올해 18살, 전시 시험을 준비 중입니다. 큰 날 전에 안내해 드릴게요!",
     "introStart": "여정 시작",

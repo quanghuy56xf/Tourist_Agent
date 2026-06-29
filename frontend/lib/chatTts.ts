@@ -9,6 +9,14 @@ let audioRef: HTMLAudioElement | null = null;
 let objectUrlRef: string | null = null;
 let abortRef: AbortController | null = null;
 let playbackGeneration = 0;
+let globalMuted = false;
+
+export function setChatTtsMuted(muted: boolean) {
+  globalMuted = muted;
+  if (audioRef) {
+    audioRef.muted = muted;
+  }
+}
 
 function teardownPlaybackResources() {
   abortRef?.abort();
@@ -38,7 +46,8 @@ export async function playChatTts(
   text: string,
   language: string,
   signal?: AbortSignal,
-  persona?: "Companion"
+  persona?: "Companion",
+  playbackRate: 1 | 1.5 | 2 = 1
 ): Promise<void> {
   const cleaned = text.trim();
   if (!cleaned) return;
@@ -56,6 +65,8 @@ export async function playChatTts(
   const hooks = {
     onAudio: (audio: HTMLAudioElement) => {
       if (isActive()) {
+        audio.muted = globalMuted;
+        audio.playbackRate = playbackRate;
         audioRef = audio;
       }
     },
@@ -94,6 +105,8 @@ export async function playChatTts(
 
     objectUrlRef = url;
     const audio = new Audio(url);
+    audio.muted = globalMuted;
+    audio.playbackRate = playbackRate;
     audioRef = audio;
 
     await new Promise<void>((resolve, reject) => {
