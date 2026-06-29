@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import CompanionChat from "@/components/visitor/CompanionChat";
 import HomeButton from "@/components/visitor/HomeButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
@@ -10,15 +9,13 @@ import {
   hasSeenCompanionIntro,
   markCompanionIntroSeen,
 } from "@/lib/companionState";
-import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
+import { useGroupSlug } from "@/lib/useGroupPath";
 import { getDynamicMinimapConfig, type MinimapConfig } from "@/lib/api";
 import { VISITOR_GROUP_ID_KEY } from "@/lib/groupSlug";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 export default function CompanionPage() {
-  const router = useRouter();
   const groupSlug = useGroupSlug();
-  const scanPath = useGroupPath("/scan");
   const { t } = useVisitorLocale();
   const [showIntro, setShowIntro] = useState(false);
   const [ready, setReady] = useState(false);
@@ -66,18 +63,11 @@ export default function CompanionPage() {
         </div>
         <div className="flex gap-2 pointer-events-auto">
           <HomeButton />
-          {/* <button
-            type="button"
-            onClick={() => router.push(scanPath)}
-            className="flex h-10 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 px-4 text-sm font-semibold text-amber-400 backdrop-blur-md transition-transform active:scale-95"
-          >
-            📸 Quét
-          </button> */}
         </div>
       </header>
-      <CompanionChat 
-        showIntro={showIntro} 
-        onCompleteIntro={completeIntro} 
+      <CompanionChat
+        showIntro={showIntro}
+        onCompleteIntro={completeIntro}
         onSuggestNextPoint={(id, name) => {
           setMinimapSuggestedId(id);
           if (name) setMinimapSuggestedName(name);

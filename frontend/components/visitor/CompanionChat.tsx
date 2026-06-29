@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
 import { playChatTts } from "@/lib/chatTts";
 import {
@@ -223,6 +223,7 @@ export default function CompanionChat({
   }, [isLoading, isSpeaking, isRecording, isTranscribing, showInlineCamera, discovery, scanPhase, history.length, suggestedNextPoint, actionButtons.length, t.companion.scanMore]);
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const stopProgress = () => {
     if (progressTimer.current) {
@@ -756,6 +757,13 @@ export default function CompanionChat({
       stopProgress();
       setScanProgress(0);
     }
+  };
+
+  const handleUploadImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || scanPhase !== "idle") return;
+    void handleCapture(file);
   };
 
   const handleSuggestionSelect = (match: SearchMatch) => {
@@ -1518,16 +1526,33 @@ export default function CompanionChat({
           )}
           
           {!fallbackSuggestions && (
-            <button
-              type="button"
-              onClick={() => document.getElementById("camera-capture-btn")?.click()}
-              disabled={scanPhase !== "idle"}
-              className="mt-8 w-full max-w-[240px] py-4 rounded-full bg-amber-500 text-black font-bold text-lg disabled:opacity-50 transition-transform active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
-            >
-              {scanPhase === "scanning" ? t.companion.scanning : scanPhase === "found" ? t.companion.identified : t.companion.captureNow}
-            </button>
+            <div className="mt-8 flex w-full max-w-[260px] flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => document.getElementById("camera-capture-btn")?.click()}
+                disabled={scanPhase !== "idle"}
+                className="w-full py-4 rounded-full bg-amber-500 text-black font-bold text-lg disabled:opacity-50 transition-transform active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+              >
+                {scanPhase === "scanning" ? t.companion.scanning : scanPhase === "found" ? t.companion.identified : t.companion.captureNow}
+              </button>
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUploadImage}
+              />
+              <button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={scanPhase !== "idle"}
+                className="w-full rounded-full border border-amber-300/35 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-amber-100 transition-colors hover:bg-white/[0.1] disabled:opacity-50"
+              >
+                🖼️ {t.companion.uploadImage}
+              </button>
+            </div>
           )}
-          
+
           <button
             type="button"
             onClick={() => {

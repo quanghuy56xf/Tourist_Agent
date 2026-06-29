@@ -267,6 +267,7 @@ export const vi = {
     scanning: "Đang quét...",
     identified: "Đã nhận diện!",
     captureNow: "Chụp ngay",
+    uploadImage: "Tải ảnh lên",
     introTitle: "Ta là Lê Quý Đôn",
     introSubtitle: "Năm nay ta vừa tròn 18, đang chuẩn bị vào thi Đình. Trước khi thi, để ta cùng bạn khám phá Quốc Tử Giám nhé!",
     introStart: "Bắt đầu hành trình",

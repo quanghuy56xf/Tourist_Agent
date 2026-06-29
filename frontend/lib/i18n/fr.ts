@@ -260,6 +260,7 @@ export const fr: VisitorTranslations = {
     "scanning": "Scan en cours...",
     "identified": "Identifié !",
     "captureNow": "Capturer maintenant",
+    "uploadImage": "Téléverser une image",
     "introTitle": "Je suis Lê Quý Đôn",
     "introSubtitle": "J'ai 18 ans cette année et je prépare l'examen de Đình. Laissez-moi vous faire visiter avant le grand jour !",
     "introStart": "Commencer le voyage",
