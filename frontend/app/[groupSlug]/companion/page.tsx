@@ -65,13 +65,15 @@ export default function CompanionPage() {
             {t.companion.name}
           </h1>
         </div>
-        <div className="flex flex-col gap-2 pointer-events-auto">
+        <div className="flex flex-col items-end gap-2 pointer-events-auto">
           <HomeButton />
-          <MuteButton isMuted={isMuted} onToggle={() => setIsMuted((prev) => !prev)} />
-          <SpeedButton
-            speed={playbackRate}
-            onToggle={() => setPlaybackRate((current) => (current === 1 ? 1.5 : current === 1.5 ? 2 : 1))}
-          />
+          <div className="flex gap-2">
+            <SpeedButton
+              speed={playbackRate}
+              onToggle={() => setPlaybackRate((current) => (current === 1 ? 1.5 : current === 1.5 ? 2 : 1))}
+            />
+            <MuteButton isMuted={isMuted} onToggle={() => setIsMuted((prev) => !prev)} />
+          </div>
         </div>
       </header>
       <CompanionChat
