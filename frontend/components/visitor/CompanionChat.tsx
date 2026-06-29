@@ -573,15 +573,69 @@ export default function CompanionChat({
     void send(t.companion.questNormalTourPrompt);
   };
 
-  const showQuestStepPrompt = (quest: CompanionQuest, stopIndex: number) => {
+  const showQuestStepPrompt = (quest: CompanionQuest, stopIndex: number, speakPrompt = true) => {
     const stop = quest.stops[stopIndex];
     if (!stop) return;
     const text = `${t.companion.questSelected.replace("{name}", quest.title)}\n\nĐiểm ${stopIndex + 1}/${quest.stops.length}: ${stop.title}. ${stop.hint}`;
-    setHistory((current) => [...current, { role: "assistant", content: text }]);
+    setHistory((current) => {
+      if (current.some((entry) => entry.role === "assistant" && entry.content === text)) {
+        return current;
+      }
+      return [...current, { role: "assistant", content: text }];
+    });
     setActionButtons([]);
     setQuestDetailExpanded(true);
-    void speak(text);
+    if (speakPrompt) void speak(text);
   };
+
+  useEffect(() => {
+    if (showIntro) return;
+
+    const questState = getCompanionQuestState(window.localStorage);
+
+    if (questState.status === "quests_unlocked") {
+      setShowQuestCards(true);
+      setActiveQuestId(null);
+      setActiveQuestStopIndex(0);
+      setCompletedQuestId(null);
+      setActionButtons([]);
+      setSuggestedNextPoint(null);
+      return;
+    }
+
+    if (questState.status === "quest_active" && questState.selectedQuestId) {
+      const quest = getQuestById(questState.selectedQuestId);
+      if (!quest) return;
+
+      const stopIndex = Math.min(questState.currentStopIndex ?? 0, quest.stops.length - 1);
+      setShowQuestCards(false);
+      setActiveQuestId(quest.id);
+      setActiveQuestStopIndex(stopIndex);
+      setCompletedQuestId(null);
+      setActionButtons([]);
+      setSuggestedNextPoint(null);
+
+      const stop = quest.stops[stopIndex];
+      const text = `${t.companion.questSelected.replace("{name}", quest.title)}\n\nĐiểm ${stopIndex + 1}/${quest.stops.length}: ${stop.title}. ${stop.hint}`;
+      setHistory((current) => {
+        if (current.some((entry) => entry.role === "assistant" && entry.content === text)) {
+          return current;
+        }
+        return [...current, { role: "assistant", content: text }];
+      });
+      setQuestDetailExpanded(true);
+      return;
+    }
+
+    if (questState.status === "quest_completed" && questState.selectedQuestId) {
+      setShowQuestCards(false);
+      setActiveQuestId(null);
+      setActiveQuestStopIndex(0);
+      setCompletedQuestId(questState.selectedQuestId);
+      setActionButtons([]);
+      setSuggestedNextPoint(null);
+    }
+  }, [showIntro, t.companion.questSelected]);
 
   const handleSelectQuest = (quest: CompanionQuest) => {
     setShowQuestCards(false);
@@ -849,28 +903,14 @@ export default function CompanionChat({
     } catch (e) {}
 
     if (history.length === 0 && !appOpenedFired.current) {
-      if ((window as any).__companionAppOpenedFired) return;
-      (window as any).__companionAppOpenedFired = true;
       appOpenedFired.current = true;
 
       const questState = getCompanionQuestState(window.localStorage);
-      if (questState.status === "quests_unlocked") {
-        setShowQuestCards(true);
-        return;
-      }
-      if (questState.status === "quest_active" && questState.selectedQuestId) {
-        const quest = getQuestById(questState.selectedQuestId);
-        if (quest) {
-          const stopIndex = Math.min(questState.currentStopIndex ?? 0, quest.stops.length - 1);
-          setActiveQuestId(quest.id);
-          setActiveQuestStopIndex(stopIndex);
-          setShowQuestCards(false);
-          showQuestStepPrompt(quest, stopIndex);
-          return;
-        }
-      }
-      if (questState.status === "quest_completed" && questState.selectedQuestId) {
-        setCompletedQuestId(questState.selectedQuestId);
+      if (
+        questState.status === "quests_unlocked" ||
+        questState.status === "quest_active" ||
+        questState.status === "quest_completed"
+      ) {
         return;
       }
 
