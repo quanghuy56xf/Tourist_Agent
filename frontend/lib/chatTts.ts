@@ -46,7 +46,8 @@ export async function playChatTts(
   text: string,
   language: string,
   signal?: AbortSignal,
-  persona?: "Companion"
+  persona?: "Companion",
+  playbackRate: 1 | 1.5 | 2 = 1
 ): Promise<void> {
   const cleaned = text.trim();
   if (!cleaned) return;
@@ -65,6 +66,7 @@ export async function playChatTts(
     onAudio: (audio: HTMLAudioElement) => {
       if (isActive()) {
         audio.muted = globalMuted;
+        audio.playbackRate = playbackRate;
         audioRef = audio;
       }
     },
@@ -104,6 +106,7 @@ export async function playChatTts(
     objectUrlRef = url;
     const audio = new Audio(url);
     audio.muted = globalMuted;
+    audio.playbackRate = playbackRate;
     audioRef = audio;
 
     await new Promise<void>((resolve, reject) => {

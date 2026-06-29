@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import CompanionChat from "@/components/visitor/CompanionChat";
 import HomeButton from "@/components/visitor/HomeButton";
 import MuteButton from "@/components/visitor/MuteButton";
+import SpeedButton from "@/components/visitor/SpeedButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
 import {
   enableCompanionMode,
@@ -24,6 +25,7 @@ export default function CompanionPage() {
   const [minimapSuggestedName, setMinimapSuggestedName] = useState<string | null>(null);
   const [config, setConfig] = useState<MinimapConfig | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
 
   useEffect(() => {
     enableCompanionMode(window.sessionStorage);
@@ -66,6 +68,10 @@ export default function CompanionPage() {
         <div className="flex flex-col gap-2 pointer-events-auto">
           <HomeButton />
           <MuteButton isMuted={isMuted} onToggle={() => setIsMuted((prev) => !prev)} />
+          <SpeedButton
+            speed={playbackRate}
+            onToggle={() => setPlaybackRate((current) => (current === 1 ? 1.5 : current === 1.5 ? 2 : 1))}
+          />
         </div>
       </header>
       <CompanionChat
@@ -76,6 +82,7 @@ export default function CompanionPage() {
           if (name) setMinimapSuggestedName(name);
         }}
         isMuted={isMuted}
+        playbackRate={playbackRate}
       />
 
       <MinimapModal

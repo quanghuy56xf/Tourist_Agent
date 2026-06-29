@@ -48,6 +48,7 @@ interface CompanionChatProps {
   onCompleteIntro?: () => void;
   onSuggestNextPoint?: (itemId: number, itemName?: string) => void;
   isMuted?: boolean;
+  playbackRate?: 1 | 1.5 | 2;
 }
 
 type DiscoveryState = {
@@ -138,6 +139,7 @@ export default function CompanionChat({
   onCompleteIntro,
   onSuggestNextPoint,
   isMuted = false,
+  playbackRate = 1,
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
   const { t, language } = useVisitorLocale();
@@ -177,7 +179,7 @@ export default function CompanionChat({
   const speak = async (text: string) => {
     setIsSpeaking(true);
     try {
-      await playChatTts(text, language, undefined, "Companion");
+      await playChatTts(text, language, undefined, "Companion", playbackRateRef.current);
     } catch {
       // ignore
     } finally {
@@ -295,11 +297,19 @@ export default function CompanionChat({
   }, [history, isLoading]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const persistentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackRateRef = useRef(playbackRate);
   const appOpenedFired = useRef(false);
 
   useEffect(() => {
     persistentAudioRef.current = new Audio();
   }, []);
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+    if (persistentAudioRef.current) {
+      persistentAudioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
 
   useEffect(() => {
     setChatTtsMuted(isMuted);
@@ -360,7 +370,12 @@ export default function CompanionChat({
               return;
             }
             audio.src = url;
+            audio.defaultPlaybackRate = playbackRateRef.current;
+            audio.playbackRate = playbackRateRef.current;
             currentAudioRef.current = audio;
+            audio.onplay = () => {
+              audio.playbackRate = playbackRateRef.current;
+            };
             audio.onended = () => {
               URL.revokeObjectURL(url);
               resolve();
