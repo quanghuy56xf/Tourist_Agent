@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import CompanionChat from "@/components/visitor/CompanionChat";
 import HomeButton from "@/components/visitor/HomeButton";
+import MuteButton from "@/components/visitor/MuteButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
 import {
   enableCompanionMode,
@@ -22,6 +23,7 @@ export default function CompanionPage() {
   const [minimapSuggestedId, setMinimapSuggestedId] = useState<number | null>(null);
   const [minimapSuggestedName, setMinimapSuggestedName] = useState<string | null>(null);
   const [config, setConfig] = useState<MinimapConfig | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     enableCompanionMode(window.sessionStorage);
@@ -61,8 +63,9 @@ export default function CompanionPage() {
             {t.companion.name}
           </h1>
         </div>
-        <div className="flex gap-2 pointer-events-auto">
+        <div className="flex flex-col gap-2 pointer-events-auto">
           <HomeButton />
+          <MuteButton isMuted={isMuted} onToggle={() => setIsMuted((prev) => !prev)} />
         </div>
       </header>
       <CompanionChat
@@ -72,6 +75,7 @@ export default function CompanionPage() {
           setMinimapSuggestedId(id);
           if (name) setMinimapSuggestedName(name);
         }}
+        isMuted={isMuted}
       />
 
       <MinimapModal

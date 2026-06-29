@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { chatWithCompanionStream, ChatMessage, transcribeAudio } from "@/lib/api";
-import { playChatTts } from "@/lib/chatTts";
+import { playChatTts, setChatTtsMuted, stopChatTts } from "@/lib/chatTts";
 import {
   addVisitedItem,
   advanceCompanionQuest,
@@ -47,6 +47,7 @@ interface CompanionChatProps {
   showIntro?: boolean;
   onCompleteIntro?: () => void;
   onSuggestNextPoint?: (itemId: number, itemName?: string) => void;
+  isMuted?: boolean;
 }
 
 type DiscoveryState = {
@@ -136,6 +137,7 @@ export default function CompanionChat({
   showIntro = false,
   onCompleteIntro,
   onSuggestNextPoint,
+  isMuted = false,
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
   const { t, language } = useVisitorLocale();
@@ -299,6 +301,16 @@ export default function CompanionChat({
     persistentAudioRef.current = new Audio();
   }, []);
 
+  useEffect(() => {
+    setChatTtsMuted(isMuted);
+    if (persistentAudioRef.current) {
+      persistentAudioRef.current.muted = isMuted;
+    }
+    return () => {
+      setChatTtsMuted(false);
+    };
+  }, [isMuted]);
+
   const stopAllAudio = () => {
     if (speakingGraceTimer.current) {
       window.clearTimeout(speakingGraceTimer.current);
@@ -313,6 +325,7 @@ export default function CompanionChat({
     isPlayingAudio.current = false;
     streamDoneRef.current = true;
     setIsSpeaking(false);
+    stopChatTts();
   };
 
   useEffect(() => {
