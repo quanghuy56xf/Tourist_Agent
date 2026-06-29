@@ -66,7 +66,7 @@ export default function MethodSelectionPage() {
     <main className="flex flex-1 flex-col w-full">
       <header className="artifact-page-head">
         <div className="mb-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 relative z-50">
             <div className="flex items-center gap-2">
               <BackButton onClick={() => router.push("/")} label={t.common.back} />
             </div>
