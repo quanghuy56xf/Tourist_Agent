@@ -10,7 +10,7 @@ interface MuteButtonProps {
 
 export default function MuteButton({ className = "", isMuted, onToggle }: MuteButtonProps) {
   const { t } = useVisitorLocale();
-  const label = isMuted ? t.companion.unmute || "Bật tiếng" : t.companion.mute || "Tắt tiếng";
+  const label = isMuted ? (t.companion as any).unmute || "Bật tiếng" : (t.companion as any).mute || "Tắt tiếng";
 
   return (
     <button
