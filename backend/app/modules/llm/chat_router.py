@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session
 from app.core.config import RAG_CHAT_TOP_K
 from app.core.database import get_db
 from app.models.item import Item
+from app.modules.analytics.chat_logs import record_chat_turn, resolve_conversation_id
 from app.modules.analytics.service import get_client_ip, record_event
 from app.modules.content.text_utils import polish_generated_text
 from app.modules.content.tts import _synthesize_speech_async
-from app.modules.llm.client import LLMServiceUnavailableError
+from app.modules.llm.client import LLMServiceUnavailableError, estimate_token_usage
 from app.modules.llm.generator import get_rag_generator
 from app.modules.content.language_support import LANGUAGE_VI, normalize_language_label
 from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
@@ -132,6 +133,9 @@ def _record_chat(
     duration_ms: int,
     success: bool,
     error_detail: str | None = None,
+    assistant_message: str | None = None,
+    token_usage=None,
+    prompt_text_for_estimate: str = "",
 ) -> None:
     record_event(
         db,
@@ -144,6 +148,69 @@ def _record_chat(
         duration_ms=duration_ms,
         success=success,
         error_detail=error_detail,
+    )
+    conversation_id = resolve_conversation_id(
+        session_id=request.session_id,
+        search_session_id=request.search_session_id,
+        item_id=item.id,
+        chat_mode="item",
+    )
+    record_chat_turn(
+        db,
+        conversation_id=conversation_id,
+        chat_mode="item",
+        user_message=request.message,
+        assistant_message=assistant_message,
+        group_id=item.group_id,
+        item_id=item.id,
+        session_id=request.session_id,
+        search_session_id=request.search_session_id,
+        persona=request.persona,
+        language=request.language,
+        success=success,
+        error_detail=error_detail,
+        duration_ms=duration_ms,
+        token_usage=token_usage,
+        prompt_text_for_estimate=prompt_text_for_estimate,
+    )
+
+
+def _record_companion_chat(
+    db: Session,
+    *,
+    request: CompanionChatRequest,
+    group_id: int | None,
+    item_id: int | None,
+    duration_ms: int,
+    success: bool,
+    assistant_message: str | None,
+    error_detail: str | None = None,
+    token_usage=None,
+    prompt_text_for_estimate: str = "",
+) -> None:
+    conversation_id = resolve_conversation_id(
+        session_id=request.session_id,
+        search_session_id=None,
+        item_id=item_id,
+        chat_mode="companion",
+    )
+    record_chat_turn(
+        db,
+        conversation_id=conversation_id,
+        chat_mode="companion",
+        user_message=request.message,
+        assistant_message=assistant_message,
+        group_id=group_id,
+        item_id=item_id,
+        session_id=request.session_id,
+        search_session_id=None,
+        persona="Companion",
+        language=request.language,
+        success=success,
+        error_detail=error_detail,
+        duration_ms=duration_ms,
+        token_usage=token_usage,
+        prompt_text_for_estimate=prompt_text_for_estimate,
     )
 
 
@@ -174,6 +241,7 @@ def chat_with_ai(
 
     if not has_verified:
         duration_ms = int((time.perf_counter() - started) * 1000)
+        fallback = no_item_knowledge_message(request.language)
         _record_chat(
             db,
             request=request,
@@ -181,11 +249,17 @@ def chat_with_ai(
             http_request=http_request,
             duration_ms=duration_ms,
             success=True,
+            assistant_message=fallback,
+            token_usage=estimate_token_usage(
+                prompt_text=request.message,
+                completion_text=fallback,
+            ),
         )
-        return ChatResponse(content=no_item_knowledge_message(request.language))
+        return ChatResponse(content=fallback)
 
+    generator = get_rag_generator()
     try:
-        content = get_rag_generator().generate_chat(
+        content = generator.generate_chat(
             message=request.message,
             history=history,
             retrieved_docs=docs,
@@ -226,7 +300,12 @@ def chat_with_ai(
             detail="Không thể sinh nội dung lúc này",
         )
 
+    polished = polish_generated_text(content)
     duration_ms = int((time.perf_counter() - started) * 1000)
+    token_usage = getattr(generator, "last_token_usage", None) or estimate_token_usage(
+        prompt_text=request.message,
+        completion_text=polished,
+    )
     _record_chat(
         db,
         request=request,
@@ -234,8 +313,11 @@ def chat_with_ai(
         http_request=http_request,
         duration_ms=duration_ms,
         success=True,
+        assistant_message=polished,
+        token_usage=token_usage,
+        prompt_text_for_estimate=request.message,
     )
-    return ChatResponse(content=polish_generated_text(content))
+    return ChatResponse(content=polished)
 
 
 @router.post("/companion/chat/stream")
@@ -265,8 +347,23 @@ async def chat_with_companion_stream(
                     if is_vi
                     else "I haven't read about this yet, let me check it later!"
                 )
+                started = time.perf_counter()
                 yield f"event: chunk\ndata: {json.dumps({'text': fallback_msg})}\n\n"
                 yield "event: done\ndata: {}\n\n"
+                duration_ms = int((time.perf_counter() - started) * 1000)
+                _record_companion_chat(
+                    db,
+                    request=request,
+                    group_id=group_id,
+                    item_id=item.id if item else None,
+                    duration_ms=duration_ms,
+                    success=True,
+                    assistant_message=fallback_msg,
+                    token_usage=estimate_token_usage(
+                        prompt_text=request.message,
+                        completion_text=fallback_msg,
+                    ),
+                )
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
         group_id = item.group_id
         current_item_name = item.name
@@ -337,8 +434,11 @@ async def chat_with_companion_stream(
             next_tts_seq = 0
             first_chunk_ms: int | None = None
             first_segment_ms: int | None = None
+            assistant_chunks: list[str] = []
+            stream_error: str | None = None
+            generator = get_rag_generator()
             try:
-                stream = get_rag_generator().generate_companion_chat_stream(
+                stream = generator.generate_companion_chat_stream(
                     message=request.message,
                     history=history,
                     retrieved_docs=docs,
@@ -350,6 +450,7 @@ async def chat_with_companion_stream(
                 async for chunk in stream:
                     if first_chunk_ms is None:
                         first_chunk_ms = elapsed_ms()
+                    assistant_chunks.append(chunk)
                     await event_queue.put(_sse_event("chunk", {"text": chunk}))
                     if stop_tts:
                         continue
@@ -374,11 +475,33 @@ async def chat_with_companion_stream(
                         first_segment_ms = elapsed_ms()
                     await tts_queue.put((next_tts_seq, remaining_text))
             except Exception:
+                stream_error = "Lỗi sinh nội dung"
                 logger.exception("Companion chat streaming failed")
-                await event_queue.put(_sse_event("error", {"detail": "Lỗi sinh nội dung"}))
+                await event_queue.put(_sse_event("error", {"detail": stream_error}))
             finally:
                 for _ in range(TTS_WORKER_COUNT):
                     await tts_queue.put(None)
+                assistant_message = "".join(assistant_chunks).strip() or None
+                duration_ms = elapsed_ms()
+                prompt_text = request.message + "\n".join(
+                    entry["content"] for entry in history[-10:]
+                )
+                token_usage = getattr(generator, "last_token_usage", None) or estimate_token_usage(
+                    prompt_text=prompt_text,
+                    completion_text=assistant_message or "",
+                )
+                _record_companion_chat(
+                    db,
+                    request=request,
+                    group_id=group_id,
+                    item_id=item.id if item else None,
+                    duration_ms=duration_ms,
+                    success=stream_error is None,
+                    assistant_message=assistant_message,
+                    error_detail=stream_error,
+                    token_usage=token_usage,
+                    prompt_text_for_estimate=prompt_text,
+                )
                 logger.info(
                     "Companion stream text latency session=%s item=%s first_chunk_ms=%s first_segment_ms=%s",
                     request.session_id,

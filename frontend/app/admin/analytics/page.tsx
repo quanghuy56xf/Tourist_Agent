@@ -23,11 +23,29 @@ import {
   AdminButton,
   AdminCard,
   AdminField,
+  AdminInput,
   AdminPage,
   AdminPageHeader,
   AdminSelect,
 } from "@/components/admin/ui";
-import { AnalyticsSummary, ContentIssueRow, fetchAnalyticsSummary, GroupSummary, listGroups } from "@/lib/api";
+import {
+  AnalyticsSummary,
+  ChatConversationRow,
+  ChatCostSummary,
+  ChatLogListResponse,
+  ChatTurnLogRow,
+  ContentIssueRow,
+  downloadAnalyticsCsv,
+  fetchAnalyticsSummary,
+  fetchChatConversations,
+  fetchChatCostSummary,
+  fetchChatLogs,
+  fetchLlmPricing,
+  getGroupItems,
+  GroupSummary,
+  listGroups,
+  saveLlmPricing,
+} from "@/lib/api";
 import { canAccessGroup, getAdminSession } from "@/lib/adminAuth";
 
 const DAY_OPTIONS = [
@@ -426,6 +444,8 @@ export default function AdminAnalyticsPage() {
           </AdminCard>
         </>
       )}
+
+      <ChatAnalyticsSection days={days} groupId={groupId === "" ? undefined : groupId} />
     </AdminPage>
   );
 }
@@ -546,6 +566,465 @@ function IssueTable({
                 </td>
                 <td className="max-w-[12rem] py-2 pr-3">
                   <TruncatedText text={row.error_detail} maxLen={36} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
+  );
+}
+
+function formatUsd(value: number): string {
+  if (value < 0.0001 && value > 0) return "< $0.0001";
+  return `$${value.toFixed(4)}`;
+}
+
+function ChatAnalyticsSection({
+  days,
+  groupId,
+}: {
+  days: number;
+  groupId?: number;
+}) {
+  const [viewMode, setViewMode] = useState<"turns" | "conversations">("turns");
+  const [itemId, setItemId] = useState<number | "">("");
+  const [conversationId, setConversationId] = useState("");
+  const [turnCode, setTurnCode] = useState("");
+  const [status, setStatus] = useState<"all" | "success" | "error">("all");
+  const [minQuestions, setMinQuestions] = useState("");
+  const [maxQuestions, setMaxQuestions] = useState("");
+  const [items, setItems] = useState<Array<{ id: number; name: string }>>([]);
+  const [pricingCacheHit, setPricingCacheHit] = useState("");
+  const [pricingCacheMiss, setPricingCacheMiss] = useState("");
+  const [pricingOutput, setPricingOutput] = useState("");
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingMessage, setPricingMessage] = useState("");
+  const [chatLogs, setChatLogs] = useState<ChatLogListResponse | null>(null);
+  const [conversations, setConversations] = useState<{
+    items: ChatConversationRow[];
+    total: number;
+    total_prompt_tokens: number;
+    total_completion_tokens: number;
+    total_tokens: number;
+    total_cost_usd: number;
+  } | null>(null);
+  const [costSummary, setCostSummary] = useState<ChatCostSummary | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  const filters = useMemo(
+    () => ({
+      days,
+      groupId,
+      itemId: itemId === "" ? undefined : itemId,
+      conversationId: conversationId.trim() || undefined,
+      turnCode: turnCode.trim() || undefined,
+      status,
+      minQuestions: minQuestions ? Number(minQuestions) : undefined,
+      maxQuestions: maxQuestions ? Number(maxQuestions) : undefined,
+    }),
+    [conversationId, days, groupId, itemId, maxQuestions, minQuestions, status, turnCode]
+  );
+
+  useEffect(() => {
+    if (!groupId) {
+      setItems([]);
+      setItemId("");
+      return;
+    }
+    getGroupItems(groupId)
+      .then((data) => setItems(data.items.map((item) => ({ id: item.id, name: item.name }))))
+      .catch(() => setItems([]));
+  }, [groupId]);
+
+  useEffect(() => {
+    fetchLlmPricing()
+      .then((data) => {
+        setPricingCacheHit(String(data.input_cache_hit_price_per_1m));
+        setPricingCacheMiss(String(data.input_cache_miss_price_per_1m));
+        setPricingOutput(String(data.output_price_per_1m));
+      })
+      .catch(() => {
+        setPricingCacheHit("0.014");
+        setPricingCacheMiss("0.075");
+        setPricingOutput("0.30");
+      });
+  }, []);
+
+  const loadChatData = useCallback(async () => {
+    setChatLoading(true);
+    setChatError("");
+    try {
+      const [logs, convs, costs] = await Promise.all([
+        fetchChatLogs(filters),
+        fetchChatConversations(filters),
+        fetchChatCostSummary(filters),
+      ]);
+      setChatLogs(logs);
+      setConversations(convs);
+      setCostSummary(costs);
+    } catch (err) {
+      setChatLogs(null);
+      setConversations(null);
+      setCostSummary(null);
+      setChatError(err instanceof Error ? err.message : "Không tải được dữ liệu chat");
+    } finally {
+      setChatLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    void loadChatData();
+  }, [loadChatData]);
+
+  const costChartData = useMemo(
+    () =>
+      costSummary?.daily.map((row) => ({
+        date: row.date.slice(5),
+        tokens: row.total_tokens,
+        cost: row.cost_usd,
+        turns: row.turn_count,
+      })) ?? [],
+    [costSummary]
+  );
+
+  const handleSavePricing = async () => {
+    setPricingSaving(true);
+    setPricingMessage("");
+    try {
+      await saveLlmPricing({
+        input_cache_hit_price_per_1m: Number(pricingCacheHit),
+        input_cache_miss_price_per_1m: Number(pricingCacheMiss),
+        output_price_per_1m: Number(pricingOutput),
+      });
+      setPricingMessage("Đã lưu giá mới — áp dụng cho lượt chat tiếp theo.");
+      void loadChatData();
+    } catch (err) {
+      setPricingMessage(err instanceof Error ? err.message : "Không lưu được giá");
+    } finally {
+      setPricingSaving(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      await downloadAnalyticsCsv(
+        viewMode === "turns" ? "chat-logs" : "chat-conversations",
+        filters
+      );
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Không xuất được CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const activeTotals =
+    viewMode === "turns"
+      ? chatLogs
+      : conversations;
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Chat RAG"
+        title="Lịch sử chat & chi phí LLM"
+        description="Theo dõi câu hỏi/trả lời, token và chi phí theo cuộc hội thoại."
+        action={
+          <AdminButton type="button" onClick={() => void loadChatData()} disabled={chatLoading}>
+            {chatLoading ? "Đang tải..." : "Làm mới chat"}
+          </AdminButton>
+        }
+      />
+
+      <AdminCard title="Cấu hình giá LLM DeepSeek (USD / 1M token)">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminField label="Input cache hit">
+            <AdminInput
+              type="number"
+              min="0"
+              step="0.001"
+              value={pricingCacheHit}
+              onChange={(e) => setPricingCacheHit(e.target.value)}
+            />
+          </AdminField>
+          <AdminField label="Input cache miss">
+            <AdminInput
+              type="number"
+              min="0"
+              step="0.001"
+              value={pricingCacheMiss}
+              onChange={(e) => setPricingCacheMiss(e.target.value)}
+            />
+          </AdminField>
+          <AdminField label="Output">
+            <AdminInput
+              type="number"
+              min="0"
+              step="0.001"
+              value={pricingOutput}
+              onChange={(e) => setPricingOutput(e.target.value)}
+            />
+          </AdminField>
+          <div className="flex items-end">
+            <AdminButton type="button" onClick={() => void handleSavePricing()} disabled={pricingSaving}>
+              {pricingSaving ? "Đang lưu..." : "Lưu giá"}
+            </AdminButton>
+          </div>
+        </div>
+        <p className="admin-muted mt-3 text-xs">
+          Chi phí = (hit × giá hit) + (miss × giá miss) + (output × giá output). Giá mới chỉ áp dụng cho lượt chat tiếp theo.
+        </p>
+        {pricingMessage && <p className="admin-muted mt-3 text-sm">{pricingMessage}</p>}
+      </AdminCard>
+
+      <AdminCard title="Bộ lọc lịch sử chat">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminField label="Hiện vật">
+            <AdminSelect
+              value={itemId === "" ? "" : String(itemId)}
+              onChange={(e) => setItemId(e.target.value ? Number(e.target.value) : "")}
+              disabled={!groupId}
+            >
+              <option value="">Tất cả hiện vật</option>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </AdminSelect>
+          </AdminField>
+          <AdminField label="Mã hội thoại">
+            <AdminInput
+              value={conversationId}
+              onChange={(e) => setConversationId(e.target.value)}
+              placeholder="search_session_id hoặc session..."
+            />
+          </AdminField>
+          <AdminField label="Mã lượt (CHAT-xxx)">
+            <AdminInput
+              value={turnCode}
+              onChange={(e) => setTurnCode(e.target.value)}
+              placeholder="CHAT-123"
+            />
+          </AdminField>
+          <AdminField label="Trạng thái">
+            <AdminSelect
+              value={status}
+              onChange={(e) => setStatus(e.target.value as "all" | "success" | "error")}
+            >
+              <option value="all">Tất cả</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+            </AdminSelect>
+          </AdminField>
+          <AdminField label="Tối thiểu câu hỏi / hội thoại">
+            <AdminInput
+              type="number"
+              min="1"
+              value={minQuestions}
+              onChange={(e) => setMinQuestions(e.target.value)}
+            />
+          </AdminField>
+          <AdminField label="Tối đa câu hỏi / hội thoại">
+            <AdminInput
+              type="number"
+              min="1"
+              value={maxQuestions}
+              onChange={(e) => setMaxQuestions(e.target.value)}
+            />
+          </AdminField>
+          <AdminField label="Chế độ xem">
+            <AdminSelect
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as "turns" | "conversations")}
+            >
+              <option value="turns">Theo lượt chat</option>
+              <option value="conversations">Theo hội thoại</option>
+            </AdminSelect>
+          </AdminField>
+          <div className="flex items-end">
+            <AdminButton type="button" onClick={() => void handleExportCsv()} disabled={exporting}>
+              {exporting ? "Đang xuất..." : "Xuất CSV"}
+            </AdminButton>
+          </div>
+        </div>
+      </AdminCard>
+
+      {chatError && <AdminAlert type="error">{chatError}</AdminAlert>}
+
+      {activeTotals && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminCard title="Tổng token input">
+            <p className="text-3xl font-semibold">{activeTotals.total_prompt_tokens.toLocaleString()}</p>
+          </AdminCard>
+          <AdminCard title="Tổng token output">
+            <p className="text-3xl font-semibold">
+              {activeTotals.total_completion_tokens.toLocaleString()}
+            </p>
+          </AdminCard>
+          <AdminCard title="Tổng token">
+            <p className="text-3xl font-semibold">{activeTotals.total_tokens.toLocaleString()}</p>
+          </AdminCard>
+          <AdminCard title="Tổng chi phí">
+            <p className="text-3xl font-semibold">{formatUsd(activeTotals.total_cost_usd)}</p>
+            <p className="admin-muted mt-1 text-xs">
+              {viewMode === "turns" ? chatLogs?.total ?? 0 : conversations?.total ?? 0}{" "}
+              {viewMode === "turns" ? "lượt" : "hội thoại"}
+            </p>
+          </AdminCard>
+        </div>
+      )}
+
+      {costSummary && costChartData.length > 0 && (
+        <AdminCard title="Token & chi phí LLM theo ngày">
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={costChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <YAxis yAxisId="tokens" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <YAxis
+                  yAxisId="cost"
+                  orientation="right"
+                  tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "#1a1a1a",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                />
+                <Legend />
+                <Line yAxisId="tokens" type="monotone" dataKey="tokens" name="Token" stroke="#7CB5EC" />
+                <Line yAxisId="cost" type="monotone" dataKey="cost" name="USD" stroke="#D4AF37" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </AdminCard>
+      )}
+
+      {viewMode === "turns" ? (
+        <AdminCard title="Lịch sử chat theo lượt">
+          <ChatTurnTable rows={chatLogs?.items ?? []} />
+        </AdminCard>
+      ) : (
+        <AdminCard title="Tổng hợp theo hội thoại">
+          <ChatConversationTable rows={conversations?.items ?? []} />
+        </AdminCard>
+      )}
+    </div>
+  );
+}
+
+function ChatTurnTable({ rows }: { rows: ChatTurnLogRow[] }) {
+  return (
+    <AdminDataTable rows={rows} emptyMessage="Chưa có lượt chat nào." minWidth="980px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="py-2 pr-3 font-medium">Mã</th>
+              <th className="max-w-[8rem] py-2 pr-3 font-medium">Thời gian</th>
+              <th className="max-w-[10rem] py-2 pr-3 font-medium">Hội thoại</th>
+              <th className="max-w-[10rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+              <th className="max-w-[12rem] py-2 pr-3 font-medium">Câu hỏi</th>
+              <th className="max-w-[12rem] py-2 pr-3 font-medium">Trả lời</th>
+              <th className="py-2 pr-3 font-medium">Token hit/miss/out</th>
+              <th className="py-2 pr-3 font-medium">Chi phí</th>
+              <th className="py-2 pr-3 font-medium">TT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.id} className="border-b border-white/5 align-top">
+                <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs">{row.turn_code}</td>
+                <td className="max-w-[8rem] py-2 pr-3">
+                  <TruncatedText text={formatShortDateTime(row.created_at)} maxLen={18} />
+                </td>
+                <td className="max-w-[10rem] py-2 pr-3">
+                  <TruncatedText text={row.conversation_id} maxLen={18} mono />
+                </td>
+                <td className="max-w-[10rem] py-2 pr-3">
+                  <TruncatedText
+                    text={
+                      row.item_name
+                        ? `${row.group_name ?? "—"} · ${row.item_name}`
+                        : (row.group_name ?? "—")
+                    }
+                    maxLen={24}
+                  />
+                </td>
+                <td className="max-w-[12rem] py-2 pr-3">
+                  <TruncatedText text={row.user_message} maxLen={40} />
+                </td>
+                <td className="max-w-[12rem] py-2 pr-3">
+                  <TruncatedText text={row.assistant_message} maxLen={40} />
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3 text-xs" title={`in hit/miss/out · ${row.token_source}`}>
+                  {row.prompt_cache_hit_tokens}/{row.prompt_cache_miss_tokens}/{row.completion_tokens}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3">{formatUsd(row.cost_usd)}</td>
+                <td className="py-2 pr-3">
+                  {row.success ? (
+                    <span className="text-emerald-300">OK</span>
+                  ) : (
+                    <span className="text-red-300" title={row.error_detail ?? undefined}>
+                      Lỗi
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
+  );
+}
+
+function ChatConversationTable({ rows }: { rows: ChatConversationRow[] }) {
+  return (
+    <AdminDataTable rows={rows} emptyMessage="Chưa có hội thoại nào." minWidth="860px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="max-w-[10rem] py-2 pr-3 font-medium">Hội thoại</th>
+              <th className="py-2 pr-3 font-medium">Câu hỏi</th>
+              <th className="max-w-[10rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+              <th className="py-2 pr-3 font-medium">Token in/out</th>
+              <th className="py-2 pr-3 font-medium">Chi phí</th>
+              <th className="max-w-[8rem] py-2 pr-3 font-medium">Thời gian</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.conversation_id} className="border-b border-white/5 align-top">
+                <td className="max-w-[10rem] py-2 pr-3">
+                  <TruncatedText text={row.conversation_id} maxLen={18} mono />
+                </td>
+                <td className="py-2 pr-3">{row.question_count}</td>
+                <td className="max-w-[10rem] py-2 pr-3">
+                  <TruncatedText
+                    text={
+                      row.item_name
+                        ? `${row.group_name ?? "—"} · ${row.item_name}`
+                        : (row.group_name ?? "—")
+                    }
+                    maxLen={24}
+                  />
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3 text-xs">
+                  {row.total_prompt_tokens}/{row.total_completion_tokens}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3">{formatUsd(row.total_cost_usd)}</td>
+                <td className="max-w-[8rem] py-2 pr-3">
+                  <TruncatedText text={formatShortDateTime(row.last_at)} maxLen={18} />
                 </td>
               </tr>
             ))}

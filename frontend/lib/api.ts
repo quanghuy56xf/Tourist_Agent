@@ -1224,3 +1224,218 @@ export async function fetchAnalyticsSummary(
   }
   return res.json();
 }
+
+export interface LlmPricingConfig {
+  input_price_per_1m: number;
+  input_cache_hit_price_per_1m: number;
+  input_cache_miss_price_per_1m: number;
+  output_price_per_1m: number;
+  currency: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface ChatTurnLogRow {
+  id: number;
+  turn_code: string;
+  conversation_id: string;
+  turn_index: number;
+  chat_mode: string;
+  group_id: number | null;
+  group_name: string | null;
+  item_id: number | null;
+  item_name: string | null;
+  user_message: string;
+  assistant_message: string | null;
+  persona: string | null;
+  language: string | null;
+  success: boolean;
+  error_detail: string | null;
+  duration_ms: number | null;
+  prompt_tokens: number;
+  prompt_cache_hit_tokens: number;
+  prompt_cache_miss_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  token_source: string;
+  input_price_per_1m: number;
+  input_cache_hit_price_per_1m: number;
+  input_cache_miss_price_per_1m: number;
+  output_price_per_1m: number;
+  cost_usd: number;
+  llm_model: string | null;
+  created_at: string;
+}
+
+export interface ChatLogListResponse {
+  range_days: number;
+  page: number;
+  limit: number;
+  total: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  items: ChatTurnLogRow[];
+}
+
+export interface ChatConversationRow {
+  conversation_id: string;
+  question_count: number;
+  chat_mode: string;
+  group_id: number | null;
+  group_name: string | null;
+  item_id: number | null;
+  item_name: string | null;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  success_count: number;
+  error_count: number;
+  first_at: string;
+  last_at: string;
+}
+
+export interface ChatConversationsResponse {
+  range_days: number;
+  page: number;
+  limit: number;
+  total: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  items: ChatConversationRow[];
+}
+
+export interface ChatCostDailyRow {
+  date: string;
+  turn_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+}
+
+export interface ChatCostSummary {
+  range_days: number;
+  total_turns: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  daily: ChatCostDailyRow[];
+}
+
+export interface ChatLogFilters {
+  days?: number;
+  groupId?: number;
+  itemId?: number;
+  conversationId?: string;
+  turnCode?: string;
+  status?: "all" | "success" | "error";
+  minQuestions?: number;
+  maxQuestions?: number;
+  page?: number;
+  limit?: number;
+}
+
+function buildChatLogParams(filters: ChatLogFilters): URLSearchParams {
+  const params = new URLSearchParams({ days: String(filters.days ?? 30) });
+  if (filters.groupId != null) params.set("group_id", String(filters.groupId));
+  if (filters.itemId != null) params.set("item_id", String(filters.itemId));
+  if (filters.conversationId) params.set("conversation_id", filters.conversationId);
+  if (filters.turnCode) params.set("turn_code", filters.turnCode);
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.minQuestions != null) params.set("min_questions", String(filters.minQuestions));
+  if (filters.maxQuestions != null) params.set("max_questions", String(filters.maxQuestions));
+  if (filters.page != null) params.set("page", String(filters.page));
+  if (filters.limit != null) params.set("limit", String(filters.limit));
+  return params;
+}
+
+export async function fetchLlmPricing(): Promise<LlmPricingConfig> {
+  const res = await fetch(`${API_URL}/api/analytics/llm-pricing`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được cấu hình giá LLM"));
+  }
+  return res.json();
+}
+
+export async function saveLlmPricing(payload: {
+  input_cache_hit_price_per_1m: number;
+  input_cache_miss_price_per_1m: number;
+  output_price_per_1m: number;
+  currency?: string;
+}): Promise<LlmPricingConfig> {
+  const res = await fetch(`${API_URL}/api/analytics/llm-pricing`, {
+    method: "PUT",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không lưu được cấu hình giá LLM"));
+  }
+  return res.json();
+}
+
+export async function fetchChatLogs(filters: ChatLogFilters = {}): Promise<ChatLogListResponse> {
+  const params = buildChatLogParams(filters);
+  const res = await fetch(`${API_URL}/api/analytics/chat-logs?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được lịch sử chat"));
+  }
+  return res.json();
+}
+
+export async function fetchChatConversations(
+  filters: ChatLogFilters = {}
+): Promise<ChatConversationsResponse> {
+  const params = buildChatLogParams(filters);
+  const res = await fetch(`${API_URL}/api/analytics/chat-conversations?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được hội thoại chat"));
+  }
+  return res.json();
+}
+
+export async function fetchChatCostSummary(
+  filters: Pick<ChatLogFilters, "days" | "groupId" | "itemId" | "status"> = {}
+): Promise<ChatCostSummary> {
+  const params = buildChatLogParams(filters);
+  const res = await fetch(`${API_URL}/api/analytics/chat-cost/summary?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được tổng hợp chi phí chat"));
+  }
+  return res.json();
+}
+
+export async function downloadAnalyticsCsv(path: "chat-logs" | "chat-conversations", filters: ChatLogFilters = {}) {
+  const params = buildChatLogParams(filters);
+  const suffix = path === "chat-logs" ? "chat-logs/export.csv" : "chat-conversations/export.csv";
+  const res = await fetch(`${API_URL}/api/analytics/${suffix}?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không xuất được file CSV"));
+  }
+  const blob = await res.blob();
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename =
+    path === "chat-logs" ? `chat-turns-${stamp}.csv` : `chat-conversations-${stamp}.csv`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

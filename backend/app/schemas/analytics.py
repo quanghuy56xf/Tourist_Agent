@@ -86,3 +86,113 @@ class AnalyticsSummaryResponse(BaseModel):
     content_text_error_count: int = 0
     content_audio_error_count: int = 0
     content_issues: list[ContentIssueRow] = []
+
+
+class LlmPricingConfigResponse(BaseModel):
+    input_price_per_1m: float
+    input_cache_hit_price_per_1m: float
+    input_cache_miss_price_per_1m: float
+    output_price_per_1m: float
+    currency: str = "USD"
+    updated_at: str
+    updated_by: str | None = None
+
+
+class LlmPricingConfigUpdate(BaseModel):
+    input_cache_hit_price_per_1m: float = Field(ge=0)
+    input_cache_miss_price_per_1m: float = Field(ge=0)
+    output_price_per_1m: float = Field(ge=0)
+    currency: str = Field(default="USD", min_length=3, max_length=8)
+
+
+class ChatTurnRow(BaseModel):
+    id: int
+    turn_code: str
+    conversation_id: str
+    turn_index: int
+    chat_mode: str
+    group_id: int | None
+    group_name: str | None = None
+    item_id: int | None
+    item_name: str | None = None
+    user_message: str
+    assistant_message: str | None
+    persona: str | None
+    language: str | None
+    success: bool
+    error_detail: str | None
+    duration_ms: int | None
+    prompt_tokens: int
+    prompt_cache_hit_tokens: int
+    prompt_cache_miss_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    token_source: str
+    input_price_per_1m: float
+    input_cache_hit_price_per_1m: float
+    input_cache_miss_price_per_1m: float
+    output_price_per_1m: float
+    cost_usd: float
+    llm_model: str | None
+    created_at: str
+
+
+class ChatLogListResponse(BaseModel):
+    range_days: int
+    page: int
+    limit: int
+    total: int
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    items: list[ChatTurnRow]
+
+
+class ChatConversationRow(BaseModel):
+    conversation_id: str
+    question_count: int
+    chat_mode: str
+    group_id: int | None
+    group_name: str | None = None
+    item_id: int | None
+    item_name: str | None = None
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    success_count: int
+    error_count: int
+    first_at: str
+    last_at: str
+
+
+class ChatConversationsResponse(BaseModel):
+    range_days: int
+    page: int
+    limit: int
+    total: int
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    items: list[ChatConversationRow]
+
+
+class ChatCostDailyRow(BaseModel):
+    date: str
+    turn_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost_usd: float
+
+
+class ChatCostSummaryResponse(BaseModel):
+    range_days: int
+    total_turns: int
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    daily: list[ChatCostDailyRow]

@@ -12,6 +12,8 @@ import app.main as main_module
 from app.main import app
 from app.models.item import Base
 from app.models.analytics_event import AnalyticsEvent  # noqa: F401
+from app.models.chat_turn_log import ChatTurnLog  # noqa: F401
+from app.models.llm_pricing_config import LlmPricingConfig  # noqa: F401
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
 from app.models.tour import Tour, TourStop  # noqa: F401
