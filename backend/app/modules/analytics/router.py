@@ -17,6 +17,7 @@ from app.modules.analytics.chat_logs import (
     query_chat_logs,
     update_pricing_config,
 )
+from app.modules.analytics.rag_eval import build_rag_eval_report
 from app.modules.analytics.service import (
     ALLOWED_CLIENT_EVENT_TYPES,
     build_summary,
@@ -33,6 +34,7 @@ from app.schemas.analytics import (
     ChatLogListResponse,
     LlmPricingConfigResponse,
     LlmPricingConfigUpdate,
+    RagEvalReportResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,24 @@ def analytics_summary(
     _require_analytics_user(user)
     allowed_group_ids = resolve_allowed_analytics_groups(db, user, group_id)
     return build_summary(db, days=days, allowed_group_ids=allowed_group_ids)
+
+
+@router.get("/rag-eval", response_model=RagEvalReportResponse)
+def rag_eval_report(
+    days: int = Query(default=30, ge=1, le=365),
+    group_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user: AuthUser | None = Depends(resolve_current_user),
+):
+    _require_analytics_user(user)
+    allowed_group_ids = resolve_allowed_analytics_groups(db, user, group_id)
+    return build_rag_eval_report(
+        db,
+        days=days,
+        allowed_group_ids=allowed_group_ids,
+        limit=limit,
+    )
 
 
 @router.get("/llm-pricing", response_model=LlmPricingConfigResponse)

@@ -41,9 +41,13 @@ import {
   fetchChatCostSummary,
   fetchChatLogs,
   fetchLlmPricing,
+  fetchRagEvalReport,
   getGroupItems,
   GroupSummary,
   listGroups,
+  RagEvalReport,
+  RagIndexHealthGroupRow,
+  RagTraceRow,
   saveLlmPricing,
 } from "@/lib/api";
 import { canAccessGroup, getAdminSession } from "@/lib/adminAuth";
@@ -69,6 +73,20 @@ function formatDuration(seconds: number): string {
   return `${hours}g ${mins}p`;
 }
 
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function confidenceClass(score: number): string {
+  if (score >= 0.7) return "text-emerald-300";
+  if (score >= 0.45) return "text-amber-300";
+  return "text-red-300";
+}
+
+function statusText(ok: boolean): string {
+  return ok ? "OK" : "Cần xử lý";
+}
+
 function mergeDailyTrend(
   groups: AnalyticsSummary["groups"],
   key: "visit_trend" | "search_trend"
@@ -91,6 +109,10 @@ export default function AdminAnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "rag-eval">("overview");
+  const [ragReport, setRagReport] = useState<RagEvalReport | null>(null);
+  const [ragLoading, setRagLoading] = useState(true);
+  const [ragError, setRagError] = useState("");
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -103,6 +125,20 @@ export default function AdminAnalyticsPage() {
       setError(err instanceof Error ? err.message : "Không tải được thống kê");
     } finally {
       setLoading(false);
+    }
+  }, [days, groupId]);
+
+  const loadRagEval = useCallback(async () => {
+    setRagLoading(true);
+    setRagError("");
+    try {
+      const data = await fetchRagEvalReport(days, groupId === "" ? undefined : groupId);
+      setRagReport(data);
+    } catch (err) {
+      setRagReport(null);
+      setRagError(err instanceof Error ? err.message : "Không tải được Rag Eval");
+    } finally {
+      setRagLoading(false);
     }
   }, [days, groupId]);
 
@@ -126,6 +162,18 @@ export default function AdminAnalyticsPage() {
   useEffect(() => {
     void loadSummary();
   }, [loadSummary]);
+
+  useEffect(() => {
+    void loadRagEval();
+  }, [loadRagEval]);
+
+  const refreshActiveTab = () => {
+    if (activeTab === "rag-eval") {
+      void loadRagEval();
+    } else {
+      void loadSummary();
+    }
+  };
 
   const groupChartData = useMemo(
     () =>
@@ -168,8 +216,12 @@ export default function AdminAnalyticsPage() {
         title="Thống kê & theo dõi"
         description="Lượt truy cập, tìm kiếm hiện vật, tương tác chat và các trường hợp chậm/lỗi."
         action={
-          <AdminButton type="button" onClick={() => void loadSummary()} disabled={loading}>
-            {loading ? "Đang tải..." : "Làm mới"}
+          <AdminButton
+            type="button"
+            onClick={refreshActiveTab}
+            disabled={activeTab === "rag-eval" ? ragLoading : loading}
+          >
+            {(activeTab === "rag-eval" ? ragLoading : loading) ? "Đang tải..." : "Làm mới"}
           </AdminButton>
         }
       />
@@ -217,9 +269,35 @@ export default function AdminAnalyticsPage() {
         </div>
       </AdminCard>
 
-      {error && <AdminAlert type="error">{error}</AdminAlert>}
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-black/10 p-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("overview")}
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+            activeTab === "overview"
+              ? "bg-[#D4AF37] text-black"
+              : "admin-muted hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          Tổng quan
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("rag-eval")}
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+            activeTab === "rag-eval"
+              ? "bg-[#D4AF37] text-black"
+              : "admin-muted hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          Rag Eval
+        </button>
+      </div>
 
-      {summary && (
+      {activeTab === "overview" && error && <AdminAlert type="error">{error}</AdminAlert>}
+      {activeTab === "rag-eval" && ragError && <AdminAlert type="error">{ragError}</AdminAlert>}
+
+      {activeTab === "overview" && summary && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <AdminCard title="Lượt truy cập">
@@ -445,8 +523,245 @@ export default function AdminAnalyticsPage() {
         </>
       )}
 
-      <ChatAnalyticsSection days={days} groupId={groupId === "" ? undefined : groupId} />
+      {activeTab === "overview" && (
+        <ChatAnalyticsSection days={days} groupId={groupId === "" ? undefined : groupId} />
+      )}
+
+      {activeTab === "rag-eval" && ragReport && <RagEvalSection report={ragReport} />}
     </AdminPage>
+  );
+}
+
+function RagEvalSection({ report }: { report: RagEvalReport }) {
+  const unhealthyGroups = report.index_health.filter((row) => !row.healthy).length;
+  const confidenceChartData = report.confidence_buckets.map((bucket) => ({
+    range: bucket.label,
+    traces: bucket.count,
+  }));
+  const healthChartData = [
+    { label: "Healthy", count: report.index_health.length - unhealthyGroups },
+    { label: "Cần xử lý", count: unhealthyGroups },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="RAG Ops"
+        title="Rag Eval"
+        description="Theo dõi trace truy hồi, confidence score, sức khỏe index và tín hiệu eval của hệ RAG."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminCard title="Tổng RAG trace">
+          <p className="text-3xl font-semibold">{report.total_traces}</p>
+          <p className="admin-muted mt-1 text-xs">Trong {report.range_days} ngày</p>
+        </AdminCard>
+        <AdminCard title="Confidence TB">
+          <p className={`text-3xl font-semibold ${confidenceClass(report.avg_confidence_score)}`}>
+            {report.avg_confidence_score.toFixed(2)}
+          </p>
+          <p className="admin-muted mt-1 text-xs">
+            {report.low_confidence_count} lượt thấp · {formatPercent(report.low_confidence_rate)}
+          </p>
+        </AdminCard>
+        <AdminCard title="Fallback retrieval">
+          <p className="text-3xl font-semibold text-amber-300">
+            {formatPercent(report.fallback_rate)}
+          </p>
+          <p className="admin-muted mt-1 text-xs">{report.fallback_count} trace dùng fallback</p>
+        </AdminCard>
+        <AdminCard title="Index health">
+          <p className={unhealthyGroups ? "text-3xl font-semibold text-red-300" : "text-3xl font-semibold text-emerald-300"}>
+            {report.index_health.length - unhealthyGroups}/{report.index_health.length}
+          </p>
+          <p className="admin-muted mt-1 text-xs">Khu khỏe mạnh · {unhealthyGroups} khu cần xử lý</p>
+        </AdminCard>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <AdminCard title="Phân bố confidence score" description="Nhóm confidence của các lượt RAG trace.">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={confidenceChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="range" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#1a1a1a",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                />
+                <Bar dataKey="traces" name="Trace" fill="#D4AF37" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </AdminCard>
+
+        <AdminCard title="Eval snapshot" description="Tỷ lệ trace có tri thức xác thực, fallback và độ mạnh dense retrieval.">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={healthChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "#1a1a1a",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                />
+                <Bar dataKey="count" name="Khu" fill="#7CB5EC" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="admin-muted">Verified knowledge</dt>
+              <dd className="text-lg font-semibold text-emerald-300">
+                {formatPercent(report.verified_knowledge_rate)}
+              </dd>
+            </div>
+            <div>
+              <dt className="admin-muted">Dense score TB</dt>
+              <dd className="text-lg font-semibold">{report.avg_dense_max_score.toFixed(2)}</dd>
+            </div>
+            <div>
+              <dt className="admin-muted">Latency TB</dt>
+              <dd className="text-lg font-semibold">{formatMs(report.avg_latency_ms)}</dd>
+            </div>
+          </dl>
+        </AdminCard>
+      </div>
+
+      <AdminCard title="Index health theo khu di tích" description="So sánh chunk dự kiến với chunk đã index, phát hiện stale/missing/orphan.">
+        <RagIndexHealthTable rows={report.index_health} />
+      </AdminCard>
+
+      <AdminCard title="RAG trace gần đây" description="Chi tiết truy hồi, confidence và fallback của từng lượt chat.">
+        <RagTraceTable rows={report.recent_traces} />
+      </AdminCard>
+    </div>
+  );
+}
+
+function RagIndexHealthTable({ rows }: { rows: RagIndexHealthGroupRow[] }) {
+  return (
+    <AdminDataTable rows={rows} emptyMessage="Chưa có dữ liệu index health." minWidth="780px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="max-w-[12rem] py-2 pr-3 font-medium">Khu di tích</th>
+              <th className="py-2 pr-3 font-medium">Trạng thái</th>
+              <th className="py-2 pr-3 font-medium">Tài liệu</th>
+              <th className="py-2 pr-3 font-medium">Doc lỗi</th>
+              <th className="py-2 pr-3 font-medium">Missing</th>
+              <th className="py-2 pr-3 font-medium">Stale</th>
+              <th className="py-2 pr-3 font-medium">Surplus</th>
+              <th className="py-2 pr-3 font-medium">Orphan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.group_id} className="border-b border-white/5">
+                <td className="max-w-[12rem] py-2 pr-3">
+                  <TruncatedText text={row.group_name} maxLen={28} />
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3">
+                  <span className={row.healthy ? "text-emerald-300" : "text-red-300"}>
+                    {statusText(row.healthy)}
+                  </span>
+                </td>
+                <td className="py-2 pr-3">{row.document_count}</td>
+                <td className="py-2 pr-3">{row.unhealthy_document_count}</td>
+                <td className="py-2 pr-3">{row.missing_chunk_count}</td>
+                <td className="py-2 pr-3">{row.stale_chunk_count}</td>
+                <td className="py-2 pr-3">{row.surplus_chunk_count}</td>
+                <td className="py-2 pr-3">{row.orphan_chunk_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
+  );
+}
+
+function RagTraceTable({ rows }: { rows: RagTraceRow[] }) {
+  return (
+    <AdminDataTable rows={rows} emptyMessage="Chưa có RAG trace nào." minWidth="1040px">
+      {(pageRows) => (
+        <>
+          <thead className="sticky top-0 z-10 bg-[#1a1510]">
+            <tr className="border-b border-white/10 text-left">
+              <th className="max-w-[8.5rem] py-2 pr-3 font-medium">Thời gian</th>
+              <th className="max-w-[11rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+              <th className="max-w-[14rem] py-2 pr-3 font-medium">Query</th>
+              <th className="py-2 pr-3 font-medium">Conf.</th>
+              <th className="py-2 pr-3 font-medium">Dense</th>
+              <th className="py-2 pr-3 font-medium">Chunks</th>
+              <th className="py-2 pr-3 font-medium">Fallback</th>
+              <th className="py-2 pr-3 font-medium">Verified</th>
+              <th className="py-2 pr-3 font-medium">Latency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.id} className="border-b border-white/5 align-top">
+                <td className="max-w-[8.5rem] py-2 pr-3">
+                  <TruncatedText text={formatShortDateTime(row.created_at)} maxLen={18} />
+                </td>
+                <td className="max-w-[11rem] py-2 pr-3">
+                  <TruncatedText
+                    text={
+                      row.item_name
+                        ? `${row.group_name ?? "—"} · ${row.item_name}`
+                        : (row.group_name ?? "—")
+                    }
+                    maxLen={28}
+                  />
+                </td>
+                <td className="max-w-[14rem] py-2 pr-3">
+                  <TruncatedText text={row.query} maxLen={42} />
+                  {row.retrieval_query !== row.query && (
+                    <TruncatedText
+                      text={row.retrieval_query}
+                      maxLen={42}
+                      className="admin-muted text-xs"
+                    />
+                  )}
+                </td>
+                <td className={`whitespace-nowrap py-2 pr-3 font-semibold ${confidenceClass(row.confidence_score)}`}>
+                  {row.confidence_score.toFixed(2)}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3">{row.dense_max_score.toFixed(2)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-xs">
+                  {row.retrieved_count}/{row.reranked_count}/{row.context_count}
+                </td>
+                <td className="max-w-[9rem] py-2 pr-3">
+                  {row.fallback_used ? (
+                    <TruncatedText text={row.fallback_reason ?? "fallback"} maxLen={22} className="text-amber-300" />
+                  ) : (
+                    <span className="text-emerald-300">Không</span>
+                  )}
+                </td>
+                <td className="py-2 pr-3">
+                  {row.has_verified_knowledge ? (
+                    <span className="text-emerald-300">Có</span>
+                  ) : (
+                    <span className="text-red-300">Không</span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3">
+                  {row.latency_ms != null ? formatMs(row.latency_ms) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </>
+      )}
+    </AdminDataTable>
   );
 }
 
