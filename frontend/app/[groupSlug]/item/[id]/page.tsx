@@ -167,20 +167,14 @@ export default function ItemDetailPage() {
     setChatHistory(updatedHistory);
     setChatInput("");
     setIsChatting(true);
+    let assistantContent = "";
     try {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory.slice(-10), persona, language, {
         sessionId: getVisitorSessionId(),
         searchSessionId: getActiveSearchSessionId(),
       });
-      const assistantContent = res.content;
+      assistantContent = res.content;
       setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
-      if (autoSpeak && assistantContent.trim()) {
-        try {
-          await playChatTts(assistantContent, language);
-        } catch {
-          /* ignore playback errors */
-        }
-      }
     } catch {
       setChatHistory([
         ...updatedHistory,
@@ -188,6 +182,11 @@ export default function ItemDetailPage() {
       ]);
     } finally {
       setIsChatting(false);
+    }
+    if (autoSpeak && assistantContent.trim()) {
+      void playChatTts(assistantContent, language).catch(() => {
+        /* ignore playback errors */
+      });
     }
   };
 

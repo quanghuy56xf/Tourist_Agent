@@ -65,6 +65,17 @@ LLM_MODEL = os.getenv("LLM_MODEL", _DEFAULT_LLM_MODEL)
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "1024"))
+LLM_INPUT_PRICE_PER_1M = float(os.getenv("LLM_INPUT_PRICE_PER_1M", "0.075"))
+LLM_INPUT_CACHE_HIT_PRICE_PER_1M = float(
+    os.getenv("LLM_INPUT_CACHE_HIT_PRICE_PER_1M", "0.014")
+)
+LLM_INPUT_CACHE_MISS_PRICE_PER_1M = float(
+    os.getenv(
+        "LLM_INPUT_CACHE_MISS_PRICE_PER_1M",
+        os.getenv("LLM_INPUT_PRICE_PER_1M", "0.075"),
+    )
+)
+LLM_OUTPUT_PRICE_PER_1M = float(os.getenv("LLM_OUTPUT_PRICE_PER_1M", "0.30"))
 RAG_CHROMA_PATH = _backend_path_env("RAG_CHROMA_PATH", BASE_DIR / "data" / "rag_chroma")
 RAG_BM25_PATH = _backend_path_env("RAG_BM25_PATH", BASE_DIR / "data" / "rag" / "bm25_index.pkl")
 RAG_CHUNKS_PATH = _backend_path_env("RAG_CHUNKS_PATH", BASE_DIR / "data" / "rag" / "chunks.pkl")

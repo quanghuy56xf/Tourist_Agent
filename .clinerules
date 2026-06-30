@@ -1,0 +1,26 @@
+# HERA Project - Agent Rules & Guidelines
+
+Chào mừng bạn đến với dự án HERA. Để đảm bảo hệ thống hoạt động ổn định, tránh crash OOM và luôn đi đúng hướng thiết kế, bạn (Agent/AI) phải tuyệt đối tuân thủ các quy tắc sau trong mọi lượt tương tác:
+
+## 1. QUY TẮC PHÊ DUYỆT KẾ HOẠCH (BẮT BUỘC)
+*   **Trình bày Kế hoạch trước khi sửa đổi:** Trước khi tiến hành bất kỳ chỉnh sửa mã nguồn nào, thêm file mới, hoặc chạy lệnh cài đặt/biên dịch, bạn **phải trình bày kế hoạch chi tiết (Plan)** cho người dùng duyệt.
+*   **Nội dung Kế hoạch cần có:**
+    1.  Mục tiêu thay đổi (Goal).
+    2.  Danh sách các file cần chỉnh sửa (Modify) kèm đường dẫn chi tiết.
+    3.  Danh sách các file cần tạo mới (New) hoặc xóa bỏ (Delete).
+    4.  Phương án kiểm thử/xác minh (Verification Plan).
+*   **Đợi phê duyệt:** Bạn **phải dừng lại và đợi** người dùng gõ lệnh phê duyệt (đồng ý/approve) mới được phép thực thi. Không tự ý sửa code khi chưa được duyệt.
+
+## 2. QUY TẮC QUẢN LÝ TÀI NGUYÊN (Tránh crash OOM)
+*   **Không chạy Web Server trên Terminal của IDE:** Không bao giờ chạy các lệnh khởi chạy kéo dài như `npm run dev` (Frontend) hoặc `uvicorn` (Backend) bên trong Terminal tích hợp của IDE. Hãy hướng dẫn người dùng chạy ở cửa sổ Terminal ngoài.
+*   **Xử lý kẹt cổng mạng (Port Blocking):** Khi gặp lỗi cổng `3000` hoặc `8000` bị chiếm dụng, hãy dùng lệnh `netstat -ano | findstr :<port>` và `taskkill /F /PID <PID>` để giải phóng cổng.
+*   **Cấu hình loại trừ quét file:** Thư mục `.next/`, `node_modules/`, `.venv/`, `.pytest_cache/` đã được cấu hình loại trừ trong File Watcher của IDE để tránh tràn RAM. Tuyệt đối không xóa cấu hình này.
+
+## 3. BỐ CỤC CÔNG NGHỆ DỰ ÁN
+*   **Frontend:** Next.js 14, React, TypeScript, TailwindCSS.
+*   **Backend:** FastAPI (Python 3.12), SQLite (SQLAlchemy), ChromaDB (Vector Store cho RAG).
+*   **AI Models:** DINOv2 (facebook/dinov2-small) để trích xuất đặc trưng ảnh hiện vật, DeepSeek/Gemini để sinh nội dung và chat.
+
+## 4. GIAO TIẾP & ĐỊNH DẠNG
+*   **Ngôn ngữ:** Giao tiếp bằng tiếng Việt ngắn gọn, rõ ràng, tập trung vào giải pháp.
+*   **Liên kết file:** Luôn tạo liên kết có thể nhấp được (clickable link) cho các file hoặc mã nguồn khi nhắc đến chúng trong câu trả lời (ví dụ: `[main.py](file:///d:/HocAI/Code%20Team60/backend/app/main.py)`).

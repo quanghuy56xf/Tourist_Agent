@@ -21,7 +21,7 @@ from app.modules.content.language_support import (
     document_not_found_message,
     write_language_instruction,
 )
-from app.modules.llm.client import extract_complete_text, invoke_llm
+from app.modules.llm.client import extract_complete_text, extract_token_usage, invoke_llm, merge_stream_token_usage, TokenUsage
 
 _NATURAL_SPEECH_RULE = """KHÔNG mở đầu hoặc chen các cụm meta như "Dựa trên tài liệu được cung cấp",
 "Theo thông tin trong tài liệu", "Based on the provided documents".
@@ -61,6 +61,7 @@ def _build_llm(model_name: str | None, temperature: float):
 class RAGGenerator:
     def __init__(self, model_name: str | None = None, temperature: float = 0.2):
         self.llm = _build_llm(model_name, temperature)
+        self.last_token_usage: TokenUsage | None = None
 
     def _format_context(self, docs: List[Document]) -> str:
         formatted_docs = []
@@ -268,7 +269,16 @@ Tài liệu được cung cấp (Context):
         messages.append(HumanMessage(content=message))
 
         response = invoke_llm(self.llm, messages)
-        return extract_complete_text(response)
+        text = extract_complete_text(response)
+        prompt_text = system_prompt + "\n".join(
+            msg.content for msg in messages if hasattr(msg, "content")
+        )
+        self.last_token_usage = extract_token_usage(
+            response,
+            prompt_text=prompt_text,
+            completion_text=text,
+        )
+        return text
 
 
 
@@ -385,9 +395,23 @@ Context xác thực:
                 messages.append(AIMessage(content=entry["content"]))
         messages.append(HumanMessage(content=message))
 
+        stream_chunks = []
         async for chunk in self.llm.astream(messages):
+            stream_chunks.append(chunk)
             if chunk.content:
                 yield chunk.content
+
+        stream_usage = merge_stream_token_usage(stream_chunks)
+        if stream_usage is not None:
+            self.last_token_usage = stream_usage
+        else:
+            self.last_token_usage = extract_token_usage(
+                stream_chunks[-1] if stream_chunks else None,
+                prompt_text=system_prompt + message,
+                completion_text="".join(
+                    part for part in (getattr(chunk, "content", "") or "" for chunk in stream_chunks)
+                ),
+            )
 
 # Singleton instance
 _generator_instance = None
