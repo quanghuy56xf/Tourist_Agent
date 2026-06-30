@@ -3,9 +3,12 @@ from typing import Protocol
 
 from langchain_core.documents import Document
 
+from app.core.config import RAG_ENABLE_RERANKER, RAG_MAX_CONTEXT_CHARS, RAG_RERANK_CANDIDATE_MULTIPLIER
 from app.modules.content.language_support import (
     no_item_knowledge_message as supported_no_item_knowledge_message,
 )
+from app.modules.rag.reranker import rerank_documents
+from app.modules.rag.tracing import RagTraceContext, compute_confidence, evidence_list
 
 logger = logging.getLogger(__name__)
 
@@ -339,3 +342,108 @@ def build_chat_item_context(
         vague_follow_up=is_vague_follow_up(user_message, item_name),
     )
     return chat_docs, has_verified_knowledge
+
+
+def _trim_context_documents(documents: list[Document]) -> list[Document]:
+    if RAG_MAX_CONTEXT_CHARS <= 0:
+        return documents
+    kept: list[Document] = []
+    total = 0
+    for document in documents:
+        length = len(document.page_content or "")
+        if kept and total + length > RAG_MAX_CONTEXT_CHARS:
+            break
+        kept.append(document)
+        total += length
+    return kept
+
+
+def build_chat_item_context_with_trace(
+    *,
+    item_id: int,
+    item_name: str,
+    item_description: str,
+    retriever: Retriever | None,
+    top_k: int = 8,
+    group_id: int | None = None,
+    query: str | None = None,
+) -> tuple[list[Document], bool, RagTraceContext]:
+    user_message = query or ""
+    retrieval_query = build_chat_retrieval_query(
+        item_name,
+        item_description,
+        user_message,
+    )
+    trace = RagTraceContext(retrieval_query=retrieval_query, top_k=top_k)
+    docs = [build_item_registration_document(item_id, item_description)]
+
+    if retriever is not None and group_id is not None:
+        try:
+            candidate_top_k = top_k * max(1, RAG_RERANK_CANDIDATE_MULTIPLIER)
+            if hasattr(retriever, "retrieve_with_trace"):
+                retrieved, retrieval_trace = retriever.retrieve_with_trace(
+                    retrieval_query,
+                    top_k=candidate_top_k,
+                    group_id=group_id,
+                )
+                trace.fallback_used = retrieval_trace.fallback_used
+                trace.fallback_reason = retrieval_trace.fallback_reason
+                trace.dense_max_score = retrieval_trace.dense_max_score
+                trace.retrieved_chunks = retrieval_trace.retrieved_chunks
+                trace.reranked_chunks = retrieval_trace.reranked_chunks
+            else:
+                retrieved = retriever.retrieve(
+                    retrieval_query,
+                    top_k=candidate_top_k,
+                    group_id=group_id,
+                )
+                trace.retrieved_chunks = evidence_list(retrieved)
+        except (MemoryError, OSError, RuntimeError, FileNotFoundError) as exc:
+            logger.warning("RAG unavailable; using item description: %s", exc)
+            trace.fallback_used = True
+            trace.fallback_reason = type(exc).__name__
+            retrieved = []
+
+        if RAG_ENABLE_RERANKER and retrieved:
+            retrieved = rerank_documents(
+                query=retrieval_query,
+                item_name=item_name,
+                item_description=item_description,
+                documents=retrieved,
+            )
+            trace.reranked_chunks = evidence_list(retrieved)
+
+        seen = {item_description.strip()}
+        for document in retrieved:
+            content = document.page_content.strip()
+            if content and content not in seen:
+                docs.append(document)
+                seen.add(content)
+
+    relevant_group_docs = filter_group_docs_for_item(
+        item_name,
+        item_description,
+        docs,
+    )
+    has_substantive_description = is_substantive_item_description(
+        item_description,
+        item_name,
+    )
+    has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
+    vague_follow_up = is_vague_follow_up(user_message, item_name)
+    chat_docs = _order_chat_documents(
+        item_name=item_name,
+        item_description=item_description,
+        documents=docs,
+        vague_follow_up=vague_follow_up,
+    )[:top_k]
+    chat_docs = _trim_context_documents(chat_docs)
+    trace.context_chunks = evidence_list(chat_docs)
+    trace.confidence_score, trace.confidence_reasons = compute_confidence(
+        has_substantive_description=has_substantive_description,
+        relevant_group_docs=relevant_group_docs,
+        fallback_used=trace.fallback_used,
+        dense_max_score=trace.dense_max_score,
+        vague_follow_up=vague_follow_up,
+    )
+    return chat_docs, has_verified_knowledge, trace

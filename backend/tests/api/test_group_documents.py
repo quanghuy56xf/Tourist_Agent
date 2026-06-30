@@ -15,7 +15,7 @@ class FakeGroupDocumentService:
     def list_documents(self, db, group_id):
         return [Mock(**doc) for doc in self.documents if doc["group_id"] == group_id]
 
-    async def create_document(self, db, *, group_id, title, text, upload):
+    async def create_document(self, db, *, group_id, title, text, upload, **kwargs):
         doc = {
             "id": self.next_id,
             "group_id": group_id,

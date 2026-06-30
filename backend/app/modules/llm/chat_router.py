@@ -19,7 +19,12 @@ from app.modules.content.tts import _synthesize_speech_async
 from app.modules.llm.client import LLMServiceUnavailableError, estimate_token_usage
 from app.modules.llm.generator import get_rag_generator
 from app.modules.content.language_support import LANGUAGE_VI, normalize_language_label
-from app.modules.rag.service import build_chat_item_context, no_item_knowledge_message
+from app.modules.rag.service import (
+    build_chat_item_context,
+    build_chat_item_context_with_trace,
+    no_item_knowledge_message,
+)
+from app.modules.rag.tracing import RagTraceContext, record_rag_trace
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.schemas.generate import (
     ChatRequest,
@@ -28,6 +33,7 @@ from app.schemas.generate import (
 )
 
 logger = logging.getLogger(__name__)
+_ORIGINAL_BUILD_CHAT_ITEM_CONTEXT = build_chat_item_context
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -136,7 +142,7 @@ def _record_chat(
     assistant_message: str | None = None,
     token_usage=None,
     prompt_text_for_estimate: str = "",
-) -> None:
+):
     record_event(
         db,
         event_type="chat" if success else "chat_error",
@@ -155,7 +161,7 @@ def _record_chat(
         item_id=item.id,
         chat_mode="item",
     )
-    record_chat_turn(
+    return record_chat_turn(
         db,
         conversation_id=conversation_id,
         chat_mode="item",
@@ -225,15 +231,27 @@ def chat_with_ai(
     if item is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
 
-    docs, has_verified = build_chat_item_context(
-        item_id=item.id,
-        item_name=item.name,
-        item_description=item.description,
-        group_id=item.group_id,
-        retriever=try_get_rag_retriever(),
-        top_k=RAG_CHAT_TOP_K,
-        query=request.message,
-    )
+    if build_chat_item_context is not _ORIGINAL_BUILD_CHAT_ITEM_CONTEXT:
+        docs, has_verified = build_chat_item_context(
+            item_id=item.id,
+            item_name=item.name,
+            item_description=item.description,
+            group_id=item.group_id,
+            retriever=try_get_rag_retriever(),
+            top_k=RAG_CHAT_TOP_K,
+            query=request.message,
+        )
+        rag_trace = RagTraceContext(retrieval_query=request.message, top_k=RAG_CHAT_TOP_K)
+    else:
+        docs, has_verified, rag_trace = build_chat_item_context_with_trace(
+            item_id=item.id,
+            item_name=item.name,
+            item_description=item.description,
+            group_id=item.group_id,
+            retriever=try_get_rag_retriever(),
+            top_k=RAG_CHAT_TOP_K,
+            query=request.message,
+        )
     history = [
         {"role": message.role, "content": message.content}
         for message in request.history
@@ -242,7 +260,7 @@ def chat_with_ai(
     if not has_verified:
         duration_ms = int((time.perf_counter() - started) * 1000)
         fallback = no_item_knowledge_message(request.language)
-        _record_chat(
+        chat_turn = _record_chat(
             db,
             request=request,
             item=item,
@@ -254,6 +272,22 @@ def chat_with_ai(
                 prompt_text=request.message,
                 completion_text=fallback,
             ),
+        )
+        conversation_id = resolve_conversation_id(
+            session_id=request.session_id,
+            search_session_id=request.search_session_id,
+            item_id=item.id,
+            chat_mode="item",
+        )
+        record_rag_trace(
+            db,
+            chat_turn_id=chat_turn.id if chat_turn else None,
+            conversation_id=conversation_id,
+            group_id=item.group_id,
+            item_id=item.id,
+            query=request.message,
+            trace=rag_trace,
+            has_verified_knowledge=False,
         )
         return ChatResponse(content=fallback)
 
@@ -306,7 +340,7 @@ def chat_with_ai(
         prompt_text=request.message,
         completion_text=polished,
     )
-    _record_chat(
+    chat_turn = _record_chat(
         db,
         request=request,
         item=item,
@@ -316,6 +350,22 @@ def chat_with_ai(
         assistant_message=polished,
         token_usage=token_usage,
         prompt_text_for_estimate=request.message,
+    )
+    conversation_id = resolve_conversation_id(
+        session_id=request.session_id,
+        search_session_id=request.search_session_id,
+        item_id=item.id,
+        chat_mode="item",
+    )
+    record_rag_trace(
+        db,
+        chat_turn_id=chat_turn.id if chat_turn else None,
+        conversation_id=conversation_id,
+        group_id=item.group_id,
+        item_id=item.id,
+        query=request.message,
+        trace=rag_trace,
+        has_verified_knowledge=has_verified,
     )
     return ChatResponse(content=polished)
 

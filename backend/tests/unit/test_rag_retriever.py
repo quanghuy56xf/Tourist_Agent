@@ -6,7 +6,7 @@ from app.modules.rag.retriever import HybridRetriever
 def test_group_scope_accepts_matching_group_docs():
     doc = Document(
         page_content="Fact",
-        metadata={"source": "group_doc", "group_id": 2},
+        metadata={"source": "group_doc", "group_id": 2, "visibility": "internal"},
     )
     assert HybridRetriever._matches_group_scope(doc, group_id=2) is True
 

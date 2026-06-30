@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.item import Base
@@ -24,6 +24,14 @@ class GroupDocument(Base):
     original_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False)
+    canonical_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    normalized_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    quality_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    quality_warnings: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="internal")
+    trust_level: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
+    governance_warnings: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="ready")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

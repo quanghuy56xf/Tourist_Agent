@@ -1,4 +1,6 @@
+import json
 import logging
+from unittest.mock import Mock
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -12,16 +14,41 @@ from app.modules.content.bulk_update import (
 )
 from app.modules.objects.groups import get_group_or_404
 from app.modules.rag.group_documents import get_group_document_service
+from app.modules.rag.index_lifecycle import (
+    DocumentIndexStatus,
+    GroupIndexHealth,
+    get_group_index_health,
+    reindex_group,
+    reindex_group_document,
+)
 from app.schemas.content import BulkRegenerateContentRequest, BulkRegenerateContentResponse
 from app.schemas.group_document import (
+    DocumentIndexStatusResponse,
     GroupDocumentDeleteResponse,
     GroupDocumentDetail,
     GroupDocumentSummary,
+    GroupIndexHealthResponse,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/groups", tags=["group-documents"])
+
+
+def _safe_attr(document, name: str, default=None):
+    value = getattr(document, name, default)
+    return default if isinstance(value, Mock) else value
+
+
+def _json_list_attr(document, name: str) -> list[str]:
+    raw = _safe_attr(document, name, "[]") or "[]"
+    if isinstance(raw, list):
+        return raw
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return parsed if isinstance(parsed, list) else []
 
 
 def _to_summary(document) -> GroupDocumentSummary:
@@ -34,6 +61,13 @@ def _to_summary(document) -> GroupDocumentSummary:
         chunk_count=document.chunk_count,
         status=document.status,
         error_message=document.error_message,
+        quality_score=_safe_attr(document, "quality_score", 1.0),
+        quality_warnings=_json_list_attr(document, "quality_warnings"),
+        visibility=_safe_attr(document, "visibility", "internal"),
+        trust_level=_safe_attr(document, "trust_level", "uploaded"),
+        governance_warnings=_json_list_attr(document, "governance_warnings"),
+        content_hash=_safe_attr(document, "content_hash", None),
+        normalized_hash=_safe_attr(document, "normalized_hash", None),
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
@@ -43,6 +77,30 @@ def _to_detail(document) -> GroupDocumentDetail:
     return GroupDocumentDetail(
         **_to_summary(document).model_dump(),
         extracted_text=document.extracted_text,
+        canonical_text=_safe_attr(document, "canonical_text", ""),
+    )
+
+
+def _to_index_status(status: DocumentIndexStatus) -> DocumentIndexStatusResponse:
+    return DocumentIndexStatusResponse(
+        document_id=status.document_id,
+        title=status.title,
+        expected_chunks=status.expected_chunks,
+        indexed_chunks=status.indexed_chunks,
+        missing_chunk_ids=status.missing_chunk_ids,
+        stale_chunk_ids=status.stale_chunk_ids,
+        surplus_chunk_ids=status.surplus_chunk_ids,
+        healthy=status.healthy,
+    )
+
+
+def _to_index_health(health: GroupIndexHealth) -> GroupIndexHealthResponse:
+    return GroupIndexHealthResponse(
+        group_id=health.group_id,
+        document_count=health.document_count,
+        healthy=health.healthy,
+        documents=[_to_index_status(status) for status in health.documents],
+        orphan_chunk_ids=health.orphan_chunk_ids,
     )
 
 
@@ -56,6 +114,10 @@ def _map_error(exc: ValueError) -> HTTPException:
         "empty_content": (400, "Tài liệu không có nội dung sau khi trích xuất"),
         "ingest_failed": (502, "Không thể lưu tài liệu lúc này"),
         "document_not_found": (404, "Không tìm thấy tài liệu"),
+        "group_not_found": (404, "Không tìm thấy nhóm"),
+        "file_too_large": (413, "Tài liệu vượt quá giới hạn dung lượng"),
+        "invalid_visibility": (400, "Phạm vi hiển thị tài liệu không hợp lệ"),
+        "invalid_trust_level": (400, "Mức độ tin cậy tài liệu không hợp lệ"),
     }
     if message in mapping:
         status, detail = mapping[message]
@@ -92,6 +154,35 @@ def list_group_documents(
     return [_to_summary(document) for document in documents]
 
 
+@router.get("/{group_id}/rag/health", response_model=GroupIndexHealthResponse)
+def get_rag_index_health(
+    group_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(resolve_current_user),
+):
+    get_group_or_404(db, group_id)
+    ensure_group_access(user, group_id)
+    return _to_index_health(get_group_index_health(db, group_id))
+
+
+@router.post("/{group_id}/rag/reindex", response_model=GroupIndexHealthResponse)
+def reindex_group_rag(
+    group_id: int,
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    get_group_or_404(db, group_id)
+    ensure_group_access(staff, group_id)
+    try:
+        return _to_index_health(reindex_group(db, group_id))
+    except ValueError as exc:
+        raise _map_error(exc) from exc
+    except RuntimeError as exc:
+        if "RAG retriever unavailable" in str(exc):
+            raise HTTPException(status_code=503, detail="Chỉ mục RAG tạm thời không khả dụng") from exc
+        raise
+
+
 @router.post("/{group_id}/documents", response_model=GroupDocumentDetail, status_code=201)
 async def create_group_document(
     group_id: int,
@@ -99,6 +190,8 @@ async def create_group_document(
     title: str = Form(...),
     text: str | None = Form(None),
     file: UploadFile | None = File(None),
+    visibility: str | None = Form(None),
+    trust_level: str | None = Form(None),
     db: Session = Depends(get_db),
     staff=Depends(require_admin_if_enabled),
 ):
@@ -111,6 +204,8 @@ async def create_group_document(
             title=title,
             text=text,
             upload=file,
+            visibility=visibility,
+            trust_level=trust_level,
         )
     except ValueError as exc:
         raise _map_error(exc) from exc
@@ -140,6 +235,24 @@ def get_group_document(
     return _to_detail(document)
 
 
+@router.post("/{group_id}/documents/{document_id}/reindex", response_model=DocumentIndexStatusResponse)
+def reindex_group_document_rag(
+    group_id: int,
+    document_id: int,
+    db: Session = Depends(get_db),
+    staff=Depends(require_admin_if_enabled),
+):
+    ensure_group_access(staff, group_id)
+    try:
+        return _to_index_status(reindex_group_document(db, group_id, document_id))
+    except ValueError as exc:
+        raise _map_error(exc) from exc
+    except RuntimeError as exc:
+        if "RAG retriever unavailable" in str(exc):
+            raise HTTPException(status_code=503, detail="Chỉ mục RAG tạm thời không khả dụng") from exc
+        raise
+
+
 @router.put("/{group_id}/documents/{document_id}", response_model=GroupDocumentDetail)
 async def update_group_document(
     group_id: int,
@@ -148,6 +261,8 @@ async def update_group_document(
     title: str | None = Form(None),
     text: str | None = Form(None),
     file: UploadFile | None = File(None),
+    visibility: str | None = Form(None),
+    trust_level: str | None = Form(None),
     db: Session = Depends(get_db),
     staff=Depends(require_admin_if_enabled),
 ):
@@ -160,6 +275,8 @@ async def update_group_document(
             title=title,
             text=text,
             upload=file,
+            visibility=visibility,
+            trust_level=trust_level,
         )
     except ValueError as exc:
         raise _map_error(exc) from exc
