@@ -7,12 +7,18 @@ from typing import Dict, List, Tuple
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
-from app.core.config import RAG_BM25_PATH, RAG_CHROMA_PATH, RAG_CHUNKS_PATH
+from app.core.config import (
+    RAG_BM25_PATH,
+    RAG_CHROMA_PATH,
+    RAG_CHUNKS_PATH,
+    RAG_EMBEDDING_MODEL,
+    RAG_SCHEMA_VERSION,
+)
 from app.modules.rag.types import ChunkDraft
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "bkai-foundation-models/vietnamese-bi-encoder"
+EMBEDDING_MODEL = RAG_EMBEDDING_MODEL
 
 
 def ensure_rag_index() -> None:
@@ -145,6 +151,8 @@ class HybridRetriever:
         source = document.metadata.get("source")
         if source != "group_doc":
             return False
+        if document.metadata.get("visibility") == "draft":
+            return False
         return document.metadata.get("group_id") == group_id
 
     def _filter_group_scope(
@@ -167,6 +175,23 @@ class HybridRetriever:
         fallback_threshold: float = 0.2,
         group_id: int | None = None,
     ) -> List[Document]:
+        docs, _trace = self.retrieve_with_trace(
+            query,
+            top_k=top_k,
+            fallback_threshold=fallback_threshold,
+            group_id=group_id,
+        )
+        return docs
+
+    def retrieve_with_trace(
+        self,
+        query: str,
+        top_k: int = 5,
+        fallback_threshold: float = 0.2,
+        group_id: int | None = None,
+    ):
+        from app.modules.rag.tracing import RetrievalTrace, evidence_list
+
         with self._index_lock:
             search_k = top_k * 3 if group_id is not None else top_k
             dense_docs, max_dense_score = self._dense_search(
@@ -178,10 +203,23 @@ class HybridRetriever:
             dense_docs = self._filter_group_scope(dense_docs, group_id)
             sparse_docs = self._filter_group_scope(sparse_docs, group_id)
 
-            if not dense_docs or max_dense_score < fallback_threshold:
-                return sparse_docs[:top_k]
+            trace = RetrievalTrace(
+                retrieval_query=query,
+                top_k=top_k,
+                dense_max_score=max_dense_score,
+                retrieved_chunks=evidence_list(dense_docs + sparse_docs),
+            )
 
-            return self._rrf(dense_docs, sparse_docs)[:top_k]
+            if not dense_docs or max_dense_score < fallback_threshold:
+                trace.fallback_used = True
+                trace.fallback_reason = "dense_unavailable_or_below_threshold"
+                docs = sparse_docs[:top_k]
+                trace.reranked_chunks = evidence_list(docs)
+                return docs, trace
+
+            docs = self._rrf(dense_docs, sparse_docs)[:top_k]
+            trace.reranked_chunks = evidence_list(docs)
+            return docs, trace
 
     def _persist_sparse_index(self) -> None:
         with open(RAG_CHUNKS_PATH, "wb") as file:
@@ -223,6 +261,14 @@ class HybridRetriever:
         group_id: int,
         document_title: str,
         chunk_drafts: List[ChunkDraft],
+        *,
+        document_version: int = 1,
+        source_type: str | None = None,
+        content_hash: str | None = None,
+        normalized_hash: str | None = None,
+        quality_score: float | None = None,
+        visibility: str | None = None,
+        trust_level: str | None = None,
     ) -> None:
         with self._index_lock:
             self._remove_group_document_chunks(document_id)
@@ -236,10 +282,19 @@ class HybridRetriever:
                     "group_id": group_id,
                     "document_id": document_id,
                     "document_title": document_title,
-                    "section_title": draft.section_title,
-                    "heading_level": draft.heading_level,
+                    "document_version": document_version,
+                    "source_type": source_type or "unknown",
+                    "section_title": draft.section_title or "",
+                    "heading_level": draft.heading_level or 0,
                     "chunk_index": index,
                     "chunk_strategy": draft.chunk_strategy,
+                    "content_hash": content_hash or "",
+                    "normalized_hash": normalized_hash or "",
+                    "quality_score": quality_score if quality_score is not None else 1.0,
+                    "visibility": visibility or "internal",
+                    "trust_level": trust_level or "uploaded",
+                    "schema_version": RAG_SCHEMA_VERSION,
+                    "embedding_model": EMBEDDING_MODEL,
                     "page": chunk_id,
                 }
                 documents.append(Document(page_content=draft.text, metadata=metadata))
@@ -291,8 +346,12 @@ class HybridRetriever:
                 page_content=content,
                 metadata={
                     "source": "item",
+                    "source_type": "item_registration",
+                    "trust_level": "official",
                     "page": document_id,
                     "item_id": item_id,
+                    "schema_version": RAG_SCHEMA_VERSION,
+                    "embedding_model": EMBEDDING_MODEL,
                 },
             )
             if self._ensure_dense() and self._vector_store is not None:

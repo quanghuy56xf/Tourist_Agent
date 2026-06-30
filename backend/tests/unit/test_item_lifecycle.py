@@ -89,8 +89,12 @@ def test_upsert_item_document_replaces_existing_item_chunk(
     ]
     assert instance.chunks[-1].metadata == {
         "source": "item",
+        "source_type": "item_registration",
+        "trust_level": "official",
         "page": "item-7",
         "item_id": 7,
+        "schema_version": "2026-06-mvp",
+        "embedding_model": "bkai-foundation-models/vietnamese-bi-encoder",
     }
 
 

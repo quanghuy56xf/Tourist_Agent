@@ -20,6 +20,7 @@ from app.models.llm_pricing_config import LlmPricingConfig  # noqa: F401
 from app.models.group import Group  # noqa: F401
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
+from app.models.rag_trace import RagTrace  # noqa: F401
 from app.models.tour import Tour, TourStop  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.item import Base, Item  # noqa: F401
@@ -125,6 +126,32 @@ def _migrate_schema() -> None:
                     "UPDATE chat_turn_logs "
                     "SET input_cache_miss_price_per_1m = input_price_per_1m "
                     "WHERE input_cache_miss_price_per_1m = 0 AND input_price_per_1m > 0"
+                )
+            )
+
+    if inspector.has_table("group_documents"):
+        columns = {col["name"] for col in inspector.get_columns("group_documents")}
+        additions = {
+            "canonical_text": "TEXT NOT NULL DEFAULT ''",
+            "content_hash": "VARCHAR(64)",
+            "normalized_hash": "VARCHAR(64)",
+            "quality_score": "FLOAT NOT NULL DEFAULT 1.0",
+            "quality_warnings": "TEXT NOT NULL DEFAULT '[]'",
+            "visibility": "VARCHAR(32) NOT NULL DEFAULT 'internal'",
+            "trust_level": "VARCHAR(32) NOT NULL DEFAULT 'uploaded'",
+            "governance_warnings": "TEXT NOT NULL DEFAULT '[]'",
+        }
+        with engine.begin() as conn:
+            for name, ddl in additions.items():
+                if name not in columns:
+                    conn.execute(
+                        text(f"ALTER TABLE group_documents ADD COLUMN {name} {ddl}")
+                    )
+            conn.execute(
+                text(
+                    "UPDATE group_documents "
+                    "SET canonical_text = extracted_text "
+                    "WHERE canonical_text = '' OR canonical_text IS NULL"
                 )
             )
 

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.config import ADMIN_AUTH_ENABLED
 from app.core.database import get_db
+from app.modules.auth import dependencies as auth_dependencies
 from app.modules.analytics.access import resolve_allowed_analytics_groups
 from app.modules.analytics.chat_logs import (
     build_cost_summary,
@@ -41,7 +41,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
 def _require_analytics_user(user: AuthUser | None) -> AuthUser | None:
-    if ADMIN_AUTH_ENABLED and user is None:
+    if auth_dependencies.ADMIN_AUTH_ENABLED and user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Chưa đăng nhập hoặc phiên đã hết hạn",

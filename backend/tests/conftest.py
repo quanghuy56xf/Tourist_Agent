@@ -16,6 +16,7 @@ from app.models.chat_turn_log import ChatTurnLog  # noqa: F401
 from app.models.llm_pricing_config import LlmPricingConfig  # noqa: F401
 from app.models.content_variant import ItemContentVariant  # noqa: F401
 from app.models.group_document import GroupDocument  # noqa: F401
+from app.models.rag_trace import RagTrace  # noqa: F401
 from app.models.tour import Tour, TourStop  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.modules.auth import dependencies as auth_dependencies
