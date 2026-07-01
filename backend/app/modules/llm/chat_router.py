@@ -24,6 +24,12 @@ from app.modules.rag.service import (
     build_chat_item_context_with_trace,
     no_item_knowledge_message,
 )
+from app.modules.rag.security import (
+    apply_input_guardrails,
+    apply_output_guardrails,
+    safe_fallback_message,
+    sanitize_chat_history,
+)
 from app.modules.rag.tracing import RagTraceContext, record_rag_trace
 from app.modules.rag.retriever import try_get_rag_retriever
 from app.schemas.generate import (
@@ -231,6 +237,26 @@ def chat_with_ai(
     if item is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
 
+    input_decision = apply_input_guardrails(request.message)
+    if not input_decision.allowed:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        fallback = safe_fallback_message(request.language)
+        _record_chat(
+            db,
+            request=request,
+            item=item,
+            http_request=http_request,
+            duration_ms=duration_ms,
+            success=True,
+            assistant_message=fallback,
+            token_usage=estimate_token_usage(
+                prompt_text=input_decision.sanitized_text,
+                completion_text=fallback,
+            ),
+        )
+        return ChatResponse(content=fallback)
+
+    guarded_message = input_decision.sanitized_text
     if build_chat_item_context is not _ORIGINAL_BUILD_CHAT_ITEM_CONTEXT:
         docs, has_verified = build_chat_item_context(
             item_id=item.id,
@@ -239,9 +265,9 @@ def chat_with_ai(
             group_id=item.group_id,
             retriever=try_get_rag_retriever(),
             top_k=RAG_CHAT_TOP_K,
-            query=request.message,
+            query=guarded_message,
         )
-        rag_trace = RagTraceContext(retrieval_query=request.message, top_k=RAG_CHAT_TOP_K)
+        rag_trace = RagTraceContext(retrieval_query=guarded_message, top_k=RAG_CHAT_TOP_K)
     else:
         docs, has_verified, rag_trace = build_chat_item_context_with_trace(
             item_id=item.id,
@@ -250,12 +276,14 @@ def chat_with_ai(
             group_id=item.group_id,
             retriever=try_get_rag_retriever(),
             top_k=RAG_CHAT_TOP_K,
-            query=request.message,
+            query=guarded_message,
         )
-    history = [
-        {"role": message.role, "content": message.content}
-        for message in request.history
-    ]
+    history = sanitize_chat_history(
+        [
+            {"role": message.role, "content": message.content}
+            for message in request.history
+        ]
+    )
 
     if not has_verified:
         duration_ms = int((time.perf_counter() - started) * 1000)
@@ -285,7 +313,7 @@ def chat_with_ai(
             conversation_id=conversation_id,
             group_id=item.group_id,
             item_id=item.id,
-            query=request.message,
+            query=guarded_message,
             trace=rag_trace,
             has_verified_knowledge=False,
         )
@@ -294,7 +322,7 @@ def chat_with_ai(
     generator = get_rag_generator()
     try:
         content = generator.generate_chat(
-            message=request.message,
+            message=guarded_message,
             history=history,
             retrieved_docs=docs,
             persona=request.persona,
@@ -335,9 +363,17 @@ def chat_with_ai(
         )
 
     polished = polish_generated_text(content)
+    output_decision = apply_output_guardrails(
+        polished,
+        has_verified_knowledge=has_verified,
+        confidence_score=rag_trace.confidence_score,
+        context_count=len(rag_trace.context_chunks),
+        language=request.language,
+    )
+    polished = output_decision.sanitized_text
     duration_ms = int((time.perf_counter() - started) * 1000)
     token_usage = getattr(generator, "last_token_usage", None) or estimate_token_usage(
-        prompt_text=request.message,
+        prompt_text=guarded_message,
         completion_text=polished,
     )
     chat_turn = _record_chat(
@@ -363,7 +399,7 @@ def chat_with_ai(
         conversation_id=conversation_id,
         group_id=item.group_id,
         item_id=item.id,
-        query=request.message,
+        query=guarded_message,
         trace=rag_trace,
         has_verified_knowledge=has_verified,
     )

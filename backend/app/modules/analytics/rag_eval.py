@@ -16,6 +16,14 @@ from app.schemas.analytics import (
 )
 
 LOW_CONFIDENCE_THRESHOLD = 0.45
+CRITICAL_CONFIDENCE_THRESHOLD = 0.3
+PRODUCTION_TARGETS = {
+    "avg_confidence_score": 0.7,
+    "low_confidence_rate": 0.15,
+    "fallback_rate": 0.2,
+    "verified_knowledge_rate": 0.85,
+    "index_healthy_rate": 0.95,
+}
 CONFIDENCE_BUCKETS = (
     ("0–0.25", 0.0, 0.25),
     ("0.25–0.45", 0.25, 0.45),
@@ -147,6 +155,181 @@ def _index_health_rows(db: Session, groups: list[Group]) -> list[RagIndexHealthG
             )
         )
     return rows
+
+
+def _rate(value: int, total: int) -> float:
+    return round(value / total, 4) if total else 0.0
+
+
+def _status_icon(passed: bool) -> str:
+    return "✅" if passed else "❌"
+
+
+def _trace_risk_level(trace: RagTrace) -> str:
+    confidence = float(trace.confidence_score or 0.0)
+    context = _safe_json(trace.context_chunks_json, {})
+    context_count = _context_count(context)
+    if not trace.has_verified_knowledge or context_count == 0 or confidence < CRITICAL_CONFIDENCE_THRESHOLD:
+        return "critical"
+    if trace.fallback_used or confidence < LOW_CONFIDENCE_THRESHOLD:
+        return "warning"
+    return "ok"
+
+
+def render_rag_eval_markdown(report: RagEvalReportResponse) -> str:
+    healthy_groups = sum(1 for row in report.index_health if row.healthy)
+    group_total = len(report.index_health)
+    index_healthy_rate = _rate(healthy_groups, group_total)
+    critical_traces = [trace for trace in report.recent_traces if trace.confidence_score < CRITICAL_CONFIDENCE_THRESHOLD or not trace.has_verified_knowledge or trace.context_count == 0]
+    warning_traces = [trace for trace in report.recent_traces if trace not in critical_traces and (trace.fallback_used or trace.confidence_score < LOW_CONFIDENCE_THRESHOLD)]
+
+    gates = [
+        (
+            "Average confidence >= 0.70",
+            report.avg_confidence_score >= PRODUCTION_TARGETS["avg_confidence_score"],
+            f"{report.avg_confidence_score:.3f}",
+        ),
+        (
+            "Low-confidence rate <= 15%",
+            report.low_confidence_rate <= PRODUCTION_TARGETS["low_confidence_rate"],
+            f"{report.low_confidence_rate:.1%}",
+        ),
+        (
+            "Fallback rate <= 20%",
+            report.fallback_rate <= PRODUCTION_TARGETS["fallback_rate"],
+            f"{report.fallback_rate:.1%}",
+        ),
+        (
+            "Verified-knowledge rate >= 85%",
+            report.verified_knowledge_rate >= PRODUCTION_TARGETS["verified_knowledge_rate"],
+            f"{report.verified_knowledge_rate:.1%}",
+        ),
+        (
+            "Index healthy rate >= 95%",
+            index_healthy_rate >= PRODUCTION_TARGETS["index_healthy_rate"],
+            f"{index_healthy_rate:.1%}",
+        ),
+    ]
+    gate_passed = sum(1 for _, passed, _ in gates if passed)
+    release_status = "GO for canary" if gate_passed == len(gates) and not critical_traces else "NO-GO / needs fixes"
+
+    lines = [
+        "# HERA RAG Eval Production Beta Report",
+        "",
+        f"- **Range:** Last {report.range_days} days",
+        f"- **Generated at:** {datetime.utcnow().isoformat()}Z",
+        f"- **Release status:** **{release_status}**",
+        f"- **Gate score:** {gate_passed}/{len(gates)}",
+        "",
+        "## 1. Executive Summary",
+        "",
+        f"- Total RAG traces: **{report.total_traces}**",
+        f"- Average confidence: **{report.avg_confidence_score:.3f}**",
+        f"- Low-confidence rate: **{report.low_confidence_rate:.1%}** ({report.low_confidence_count} traces)",
+        f"- Fallback rate: **{report.fallback_rate:.1%}** ({report.fallback_count} traces)",
+        f"- Verified-knowledge rate: **{report.verified_knowledge_rate:.1%}** ({report.verified_knowledge_count} traces)",
+        f"- Average dense max score: **{report.avg_dense_max_score:.3f}**",
+        f"- Average latency: **{report.avg_latency_ms:.1f} ms**",
+        f"- Healthy indexes: **{healthy_groups}/{group_total}**",
+        f"- Recent critical traces sampled: **{len(critical_traces)}**",
+        f"- Recent warning traces sampled: **{len(warning_traces)}**",
+        "",
+        "## 2. Production Gates",
+        "",
+        "| Gate | Result | Current value |",
+        "|---|---:|---:|",
+    ]
+    for label, passed, value in gates:
+        lines.append(f"| {label} | {_status_icon(passed)} | {value} |")
+
+    lines.extend(
+        [
+            "",
+            "## 3. Guardrail Setup - Production Beta",
+            "",
+            "### Request-time guardrails",
+            "- Regex PII redaction for email, Vietnamese phone-like numbers, CCCD/CMND-like identifiers, API keys, and private keys.",
+            "- Prompt-injection heuristic blocking for instruction override, system prompt extraction, jailbreak/DAN, hidden context exfiltration, and Vietnamese bypass phrases.",
+            "- Topic scope validator with hard block for clearly unsafe/off-domain abuse and soft allow for tourism/heritage-adjacent queries.",
+            "- Conversation-history sanitization: unsafe prior turns are replaced with `[Message removed by safety filter]` before reaching the LLM.",
+            "- Output contract guardrail: no verified context, empty context, or critical confidence returns a safe fallback instead of a factual answer.",
+            "",
+            "### Async/deep eval path",
+            "- Existing RAG traces capture retrieval query, chunk evidence, confidence reasons, fallback signals, verified-knowledge flag, and latency JSON.",
+            "- This report is the Markdown-only production-beta output selected for the first rollout.",
+            "- Next deep-eval additions: RAGAS faithfulness/relevancy, LLM-as-Judge pairwise comparison, hallucination/NLI scoring, and red-team regression import.",
+            "",
+            "## 4. Confidence Distribution",
+            "",
+            "| Bucket | Range | Count |",
+            "|---|---:|---:|",
+        ]
+    )
+    for bucket in report.confidence_buckets:
+        lines.append(f"| {bucket.label} | {bucket.min_score:.2f}-{bucket.max_score:.2f} | {bucket.count} |")
+
+    lines.extend(
+        [
+            "",
+            "## 5. Index Health",
+            "",
+            "| Group | Docs | Healthy | Unhealthy docs | Missing | Stale | Surplus | Orphan |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for row in report.index_health:
+        lines.append(
+            f"| {row.group_name} | {row.document_count} | {_status_icon(row.healthy)} | {row.unhealthy_document_count} | {row.missing_chunk_count} | {row.stale_chunk_count} | {row.surplus_chunk_count} | {row.orphan_chunk_count} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 6. Recent Trace Risk Review",
+            "",
+            "| Time | Risk | Group | Item | Confidence | Dense | Fallback | Verified | Context | Query |",
+            "|---|---|---|---|---:|---:|---|---|---:|---|",
+        ]
+    )
+    for trace in report.recent_traces[:25]:
+        risk = "🔴 critical" if trace in critical_traces else "🟡 warning" if trace in warning_traces else "🟢 ok"
+        query = (trace.query or "").replace("|", "\\|")[:120]
+        lines.append(
+            f"| {trace.created_at} | {risk} | {trace.group_name or '-'} | {trace.item_name or '-'} | {trace.confidence_score:.3f} | {trace.dense_max_score:.3f} | {trace.fallback_reason or ('yes' if trace.fallback_used else 'no')} | {trace.has_verified_knowledge} | {trace.context_count} | {query} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 7. Recommended Actions",
+            "",
+        ]
+    )
+    if critical_traces:
+        lines.append("- Prioritize recent critical traces: add missing documents, improve item descriptions, or tighten fallback behavior.")
+    if report.fallback_rate > PRODUCTION_TARGETS["fallback_rate"]:
+        lines.append("- Fallback rate is high: check vector index availability, dense score thresholds, and document coverage.")
+    if report.low_confidence_rate > PRODUCTION_TARGETS["low_confidence_rate"]:
+        lines.append("- Low-confidence rate is high: review retrieval quality and add human-reviewed golden cases for weak groups/items.")
+    if index_healthy_rate < PRODUCTION_TARGETS["index_healthy_rate"]:
+        lines.append("- Index health is below target: run index repair/rebuild before canary rollout.")
+    if gate_passed == len(gates) and not critical_traces:
+        lines.append("- All production-beta gates passed. Proceed with internal/canary rollout and continue async sampling.")
+
+    lines.extend(
+        [
+            "",
+            "## 8. Next Production Hardening Steps",
+            "",
+            "1. Add 50+ human-reviewed Vietnamese golden questions.",
+            "2. Add 30+ no-answer/abstention cases and track unsupported-answer rate.",
+            "3. Add 50+ Vietnamese prompt-injection/red-team regression prompts.",
+            "4. Add async RAGAS/LLM-as-Judge scores to this report once judge credentials and budget are configured.",
+            "5. Promote production failures directly into the regression suite.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def build_rag_eval_report(
