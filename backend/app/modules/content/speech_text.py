@@ -20,11 +20,16 @@ _LEADING_DECOR_PATTERN = re.compile(
     re.MULTILINE,
 )
 
+_MARKDOWN_TOKEN_PATTERN = re.compile(r"[*_`~#\[\](){}]")
+_PII_PLACEHOLDER_PATTERN = re.compile(r"\[PII_REMOVED\]")
+
 
 def prepare_text_for_speech(text: str) -> str:
-    """Remove emoji and decorative icons before text-to-speech."""
-    cleaned = _SYMBOLS_PATTERN.sub(" ", text)
+    """Remove emoji, decorative icons, and markup before text-to-speech."""
+    cleaned = _PII_PLACEHOLDER_PATTERN.sub(" ", text)
+    cleaned = _SYMBOLS_PATTERN.sub(" ", cleaned)
     cleaned = _LEADING_DECOR_PATTERN.sub("", cleaned)
+    cleaned = _MARKDOWN_TOKEN_PATTERN.sub("", cleaned)
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()

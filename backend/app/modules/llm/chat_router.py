@@ -416,11 +416,13 @@ async def chat_with_companion_stream(
         if item is None:
             raise HTTPException(status_code=404, detail="Không tìm thấy hiện vật.")
 
+        group_id = item.group_id
+        current_item_name = item.name
         docs, has_verified = build_chat_item_context(
             item_id=item.id,
             item_name=item.name,
             item_description=item.description,
-            group_id=item.group_id,
+            group_id=group_id,
             retriever=try_get_rag_retriever(),
             top_k=RAG_CHAT_TOP_K,
             query=request.message,
@@ -451,8 +453,6 @@ async def chat_with_companion_stream(
                     ),
                 )
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
-        group_id = item.group_id
-        current_item_name = item.name
     else:
         item = None
         docs = []

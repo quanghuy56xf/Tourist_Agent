@@ -21,6 +21,33 @@ def test_tts_returns_audio_stream(client, monkeypatch):
     assert response.content == b"fake-mp3"
 
 
+def test_tts_uses_cleaned_text(client, monkeypatch):
+    captured = {}
+
+    def fake_speech(text, language, persona=None):
+        captured["text"] = text
+        return TTSResult(ok=True, audio=b"fake-mp3", mime="audio/mpeg")
+
+    monkeypatch.setattr(tts_router, "synthesize_speech", fake_speech)
+
+    response = client.post(
+        "/api/tts",
+        json={"text": "**Văn Miếu** 😀", "language": "vi"},
+    )
+
+    assert response.status_code == 200
+    assert captured["text"] == "Văn Miếu"
+
+
+def test_tts_rejects_text_empty_after_cleaning(client):
+    response = client.post(
+        "/api/tts",
+        json={"text": "😀 ✦", "language": "vi"},
+    )
+
+    assert response.status_code == 400
+
+
 def test_tts_rejects_empty_text(client):
     response = client.post(
         "/api/tts",
@@ -61,6 +88,24 @@ def test_tts_stream_returns_chunked_audio(client, monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/mpeg")
     assert response.content == b"fake-mp3-chunk-1fake-mp3-chunk-2"
+
+
+def test_tts_stream_uses_cleaned_text(client, monkeypatch):
+    captured = {}
+
+    async def fake_stream(text, language, persona=None):
+        captured["text"] = text
+        yield b"fake-mp3-chunk"
+
+    monkeypatch.setattr(tts_router, "stream_speech_chunks", fake_stream)
+
+    response = client.post(
+        "/api/tts/stream",
+        json={"text": "**Văn Miếu** 😀", "language": "vi"},
+    )
+
+    assert response.status_code == 200
+    assert captured["text"] == "Văn Miếu"
 
 
 def test_tts_stream_rejects_empty_text(client):

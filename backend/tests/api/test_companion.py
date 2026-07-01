@@ -80,6 +80,50 @@ def test_companion_chat_rejects_empty_message(client):
     assert response.status_code == 422
 
 
+def test_companion_chat_fallback_stream_records_with_item_group(
+    client,
+    db_session,
+    monkeypatch,
+):
+    current = Item(name="Không liên quan", description="Primary", group_id=7)
+    db_session.add(current)
+    db_session.commit()
+    captured = {}
+
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(
+        chat_router,
+        "build_chat_item_context",
+        lambda **kwargs: ([], False),
+    )
+
+    def fake_record_companion_chat(*args, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        chat_router,
+        "_record_companion_chat",
+        fake_record_companion_chat,
+    )
+
+    response = client.post(
+        "/api/companion/chat/stream",
+        json={
+            "item_id": current.id,
+            "message": "Bao nhiêu bia tiến sĩ?",
+            "history": [],
+            "visited_item_ids": [],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "event: chunk" in response.text
+    assert "event: done" in response.text
+    assert captured["group_id"] == current.group_id
+    assert captured["item_id"] == current.id
+    assert captured["assistant_message"]
+
+
 def test_companion_can_suggest_next_unvisited_item(client, db_session, monkeypatch):
     current = Item(name="C?ng ch?nh", description="Gate", group_id=1)
     visited = Item(name="Khu? V?n C?c", description="Visited", group_id=1)
