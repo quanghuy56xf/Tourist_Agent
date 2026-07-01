@@ -88,6 +88,64 @@ class AnalyticsSummaryResponse(BaseModel):
     content_issues: list[ContentIssueRow] = []
 
 
+class RagConfidenceBucket(BaseModel):
+    label: str
+    min_score: float
+    max_score: float
+    count: int
+
+
+class RagTraceRow(BaseModel):
+    id: int
+    chat_turn_id: int | None
+    conversation_id: str
+    group_id: int | None
+    group_name: str | None = None
+    item_id: int | None
+    item_name: str | None = None
+    query: str
+    retrieval_query: str
+    confidence_score: float
+    dense_max_score: float
+    fallback_used: bool
+    fallback_reason: str | None
+    has_verified_knowledge: bool
+    retrieved_count: int
+    reranked_count: int
+    context_count: int
+    latency_ms: int | None
+    created_at: str
+
+
+class RagIndexHealthGroupRow(BaseModel):
+    group_id: int
+    group_name: str
+    document_count: int
+    healthy: bool
+    unhealthy_document_count: int
+    missing_chunk_count: int
+    stale_chunk_count: int
+    surplus_chunk_count: int
+    orphan_chunk_count: int
+
+
+class RagEvalReportResponse(BaseModel):
+    range_days: int
+    total_traces: int
+    avg_confidence_score: float
+    avg_dense_max_score: float
+    low_confidence_count: int
+    low_confidence_rate: float
+    fallback_count: int
+    fallback_rate: float
+    verified_knowledge_count: int
+    verified_knowledge_rate: float
+    avg_latency_ms: float
+    confidence_buckets: list[RagConfidenceBucket]
+    index_health: list[RagIndexHealthGroupRow]
+    recent_traces: list[RagTraceRow]
+
+
 class LlmPricingConfigResponse(BaseModel):
     input_price_per_1m: float
     input_cache_hit_price_per_1m: float

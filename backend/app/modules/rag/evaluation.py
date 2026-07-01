@@ -14,8 +14,10 @@ from app.modules.rag.tracing import RagTraceContext
 @dataclass(frozen=True)
 class RagEvalCase:
     question: str
-    item_id: int
+    item_id: int | None = None
     group_id: int | None = None
+    scope: str = "item"
+    ground_truth: str = ""
     expected_document_ids: list[int] = field(default_factory=list)
     expected_terms: list[str] = field(default_factory=list)
     expect_no_data: bool = False
@@ -77,11 +79,20 @@ def load_eval_cases(path: str | Path) -> list[RagEvalCase]:
             payload = json.loads(stripped)
             if not isinstance(payload, dict):
                 raise ValueError(f"invalid_eval_case:{line_number}")
+            scope = str(payload.get("scope") or "item").strip().lower()
+            if scope not in {"item", "corpus"}:
+                raise ValueError(f"invalid_eval_scope:{line_number}:{scope}")
+            raw_item_id = payload.get("item_id")
+            item_id = raw_item_id if isinstance(raw_item_id, int) else None
+            if scope == "item" and item_id is None:
+                raise ValueError(f"missing_item_id:{line_number}")
             cases.append(
                 RagEvalCase(
                     question=str(payload.get("question") or ""),
-                    item_id=int(payload["item_id"]),
+                    item_id=item_id,
                     group_id=payload.get("group_id") if isinstance(payload.get("group_id"), int) else None,
+                    scope=scope,
+                    ground_truth=str(payload.get("ground_truth") or payload.get("reference") or ""),
                     expected_document_ids=_as_int_list(payload.get("expected_document_ids")),
                     expected_terms=_as_str_list(payload.get("expected_terms")),
                     expect_no_data=bool(payload.get("expect_no_data", False)),
@@ -104,6 +115,7 @@ def report_to_dict(report: RagEvalReport, *, include_results: bool = False) -> d
             {
                 "question": result.case.question,
                 "item_id": result.case.item_id,
+                "ground_truth": result.case.ground_truth,
                 "retrieved_document_ids": result.retrieved_document_ids,
                 "has_verified_knowledge": result.has_verified_knowledge,
                 "confidence_score": result.confidence_score,
@@ -140,6 +152,8 @@ def evaluate_cases(
 ) -> RagEvalReport:
     results: list[RagEvalCaseResult] = []
     for index, case in enumerate(cases):
+        if case.item_id is None:
+            raise ValueError(f"missing_item_id:{index}")
         item = db.query(Item).filter(Item.id == case.item_id).first()
         if item is None:
             raise ValueError(f"item_not_found:{case.item_id}")

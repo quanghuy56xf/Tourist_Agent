@@ -26,3 +26,11 @@ def test_strips_leading_bullets():
 
 def test_empty_after_strip_returns_empty():
     assert prepare_text_for_speech("😀 🎉 ✦") == ""
+
+
+def test_strips_inline_markdown_tokens():
+    assert prepare_text_for_speech("**Văn Miếu** và `bia tiến sĩ`") == "Văn Miếu và bia tiến sĩ"
+
+
+def test_strips_pii_placeholder():
+    assert prepare_text_for_speech("Thông tin [PII_REMOVED] cần được ẩn") == "Thông tin cần được ẩn"

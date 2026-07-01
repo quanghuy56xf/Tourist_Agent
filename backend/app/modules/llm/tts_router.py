@@ -15,8 +15,12 @@ router = APIRouter(prefix="/api", tags=["tts"])
 
 @router.post("/tts")
 def text_to_speech(request: TTSRequest):
+    cleaned = prepare_text_for_speech(request.text)
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Không có văn bản để đọc thành audio")
+
     try:
-        result = synthesize_speech(request.text, request.language, request.persona)
+        result = synthesize_speech(cleaned, request.language, request.persona)
         payload = result.as_tuple()
         if not payload:
             raise HTTPException(
@@ -44,7 +48,7 @@ async def text_to_speech_stream(request: TTSRequest):
         raise HTTPException(status_code=400, detail="Không có văn bản để đọc thành audio")
 
     async def audio_stream():
-        async for chunk in stream_speech_chunks(request.text, request.language, request.persona):
+        async for chunk in stream_speech_chunks(cleaned, request.language, request.persona):
             yield chunk
 
     return StreamingResponse(

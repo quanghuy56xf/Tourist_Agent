@@ -1225,6 +1225,79 @@ export async function fetchAnalyticsSummary(
   return res.json();
 }
 
+export async function fetchRagEvalReport(
+  days = 30,
+  groupId?: number
+): Promise<RagEvalReport> {
+  const params = new URLSearchParams({ days: String(days) });
+  if (groupId != null) params.set("group_id", String(groupId));
+  const res = await fetch(`${API_URL}/api/analytics/rag-eval?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được báo cáo Rag Eval"));
+  }
+  return res.json();
+}
+
+export interface RagConfidenceBucket {
+  label: string;
+  min_score: number;
+  max_score: number;
+  count: number;
+}
+
+export interface RagTraceRow {
+  id: number;
+  chat_turn_id: number | null;
+  conversation_id: string;
+  group_id: number | null;
+  group_name: string | null;
+  item_id: number | null;
+  item_name: string | null;
+  query: string;
+  retrieval_query: string;
+  confidence_score: number;
+  dense_max_score: number;
+  fallback_used: boolean;
+  fallback_reason: string | null;
+  has_verified_knowledge: boolean;
+  retrieved_count: number;
+  reranked_count: number;
+  context_count: number;
+  latency_ms: number | null;
+  created_at: string;
+}
+
+export interface RagIndexHealthGroupRow {
+  group_id: number;
+  group_name: string;
+  document_count: number;
+  healthy: boolean;
+  unhealthy_document_count: number;
+  missing_chunk_count: number;
+  stale_chunk_count: number;
+  surplus_chunk_count: number;
+  orphan_chunk_count: number;
+}
+
+export interface RagEvalReport {
+  range_days: number;
+  total_traces: number;
+  avg_confidence_score: number;
+  avg_dense_max_score: number;
+  low_confidence_count: number;
+  low_confidence_rate: number;
+  fallback_count: number;
+  fallback_rate: number;
+  verified_knowledge_count: number;
+  verified_knowledge_rate: number;
+  avg_latency_ms: number;
+  confidence_buckets: RagConfidenceBucket[];
+  index_health: RagIndexHealthGroupRow[];
+  recent_traces: RagTraceRow[];
+}
+
 export interface LlmPricingConfig {
   input_price_per_1m: number;
   input_cache_hit_price_per_1m: number;

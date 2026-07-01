@@ -1,3 +1,117 @@
+## 2026-07-01 - Hoàn thiện RAGAS golden eval và báo cáo RAG production
+
+Bối cảnh:
+- Cần xác thực bộ golden dataset mới cho RAG, bao gồm 50 câu corpus-scoped và nhóm item-scoped bắt đầu từ `golden-051`.
+- Smoke RAGAS trước đó chạy được pipeline retrieval/generation nhưng metrics không hợp lệ do lỗi `RuntimeError(Timeout should be used inside a task)` và non-finite scores.
+- Sau khi cập nhật judge credentials, cần chạy lại smoke/full eval và cập nhật báo cáo release.
+
+Các thay đổi đã làm:
+- Debug và sửa lỗi RAGAS async timeout trong `backend/app/modules/rag/ragas_eval.py`:
+  - Chạy RAGAS evaluator qua async-safe wrapper.
+  - Bọc evaluator bằng `asyncio.create_task(...)` rõ ràng.
+  - Chặn `nest_asyncio.apply()` trong phạm vi import/chạy RAGAS để tránh phá context `asyncio.Task` trên Python mới.
+  - Giữ fallback chạy `ragas.evaluate(...)` qua worker thread khi bản RAGAS không có `aevaluate`.
+- Cập nhật unit test `backend/tests/unit/test_ragas_eval.py` để giả lập async RAGAS path và bảo vệ logic normalize non-finite metrics.
+- Tạo subset tạm `backend/.pytest_tmp/rag_golden_051_055.jsonl` để smoke test riêng các câu item-scoped `golden-051` → `golden-055`.
+- Chạy và lưu report RAGAS item-scoped smoke:
+  - `docs/reports/ragas_golden_051_055_smoke_report.md`
+  - `docs/reports/ragas_golden_051_055_smoke_results.json`
+- Chạy full golden eval 70 câu và lưu report:
+  - `docs/reports/ragas_golden_70_report.md`
+  - `docs/reports/ragas_golden_70_results.json`
+- Cập nhật `docs/reports/ragas_golden_70_report.md` phần Next Actions để phản ánh trạng thái mới thay vì checklist scaffold cũ.
+- Cập nhật `docs/reports/rag_eval_report.md` với kết quả RAGAS golden latest run, gate score, metrics và recommended actions mới.
+
+Xác nhận:
+- Unit test RAGAS eval:
+  - `uv run --directory backend pytest tests/unit/test_ragas_eval.py -q --basetemp .pytest_tmp`
+  - Kết quả: `4 passed, 6 warnings`.
+- Smoke 10 câu corpus-scoped sau khi cấu hình OpenAI API key:
+  - `uv run --directory backend python scripts/run_ragas_golden_eval.py --limit 10`
+  - Kết quả: pass, `GO for canary`, gate score `4/4`, không có runtime notes.
+  - Metrics: faithfulness `0.9857`, answer_relevancy `0.8912`, context_recall `0.9500`, context_precision `0.8609`.
+- Smoke 5 câu item-scoped `golden-051` → `golden-055`:
+  - Kết quả: pass, `GO for canary`, total/attempted `5/5`, errored cases `0`, gate score `4/4`.
+  - Metrics: faithfulness `0.9033`, answer_relevancy `0.8702`, context_recall `1.0000`, context_precision `0.8996`.
+- Full golden eval 70 câu:
+  - `uv run --directory backend python scripts/run_ragas_golden_eval.py --limit 70 --markdown-output ../docs/reports/ragas_golden_70_report.md --json-output ../docs/reports/ragas_golden_70_results.json`
+  - Kết quả: `GO for canary`, total/attempted `70/70`, corpus `50`, item `20`, errored cases `0`, gate score `4/4`.
+  - Metrics: faithfulness `0.8918`, answer_relevancy `0.8439`, context_recall `0.9762`, context_precision `0.8277`.
+  - Risk summary: low-confidence `0`, retrieval fallback `1`, error `0`.
+
+Còn lại / follow-up:
+- Inspect 1 retrieval fallback case trong report JSON 70 câu để quyết định có cần tuning retriever, sửa source data hoặc chỉnh dataset không.
+- Tiếp tục curate `golden-071` → `golden-100` bằng human-reviewed item-scoped, no-answer hoặc production-regression cases.
+- Bổ sung no-answer/abstention cases và Vietnamese prompt-injection/red-team regression prompts vào eval suite.
+- Duy trì RAGAS judge credentials và compatible LLM/embedding settings trước mỗi release eval run.
+
+## 2026-06-30 - Nâng cấp RAG pipeline theo hướng production
+
+Bối cảnh:
+- Luồng RAG hiện tại đã chạy được nhưng còn thiếu nhiều lớp quan trọng của môi trường production: chuẩn hóa ingest, kiểm soát chất lượng dữ liệu, metadata đầy đủ, trace/evidence, confidence score, reranking, lifecycle index, evaluation và governance.
+- Quyết định kỹ thuật đã chốt: nâng cấp pipeline hiện tại thay vì viết lại từ đầu; canonical Markdown/text là format nội bộ, admin vẫn có thể upload `.txt`, `.docx`, `.pdf` hoặc nhập text như trước.
+
+Các nâng cấp đã làm:
+- Data quality:
+  - Thêm `backend/app/modules/rag/quality.py` để tính `content_hash`, `normalized_hash`, `quality_score`, `quality_warnings`, số ký tự/section/chunk và cảnh báo duplicate/truncated/noisy/too-short content.
+  - Lưu các trường chất lượng vào `group_documents` và trả về qua API document.
+- Canonical Markdown ingest:
+  - Thêm `backend/app/modules/rag/normalization.py` để chuẩn hóa Unicode, whitespace, line endings và chuyển `StructuredSection` thành canonical Markdown/text nội bộ.
+  - Lưu `canonical_text` trên document để debug/reindex ổn định hơn.
+- Metadata đầy đủ:
+  - Mở rộng metadata chunk trong `backend/app/modules/rag/retriever.py` với `document_id`, `document_title`, `document_version`, `source_type`, `section_title`, `chunk_index`, `chunk_strategy`, hash, quality score, schema version, embedding model.
+  - Item registration chunk có thêm `source_type=item_registration`, `trust_level=official`, `schema_version`, `embedding_model`.
+- RAG trace/evidence:
+  - Thêm model `backend/app/models/rag_trace.py` và module `backend/app/modules/rag/tracing.py`.
+  - Chat route ghi lại query, retrieval query, fallback, dense score, retrieved/reranked/context chunks, snippet evidence, confidence score và latency vào bảng `rag_traces`.
+  - Giữ tương thích với tests/logic cũ bằng cách giữ `retrieve(...)`, `build_chat_item_context(...)` và thêm biến thể trace-aware.
+- Confidence score:
+  - Tính điểm tin cậy dựa trên mô tả item, group docs liên quan, fallback/dense score, item name trong context và số lượng context docs.
+  - Lưu confidence score/reasons trong RAG trace để admin/debug được câu trả lời rủi ro.
+- Heuristic reranker:
+  - Thêm `backend/app/modules/rag/reranker.py` để ưu tiên chunk có item name, query term overlap, section overlap, official item source, group doc nhắc tới item.
+  - Thêm config bật/tắt và candidate multiplier: `RAG_ENABLE_RERANKER`, `RAG_RERANK_CANDIDATE_MULTIPLIER`, `RAG_MAX_CONTEXT_CHARS`.
+- Index lifecycle / versioning:
+  - Thêm `backend/app/modules/rag/index_lifecycle.py` để healthcheck index, phát hiện missing/stale/surplus/orphan chunks, reindex một document hoặc cả group.
+  - Thêm endpoints:
+    - `GET /api/groups/{group_id}/rag/health`
+    - `POST /api/groups/{group_id}/documents/{document_id}/reindex`
+    - `POST /api/groups/{group_id}/rag/reindex`
+- Evaluation:
+  - Thêm `backend/app/modules/rag/evaluation.py` với `RagEvalCase`, `RagEvalReport`, `evaluate_cases`, `load_eval_cases`, `report_to_dict`.
+  - Metrics MVP: `hit_at_k`, `expected_document_hit_rate`, `expected_terms_hit_rate`, `no_data_accuracy`, `low_confidence_rate`.
+  - Thêm fixture mẫu `backend/tests/unit/rag_eval_sample.jsonl`.
+- Security / governance:
+  - Thêm `backend/app/modules/rag/security.py` để giới hạn dung lượng theo `GROUP_DOC_MAX_BYTES`, sanitize filename, chuẩn hóa `visibility`/`trust_level`, detect email/phone/api key/private key pattern.
+  - Thêm fields `visibility`, `trust_level`, `governance_warnings` vào `GroupDocument` và migration tương ứng.
+  - API create/update group document nhận thêm `visibility` và `trust_level`.
+  - Retrieval theo group bỏ qua tài liệu có `visibility=draft` để tài liệu nháp không được dùng trả lời cho khách.
+- Observability liên quan analytics:
+  - Sửa `analytics/router.py` để đọc `auth_dependencies.ADMIN_AUTH_ENABLED` động, tương thích test và runtime monkeypatch.
+
+Tests đã thêm/cập nhật:
+- `backend/tests/unit/test_rag_evaluation.py`
+- `backend/tests/unit/test_rag_index_lifecycle.py`
+- `backend/tests/unit/test_rag_security.py`
+- Cập nhật `test_rag_retriever.py`, `test_item_lifecycle.py`, `test_group_documents.py`, `conftest.py`.
+
+Xác nhận:
+- Targeted RAG/security/lifecycle/evaluation/API document tests: pass.
+- Full backend unit tests: `150 passed, 3 warnings`.
+- Full backend API tests: `124 passed, 6 warnings`.
+- `git diff --check`: không có lỗi whitespace.
+- Đã commit: `c4a590c6 feat: harden production RAG pipeline`.
+
+Chưa làm / còn lại:
+- Feedback loop chưa triển khai theo yêu cầu hiện tại:
+  - Chưa có model `ChatFeedback`.
+  - Chưa có endpoint `POST /api/chat-turns/{turn_code}/feedback`.
+  - Chưa có analytics cho dislike/no-data/low-confidence theo item/document/chunk.
+- Evaluation mới là offline/module-level, chưa có CLI/admin UI để chạy dataset trực tiếp từ giao diện.
+- Governance mới ở mức heuristic MVP; chưa có DLP/PII detector nâng cao, review workflow cho tài liệu public, hoặc chính sách phân quyền tài liệu chi tiết hơn theo role.
+- Chưa có dashboard admin trực quan cho RAG trace, confidence score, index health và eval report.
+- Chưa tự động chạy eval suite trong CI/CD trước khi merge; hiện mới có unit tests cho module eval.
+
 ## 2026-06-28 - Hoàn thiện MVP Companion Quest Phase 1
 
 Bối cảnh:
