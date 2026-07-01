@@ -168,4 +168,4 @@ curl -X POST "http://localhost:8000/api/llm/chat" \
 - **Tài liệu Yêu cầu (PRD V3)**: [docs/prd/PRD_v3.md](docs/prd/PRD_v3.md)
 - **Kiến trúc V3**: [docs/architecture/architecture_v3.md](docs/architecture/architecture_v3.md)
 - **Hướng dẫn chạy chi tiết**: [manual_run.md](manual_run.md)
-- **Hướng dẫn triển khai**: [DEPLOY.md](DEPLOY.md)
+- **Hướng dẫn triển khai**: [DEPLOY.md](DEPLOY.md) 
