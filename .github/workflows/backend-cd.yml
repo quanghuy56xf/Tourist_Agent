@@ -25,5 +25,6 @@ jobs:
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
+          git config --global --add safe.directory /opt/c2-app/C2-App-060
           cd /opt/c2-app/C2-App-060
           bash deploy.sh
