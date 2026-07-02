@@ -126,9 +126,9 @@ export default function MethodSelectionPage() {
         <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
           <li>• Chọn ngôn ngữ ở góc trên để HERA hiển thị và kể chuyện bằng ngôn ngữ bạn muốn.</li>
           <li>• Chọn persona để điều chỉnh cách kể chuyện: dễ hiểu, học thuật, vui vẻ hoặc phù hợp nhóm khách.</li>
-          <li>• Chọn Companion nếu muốn trò chuyện, nghe hướng dẫn và làm quest trong suốt hành trình.</li>
-          <li>• Chọn Chụp ảnh trực tiếp nếu muốn scan hiện vật; trong màn hình camera bạn cũng có thể tải ảnh có sẵn lên.</li>
-          <li>• Chọn Tour khám phá nếu muốn đi theo lộ trình gợi ý.</li>
+          <li>• Chọn Trợ Lý Đồng Hành nếu muốn trò chuyện, nghe hướng dẫn và làm quest trong suốt hành trình.</li>
+          <li>• Chọn Ống Kính Di Sản nếu muốn scan hiện vật; trong màn hình camera bạn cũng có thể tải ảnh có sẵn lên.</li>
+          <li>• Chọn Thử Thách Tương Tác nếu muốn chơi game theo nhóm hoặc khám phá lộ trình.</li>
         </ul>
       </VisitorInfoDialog>
     </main>
