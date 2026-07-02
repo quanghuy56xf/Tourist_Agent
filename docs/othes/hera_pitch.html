@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>HERA - The Complete AI Product</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/black.min.css" id="theme">
+  
+  <style>
+    /* Animated Gradient Background */
+    body {
+      background: linear-gradient(-45deg, #0f172a, #1e1b4b, #312e81, #0f172a);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+      font-family: 'Outfit', sans-serif !important;
+    }
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Glassmorphism Slide Containers */
+    .reveal .slides > section {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 40px !important;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    /* Typography Tweaks */
+    .reveal h1, .reveal h2, .reveal h3 { 
+      font-family: 'Outfit', sans-serif; 
+      text-transform: none; 
+      font-weight: 700;
+      background: -webkit-linear-gradient(45deg, #00f2fe, #4facfe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 30px;
+    }
+    .reveal h3 { background: -webkit-linear-gradient(45deg, #43e97b, #38f9d7); -webkit-background-clip: text; }
+    
+    .reveal p, .reveal li { font-weight: 300; font-size: 0.85em; text-align: left; line-height: 1.6; }
+    
+    /* Neon Highlight */
+    .highlight { 
+      color: #ff79c6 !important; 
+      font-weight: bold; 
+      text-shadow: 0 0 10px rgba(255, 121, 198, 0.6);
+    }
+    
+    /* Table Styling */
+    .reveal table { font-size: 0.65em; margin: 0 auto; width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; }
+    .reveal th, .reveal td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 15px; text-align: center; }
+    .reveal th { background-color: rgba(255,255,255,0.1); color: #fff; font-weight: 500; }
+    .reveal tr:hover td { background-color: rgba(255, 255, 255, 0.05); transition: 0.3s; }
+
+    /* Custom list bullets */
+    ul { list-style: none !important; }
+    li::before { content: "✨"; display: inline-block; width: 1.5em; margin-left: -1.5em; }
+
+    /* Fragment animations tweaks */
+    .reveal .fragment.grow { color: #50fa7b; text-shadow: 0 0 15px rgba(80, 250, 123, 0.5); }
+    
+    /* Flow arrow */
+    .flow-arrow {
+        text-align: center;
+        font-size: 1.2em;
+        opacity: 0.7;
+        margin: 5px 0;
+        color: #fff;
+    }
+    
+    .flow-item {
+        text-align: center;
+        background: rgba(255,255,255,0.1);
+        padding: 5px 15px;
+        border-radius: 8px;
+        display: inline-block;
+        margin: 0 auto;
+    }
+    
+    .flow-container {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    /* Grid layout for "Everything behind one answer" */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      font-size: 0.6em;
+      text-align: center;
+    }
+    .grid-item {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .grid-arrow::after {
+      content: "→";
+      position: absolute;
+      right: -15px;
+      color: #fff;
+      opacity: 0.5;
+    }
+    .grid-item:nth-child(3n)::after {
+      content: "";
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      
+      <!-- TITLE SLIDE -->
+      <section data-transition="zoom">
+        <h2 style="font-size: 2.2em; margin-bottom: 10px;">HERA</h2>
+        <h3 style="font-size: 1.2em; color: #fff; -webkit-text-fill-color: #fff;">A Complete AI Product, Not Just a Chatbot</h3>
+        <p style="text-align: center; opacity: 0.7; margin-top: 50px;"><small>✨ Khám phá Di sản qua Góc nhìn AI</small></p>
+      </section>
+
+      <!-- 1. PAIN POINT -->
+      <section data-transition="slide">
+        <h2>Vấn đề (Pain Point)</h2>
+        <div class="flow-container" style="font-size: 1.2em; margin-top: 30px;">
+          <div class="fragment fade-up flow-item">Tham quan Di tích</div>
+          <div class="fragment fade-up flow-arrow">→</div>
+          <div class="fragment fade-up flow-item">Đọc bảng thông tin dài</div>
+          <div class="fragment fade-up flow-arrow">→</div>
+          <div class="fragment fade-up flow-item" style="color: #ff5555;">Nhanh chán</div>
+          <div class="fragment fade-up flow-arrow">→</div>
+          <div class="fragment fade-up flow-item highlight">Mau quên</div>
+        </div>
+      </section>
+
+      <!-- 2. SOLUTION -->
+      <section data-transition="convex">
+        <h2>Giải pháp của HERA</h2>
+        <p style="text-align: center; margin-bottom: 20px;">Thay đổi hoàn toàn cách tiếp cận lịch sử</p>
+        <div class="flow-container" style="font-size: 1.1em;">
+          <div class="fragment fade-right flow-item">📸 Camera</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-right flow-item">🧠 AI Nhận diện</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-right flow-item highlight">🗣️ AI Companion (Lê Quý Đôn)</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-right flow-item" style="background: rgba(80, 250, 123, 0.2); border: 1px solid #50fa7b;">🎯 Learning Experience</div>
+        </div>
+      </section>
+
+      <!-- 3. ARCHITECTURE -->
+      <section data-transition="slide">
+        <h2>Kiến trúc Hệ thống (Architecture)</h2>
+        <p style="text-align: center;">Mô hình <span class="highlight">Self-hosted & Multi-tenant</span></p>
+        <ul style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 20px;">
+          <li class="fragment fade-up"><strong>Frontend:</strong> Next.js 14, React 18</li>
+          <li class="fragment fade-up"><strong>Backend:</strong> FastAPI, Python</li>
+          <li class="fragment fade-up"><strong>Vision:</strong> DINOv2 + ChromaDB</li>
+          <li class="fragment fade-up"><strong>RAG:</strong> Hybrid (Bi-encoder + BM25)</li>
+          <li class="fragment fade-up"><strong>LLM:</strong> Generative AI (Gemini)</li>
+          <li class="fragment fade-up"><strong>TTS:</strong> Edge TTS (Streaming)</li>
+          <li class="fragment fade-up"><strong>Database:</strong> SQLite (Metadata)</li>
+          <li class="fragment fade-up"><strong>Infrastructure:</strong> Docker, Cloudflare</li>
+        </ul>
+      </section>
+
+      <!-- 4. AI PIPELINE -->
+      <section data-transition="concave">
+        <h2>Production AI Pipeline</h2>
+        <p style="text-align: center; font-size: 0.8em; opacity: 0.8;">Data Engineering - Pipeline chuẩn bị dữ liệu</p>
+        <div class="flow-container" style="font-size: 0.85em; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px;">
+          <div class="fragment fade-in flow-item">Raw PDF</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">OCR</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Cleaning</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item highlight">Chunking</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Embedding</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Retriever</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">LLM</div>
+        </div>
+        <div class="fragment fade-up" style="display: flex; justify-content: space-around; margin-top: 40px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px;">
+            <div style="text-align: center;"><h3 style="margin:0; font-size:1.5em;">1000+</h3><span style="font-size:0.6em;">Chunks</span></div>
+            <div style="text-align: center;"><h3 style="margin:0; font-size:1.5em;">180+</h3><span style="font-size:0.6em;">Images</span></div>
+            <div style="text-align: center;"><h3 style="margin:0; font-size:1.5em;">70+</h3><span style="font-size:0.6em;">Golden QA</span></div>
+        </div>
+      </section>
+
+      <!-- 5. VISION PIPELINE -->
+      <section data-transition="zoom">
+        <h2>Vision Pipeline</h2>
+        <p style="text-align: center; font-size: 0.8em; opacity: 0.8;">Nhận diện hiện vật offline với độ trễ cực thấp</p>
+        <div class="flow-container" style="font-size: 0.9em; margin-top: 20px;">
+          <div class="fragment fade-down flow-item">📱 Camera Feed</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-down flow-item highlight">👁️ DINOv2 Vector Extraction</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-down flow-item">🔍 ChromaDB Similarity Search</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-down flow-item">📊 Confidence Score Logic</div>
+          <div class="fragment fade-down flow-arrow">→</div>
+          <div class="fragment fade-down flow-item" style="border-color: #50fa7b;">🏺 Artifact Recognized</div>
+        </div>
+      </section>
+
+      <!-- 6. COMPANION PIPELINE -->
+      <section data-transition="slide">
+        <h2>Companion Pipeline</h2>
+        <p style="text-align: center; font-size: 0.8em; opacity: 0.8;">Hệ thống tạo ra Persona Lê Quý Đôn</p>
+        <div class="flow-container" style="font-size: 0.85em; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px;">
+          <div class="fragment fade-in flow-item">Artifact / Context</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item highlight">Persona Constraints</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Prompt Builder</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">LLM (Gemini)</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item highlight">Streaming Text</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Edge TTS</div> <div class="fragment fade-in flow-arrow" >→</div>
+          <div class="fragment fade-in flow-item">Avatar Animation</div>
+        </div>
+      </section>
+
+      <!-- 7. ENGINEERING -->
+      <section data-transition="slide">
+        <h2>Software Engineering</h2>
+        <p style="text-align: center;">Đây không phải mô hình Lab. Đây là hệ thống Production.</p>
+        <div class="flow-container" style="font-size: 0.9em; margin-top: 30px;">
+          <div class="fragment fade-left flow-item">GitHub Repository</div>
+          <div class="fragment fade-left flow-arrow">→</div>
+          <div class="fragment fade-left flow-item">CI/CD Pipelines (GitHub Actions)</div>
+          <div class="fragment fade-left flow-arrow">→</div>
+          <div class="fragment fade-left flow-item highlight">Docker & Docker Compose</div>
+          <div class="fragment fade-left flow-arrow">→</div>
+          <div class="fragment fade-left flow-item">Cloud VM Deployment</div>
+          <div class="fragment fade-left flow-arrow">→</div>
+          <div class="fragment fade-left flow-item">Cloudflare & HTTPS</div>
+          <div class="fragment fade-left flow-arrow">→</div>
+          <div class="fragment fade-left flow-item" style="color: #50fa7b; font-weight: bold;">Production Environment</div>
+        </div>
+      </section>
+
+      <!-- 8. EVALUATION -->
+      <section data-transition="convex">
+        <h2>AI Evaluation & Observability</h2>
+        <p style="text-align: center; margin-bottom: 30px;">Giám sát chặt chẽ chất lượng đầu ra</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div class="fragment fade-up" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+            <h4 style="margin: 0 0 10px 0; color: #4facfe; font-size: 1.1em;">RAG Metrics (Ragas)</h4>
+            <ul>
+              <li>Faithfulness (90%+)</li>
+              <li>Answer Relevancy (85%+)</li>
+              <li>Context Recall & Precision</li>
+            </ul>
+          </div>
+          <div class="fragment fade-up" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+            <h4 style="margin: 0 0 10px 0; color: #43e97b; font-size: 1.1em;">System Metrics</h4>
+            <ul>
+              <li>Vision Latency (&lt;100ms)</li>
+              <li>Retrieval Hit Rate</li>
+              <li>LLM Cost Monitoring</li>
+            </ul>
+          </div>
+        </div>
+        <p class="fragment fade-up" style="text-align: center; margin-top: 20px;"><span class="highlight">Tracing:</span> Mọi quyết định của RAG đều được lưu log (RagTrace).</p>
+      </section>
+      
+      <!-- 11. EVERYTHING BEHIND ONE ANSWER -->
+      <section data-transition="zoom">
+        <h2 style="font-size: 1.8em;">Everything Behind One Answer</h2>
+        <p style="text-align: center; font-style: italic;">Khách chỉ hỏi: <span class="highlight">"Đây là gì?"</span></p>
+        
+        <div class="grid-container fragment fade-in">
+          <div class="grid-item grid-arrow">1. Camera Capture</div>
+          <div class="grid-item grid-arrow">2. Image Preprocessing</div>
+          <div class="grid-item">3. Vision Model (DINOv2)</div>
+          
+          <div class="grid-item grid-arrow">4. Artifact Recognition</div>
+          <div class="grid-item grid-arrow">5. Confidence Score</div>
+          <div class="grid-item">6. Metadata Lookup</div>
+          
+          <div class="grid-item grid-arrow">7. Hybrid Retrieval</div>
+          <div class="grid-item grid-arrow">8. Re-ranking (BM25)</div>
+          <div class="grid-item">9. Context Assembly</div>
+          
+          <div class="grid-item grid-arrow">10. Prompt Builder</div>
+          <div class="grid-item grid-arrow">11. LLM Generation</div>
+          <div class="grid-item">12. Persona Rewrite</div>
+          
+          <div class="grid-item grid-arrow">13. Edge TTS Synthesis</div>
+          <div class="grid-item grid-arrow">14. Avatar Animation</div>
+          <div class="grid-item">15. Frontend Streaming</div>
+          
+          <div class="grid-item grid-arrow">16. RAG Tracing</div>
+          <div class="grid-item grid-arrow">17. Analytics Logging</div>
+          <div class="grid-item highlight" style="border-color: #ff79c6;">18. Trả về kết quả</div>
+        </div>
+      </section>
+
+      <!-- 9. LIVE DEMO -->
+      <section data-transition="fade" data-background-color="#000">
+        <h1 style="font-size: 4em; color: #fff; text-shadow: 0 0 20px #4facfe;">LIVE DEMO</h1>
+        <p style="text-align: center; font-size: 1.5em; opacity: 0.8;">HERA AI Companion</p>
+      </section>
+
+      <!-- 10. ROADMAP -->
+      <section data-transition="slide">
+        <h2>Roadmap Tương lai</h2>
+        <ul>
+          <li class="fragment fade-up"><span class="highlight">Multi-language:</span> Triển khai giao diện và giọng đọc i18n đầy đủ.</li>
+          <li class="fragment fade-up"><span class="highlight">Multi-site Heritage:</span> Quản lý tập trung nhiều di tích (Group) riêng biệt.</li>
+          <li class="fragment fade-up"><span class="highlight">AR Features:</span> Ứng dụng thực tế tăng cường trên hiện vật thực tế.</li>
+          <li class="fragment fade-up"><span class="highlight">Offline Mode:</span> Cache nội dung để sử dụng khi kết nối mạng kém.</li>
+          <li class="fragment fade-up"><span class="highlight">Analytics Dashboard:</span> Phân tích chi tiết Insight và Journey của khách tham quan.</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      controls: true,
+      progress: true,
+      center: true,
+      transition: 'slide',
+      backgroundTransition: 'fade',
+      fragmentInURL: true,
+      margin: 0.1,
+      minScale: 0.2,
+      maxScale: 2.0
+    });
+  </script>
+</body>
+</html>
