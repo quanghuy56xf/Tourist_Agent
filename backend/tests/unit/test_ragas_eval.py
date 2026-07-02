@@ -106,6 +106,30 @@ def test_run_ragas_golden_eval_supports_corpus_scope(tmp_path, monkeypatch):
     assert report.metrics["faithfulness"] == 0.9
 
 
+def test_report_to_dict_counts_trustworthy_questions_from_case_scores():
+    report = RagasGoldenReport(
+        dataset_path="golden.jsonl",
+        generated_at="2026-07-01T00:00:00Z",
+        total_cases=3,
+        attempted_cases=3,
+        errored_cases=0,
+        metrics={"faithfulness": 0.9, "answer_relevancy": 0.86},
+        gate_results={"faithfulness": True, "answer_relevancy": True},
+        case_scores=[
+            {"case_index": 0, "scores": {"faithfulness": 0.90, "answer_relevancy": 0.90}},
+            {"case_index": 1, "scores": {"faithfulness": 0.84, "answer_relevancy": 0.95}},
+            {"case_index": 2, "scores": {"faithfulness": 0.91, "answer_relevancy": 0.79}},
+        ],
+    )
+
+    payload = report_to_dict(report)
+
+    assert payload["passed_questions"] == 1
+    assert payload["total_questions"] == 3
+    assert payload["trustworthy_answer_rate"] == 0.3333
+
+
+def test_report_to_dict_falls_back_to_global_gate_without_case_scores():
     report = RagasGoldenReport(
         dataset_path="golden.jsonl",
         generated_at="2026-07-01T00:00:00Z",
@@ -181,7 +205,8 @@ def test_default_ragas_evaluator_uses_async_api(monkeypatch):
         ["faithfulness"],
     )
 
-    assert scores == {"faithfulness": 0.91}
+    assert scores["faithfulness"] == 0.91
+    assert "case_scores" not in scores
     assert calls[0][0] == "dataset"
     assert calls[1][0] == "aevaluate"
 

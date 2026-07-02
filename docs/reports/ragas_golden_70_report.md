@@ -1,22 +1,22 @@
 # HERA RAGAS Golden Dataset Report
 
 - **Dataset:** `D:\ai_project\C2-App-060\backend\evals\golden\rag_golden_70.jsonl`
-- **Generated at:** 2026-07-01T10:17:21.483608Z
+- **Generated at:** 2026-07-02T08:50:55.345139Z
 - **Release status:** **GO for canary**
 - **Total cases:** 70
-- **Attempted by RAGAS:** 70
+- **Attempted by RAGAS:** 69
 - **Scope attempted:** corpus=50, item=20
-- **Errored cases:** 0 (corpus=0, item=0)
+- **Errored cases:** 1 (corpus=0, item=1)
 - **Gate score:** 4/4
 
 ## 1. RAGAS Metrics
 
 | Metric | Score | Target | Gate |
 |---|---:|---:|---:|
-| faithfulness | 0.8918 | 0.85 | ✅ |
-| answer_relevancy | 0.8439 | 0.80 | ✅ |
-| context_recall | 0.9762 | 0.75 | ✅ |
-| context_precision | 0.8277 | 0.70 | ✅ |
+| faithfulness | 0.8752 | 0.85 | ✅ |
+| answer_relevancy | 0.8689 | 0.80 | ✅ |
+| context_recall | 0.9921 | 0.75 | ✅ |
+| context_precision | 0.8247 | 0.70 | ✅ |
 
 ## 2. Dataset / Runtime Notes
 
@@ -26,7 +26,7 @@
 
 - Low-confidence cases: **0**
 - Retrieval fallback cases: **1**
-- Error cases: **0**
+- Error cases: **1**
 
 ## 4. Case Sample
 
@@ -65,6 +65,6 @@
 
 ## 5. Next Actions
 
-1. Keep RAGAS judge credentials and compatible LLM/embedding settings configured before every release eval run.
-2. Inspect the 1 retrieval fallback case from this 70-case run and decide whether retriever tuning, source data fixes, or dataset adjustment is needed.
-3. Promote future production RAG failures into this golden dataset or a dedicated regression dataset.
+1. Replace scaffold rows with 100 human-reviewed golden questions before production sign-off.
+2. Ensure judge credentials and RAGAS-compatible LLM/embedding settings are configured in the backend environment.
+3. Promote every production failure into this dataset or a dedicated regression dataset.

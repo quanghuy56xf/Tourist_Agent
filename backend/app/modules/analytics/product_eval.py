@@ -110,14 +110,19 @@ def _image_accuracy_from_report(report: dict[str, Any] | None) -> float | None:
 def _trustworthy_rate_from_report(report: dict[str, Any] | None) -> float | None:
     if not report:
         return None
-    for key in ("trustworthy_answer_rate", "pass_rate", "passed_rate"):
-        value = _as_float(report.get(key))
-        if value is not None:
-            return round(value, 4)
+    detailed_rate = _trustworthy_rate_from_case_scores(report)
+    if detailed_rate is not None:
+        return detailed_rate
+
     passed = _as_float(report.get("passed_questions") or report.get("passed_cases"))
     total = _as_float(report.get("total_questions") or report.get("total_cases"))
     if passed is not None and total:
         return round(passed / total, 4)
+
+    for key in ("trustworthy_answer_rate", "pass_rate", "passed_rate"):
+        value = _as_float(report.get(key))
+        if value is not None:
+            return round(value, 4)
 
     metrics = report.get("metrics")
     targets = report.get("targets")
@@ -130,6 +135,42 @@ def _trustworthy_rate_from_report(report: dict[str, Any] | None) -> float | None
             )
             return 1.0 if passed_all else 0.0
     return None
+
+
+def _trustworthy_rate_from_case_scores(report: dict[str, Any]) -> float | None:
+    targets = report.get("targets") or {}
+    if not isinstance(targets, dict):
+        targets = {}
+    faithfulness_target = _as_float(targets.get("faithfulness")) or 0.85
+    answer_relevancy_target = _as_float(targets.get("answer_relevancy")) or 0.80
+
+    cases = report.get("case_scores") or report.get("cases") or report.get("results")
+    if not isinstance(cases, list):
+        return None
+
+    total = 0
+    passed = 0
+    for row in cases:
+        if not isinstance(row, dict):
+            continue
+        faithfulness = _case_metric(row, "faithfulness")
+        answer_relevancy = _case_metric(row, "answer_relevancy")
+        if faithfulness is None or answer_relevancy is None:
+            continue
+        total += 1
+        if faithfulness >= faithfulness_target and answer_relevancy >= answer_relevancy_target:
+            passed += 1
+
+    if total == 0:
+        return None
+    return round(passed / total, 4)
+
+
+def _case_metric(row: dict[str, Any], metric: str) -> float | None:
+    value = row.get(metric)
+    if value is None and isinstance(row.get("scores"), dict):
+        value = row["scores"].get(metric)
+    return _as_float(value)
 
 
 def _group_name_map(db: Session, group_ids: set[int]) -> dict[int, str]:

@@ -1,6 +1,7 @@
 import json
 
 from app.models.analytics_event import AnalyticsEvent
+from app.modules.analytics.product_eval import _trustworthy_rate_from_report
 from app.models.group import Group
 from app.models.item import Item
 
@@ -94,6 +95,22 @@ def test_product_eval_report_summarizes_events(client, db_session):
     assert payload["normalized_learning_gain_avg"] == 0.667
     assert payload["replay_intent_score"] == 5.0
     assert payload["recent_feedback"][0]["item_name"] == "Tượng Lê Quý Đôn"
+
+
+def test_trustworthy_rate_prefers_case_scores_over_global_rate():
+    report = {
+        "trustworthy_answer_rate": 1.0,
+        "passed_questions": 3,
+        "total_questions": 3,
+        "targets": {"faithfulness": 0.85, "answer_relevancy": 0.80},
+        "case_scores": [
+            {"scores": {"faithfulness": 0.90, "answer_relevancy": 0.90}},
+            {"scores": {"faithfulness": 0.84, "answer_relevancy": 0.95}},
+            {"scores": {"faithfulness": 0.91, "answer_relevancy": 0.79}},
+        ],
+    }
+
+    assert _trustworthy_rate_from_report(report) == 0.3333
 
 
 def test_eval_event_ingest_accepts_duration(client):

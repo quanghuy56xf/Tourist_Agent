@@ -69,7 +69,7 @@ def run_image_eval(labels_path: Path, *, limit: int | None = None) -> dict[str, 
             started = time.perf_counter()
             image_id = row.get("image_id") or Path(row.get("file_path", "")).stem
             raw_file_path = row.get("file_path") or ""
-            image_path = _resolve(raw_file_path, base=labels_path.parent)
+            image_path = _resolve(raw_file_path, base=BACKEND_DIR)
             expected_item_id = _optional_int(row.get("expected_item_id"))
             expected_label = (row.get("expected_label") or "").strip() or None
             group_id = _optional_int(row.get("group_id"))
