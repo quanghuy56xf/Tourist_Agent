@@ -21,7 +21,7 @@ def _resolve(path: str) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run RAGAS on the HERA golden RAG dataset.")
-    parser.add_argument("--dataset", default="evals/golden/rag_golden_100.jsonl")
+    parser.add_argument("--dataset", default="evals/golden/rag_golden_70.jsonl")
     parser.add_argument("--top-k", type=int, default=8)
     parser.add_argument("--limit", type=int, default=None, help="Optional limit for smoke runs.")
     parser.add_argument("--language", default="Tiếng Việt")

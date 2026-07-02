@@ -469,12 +469,23 @@ def _scope_counts(runs: list[RagasCaseRun]) -> dict[str, int]:
 
 
 def report_to_dict(report: RagasGoldenReport, *, include_cases: bool = False) -> dict[str, Any]:
+    faithfulness = report.metrics.get("faithfulness")
+    answer_relevancy = report.metrics.get("answer_relevancy")
+    trustworthy_passed = (
+        faithfulness is not None
+        and answer_relevancy is not None
+        and float(faithfulness) >= report.targets["faithfulness"]
+        and float(answer_relevancy) >= report.targets["answer_relevancy"]
+    )
     data: dict[str, Any] = {
         "dataset_path": report.dataset_path,
         "generated_at": report.generated_at,
         "total_cases": report.total_cases,
         "attempted_cases": report.attempted_cases,
         "errored_cases": report.errored_cases,
+        "passed_questions": report.attempted_cases if trustworthy_passed else 0,
+        "total_questions": report.attempted_cases,
+        "trustworthy_answer_rate": 1.0 if trustworthy_passed else 0.0,
         "scope_counts": _scope_counts(report.case_runs),
         "scope_error_counts": _scope_counts([run for run in report.case_runs if run.error]),
         "metrics": report.metrics,

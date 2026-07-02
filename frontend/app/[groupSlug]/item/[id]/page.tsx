@@ -31,6 +31,7 @@ import {
 } from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
+import EvalFeedbackPanel from "@/components/visitor/EvalFeedbackPanel";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -287,6 +288,10 @@ export default function ItemDetailPage() {
             slideshowAlt={item.name}
             onIntroActiveChange={setIntroActive}
           />
+        </div>
+
+        <div className="mb-4">
+          <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
         </div>
 
         <div className="mb-3 flex items-center gap-2">

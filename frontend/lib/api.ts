@@ -1240,6 +1240,63 @@ export async function fetchRagEvalReport(
   return res.json();
 }
 
+export interface ProductEvalReportSource {
+  path: string;
+  exists: boolean;
+}
+
+export interface ProductEvalFeedbackRow {
+  created_at: string;
+  session_id: string | null;
+  group_name: string | null;
+  item_name: string | null;
+  persona_score: number | null;
+  storytelling_score: number | null;
+  voice_naturalness_score: number | null;
+  replay_intent_score: number | null;
+  comment: string | null;
+}
+
+export interface ProductEvalReport {
+  range_days: number;
+  top1_image_accuracy: number | null;
+  trustworthy_answer_rate: number | null;
+  time_to_first_story_avg_ms: number | null;
+  time_to_first_story_p95_ms: number | null;
+  persona_storytelling_score: number | null;
+  voice_mos: number | null;
+  quest_started_count: number;
+  quest_completed_count: number;
+  quest_completion_rate: number | null;
+  learning_gain_avg: number | null;
+  normalized_learning_gain_avg: number | null;
+  replay_intent_score: number | null;
+  avg_artifacts_per_session: number | null;
+  p95_search_latency_ms: number | null;
+  p95_chat_latency_ms: number | null;
+  p95_e2e_latency_ms: number | null;
+  feedback_count: number;
+  session_count: number;
+  report_sources: ProductEvalReportSource[];
+  recent_feedback: ProductEvalFeedbackRow[];
+  notes: string[];
+}
+
+export async function fetchProductEvalReport(
+  days = 30,
+  groupId?: number
+): Promise<ProductEvalReport> {
+  const params = new URLSearchParams({ days: String(days) });
+  if (groupId != null) params.set("group_id", String(groupId));
+  const res = await fetch(`${API_URL}/api/analytics/product-eval?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được Product Eval"));
+  }
+  return res.json();
+}
+
 export interface RagConfidenceBucket {
   label: string;
   min_score: number;

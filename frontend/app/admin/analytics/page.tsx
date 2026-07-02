@@ -41,10 +41,12 @@ import {
   fetchChatCostSummary,
   fetchChatLogs,
   fetchLlmPricing,
+  fetchProductEvalReport,
   fetchRagEvalReport,
   getGroupItems,
   GroupSummary,
   listGroups,
+  ProductEvalReport,
   RagEvalReport,
   RagIndexHealthGroupRow,
   RagTraceRow,
@@ -109,10 +111,13 @@ export default function AdminAnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "rag-eval">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "rag-eval" | "product-eval">("overview");
   const [ragReport, setRagReport] = useState<RagEvalReport | null>(null);
   const [ragLoading, setRagLoading] = useState(true);
   const [ragError, setRagError] = useState("");
+  const [productEvalReport, setProductEvalReport] = useState<ProductEvalReport | null>(null);
+  const [productEvalLoading, setProductEvalLoading] = useState(true);
+  const [productEvalError, setProductEvalError] = useState("");
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -142,6 +147,20 @@ export default function AdminAnalyticsPage() {
     }
   }, [days, groupId]);
 
+  const loadProductEval = useCallback(async () => {
+    setProductEvalLoading(true);
+    setProductEvalError("");
+    try {
+      const data = await fetchProductEvalReport(days, groupId === "" ? undefined : groupId);
+      setProductEvalReport(data);
+    } catch (err) {
+      setProductEvalReport(null);
+      setProductEvalError(err instanceof Error ? err.message : "Không tải được Product Eval");
+    } finally {
+      setProductEvalLoading(false);
+    }
+  }, [days, groupId]);
+
   useEffect(() => {
     listGroups()
       .then((data) => {
@@ -167,13 +186,26 @@ export default function AdminAnalyticsPage() {
     void loadRagEval();
   }, [loadRagEval]);
 
+  useEffect(() => {
+    void loadProductEval();
+  }, [loadProductEval]);
+
   const refreshActiveTab = () => {
     if (activeTab === "rag-eval") {
       void loadRagEval();
+    } else if (activeTab === "product-eval") {
+      void loadProductEval();
     } else {
       void loadSummary();
     }
   };
+
+  const activeLoading =
+    activeTab === "rag-eval"
+      ? ragLoading
+      : activeTab === "product-eval"
+        ? productEvalLoading
+        : loading;
 
   const groupChartData = useMemo(
     () =>
@@ -219,9 +251,9 @@ export default function AdminAnalyticsPage() {
           <AdminButton
             type="button"
             onClick={refreshActiveTab}
-            disabled={activeTab === "rag-eval" ? ragLoading : loading}
+            disabled={activeLoading}
           >
-            {(activeTab === "rag-eval" ? ragLoading : loading) ? "Đang tải..." : "Làm mới"}
+            {activeLoading ? "Đang tải..." : "Làm mới"}
           </AdminButton>
         }
       />
@@ -292,10 +324,22 @@ export default function AdminAnalyticsPage() {
         >
           Rag Eval
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("product-eval")}
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+            activeTab === "product-eval"
+              ? "bg-[#D4AF37] text-black"
+              : "admin-muted hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          Product Eval
+        </button>
       </div>
 
       {activeTab === "overview" && error && <AdminAlert type="error">{error}</AdminAlert>}
       {activeTab === "rag-eval" && ragError && <AdminAlert type="error">{ragError}</AdminAlert>}
+      {activeTab === "product-eval" && productEvalError && <AdminAlert type="error">{productEvalError}</AdminAlert>}
 
       {activeTab === "overview" && summary && (
         <>
@@ -528,7 +572,191 @@ export default function AdminAnalyticsPage() {
       )}
 
       {activeTab === "rag-eval" && ragReport && <RagEvalSection report={ragReport} />}
+      {activeTab === "product-eval" && productEvalReport && <ProductEvalSection report={productEvalReport} />}
     </AdminPage>
+  );
+}
+
+function formatNullablePercent(value: number | null): string {
+  return value == null ? "—" : formatPercent(value);
+}
+
+function formatScore(value: number | null): string {
+  return value == null ? "—" : `${value.toFixed(1)}/5`;
+}
+
+function formatGain(value: number | null): string {
+  if (value == null) return "—";
+  return value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
+}
+
+function ProductMetricCard({
+  title,
+  value,
+  hint,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <AdminCard title={title}>
+      <p className="text-3xl font-semibold">{value}</p>
+      <p className="admin-muted mt-1 text-xs">{hint}</p>
+    </AdminCard>
+  );
+}
+
+function ProductEvalSection({ report }: { report: ProductEvalReport }) {
+  const latencyData = [
+    { label: "Search", p95: report.p95_search_latency_ms ?? 0 },
+    { label: "Chat", p95: report.p95_chat_latency_ms ?? 0 },
+    { label: "E2E", p95: report.p95_e2e_latency_ms ?? 0 },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Pitch/Demo Eval"
+        title="Product Eval"
+        description="Bộ chỉ số đánh giá trải nghiệm HERA: nhận diện ảnh, độ tin cậy câu trả lời, kể chuyện, voice, quest, learning và latency."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ProductMetricCard
+          title="Top-1 Image Accuracy"
+          value={formatNullablePercent(report.top1_image_accuracy)}
+          hint="Từ latest image eval report"
+        />
+        <ProductMetricCard
+          title="Trustworthy Answer Rate"
+          value={formatNullablePercent(report.trustworthy_answer_rate)}
+          hint="Từ golden RAG/RAGAS report"
+        />
+        <ProductMetricCard
+          title="Time to First Story p95"
+          value={report.time_to_first_story_p95_ms == null ? "—" : formatMs(report.time_to_first_story_p95_ms)}
+          hint={report.time_to_first_story_avg_ms == null ? "Chưa có event first audio" : `TB ${formatMs(report.time_to_first_story_avg_ms)}`}
+        />
+        <ProductMetricCard
+          title="Persona & Storytelling"
+          value={formatScore(report.persona_storytelling_score)}
+          hint={`${report.feedback_count} feedback trong ${report.range_days} ngày`}
+        />
+        <ProductMetricCard
+          title="Voice Naturalness MOS"
+          value={formatScore(report.voice_mos)}
+          hint="Điểm tự nhiên giọng nói từ human feedback"
+        />
+        <ProductMetricCard
+          title="Quest Completion"
+          value={formatNullablePercent(report.quest_completion_rate)}
+          hint={`${report.quest_completed_count}/${report.quest_started_count} quest hoàn thành`}
+        />
+        <ProductMetricCard
+          title="Learning Gain"
+          value={formatGain(report.learning_gain_avg)}
+          hint={report.normalized_learning_gain_avg == null ? "Chưa có pre/post quiz" : `Normalized ${report.normalized_learning_gain_avg.toFixed(2)}`}
+        />
+        <ProductMetricCard
+          title="Replay Intent"
+          value={formatScore(report.replay_intent_score)}
+          hint={report.avg_artifacts_per_session == null ? "Chưa có session data" : `${report.avg_artifacts_per_session.toFixed(1)} hiện vật / session`}
+        />
+        <ProductMetricCard
+          title="p95 E2E Latency"
+          value={report.p95_e2e_latency_ms == null ? "—" : formatMs(report.p95_e2e_latency_ms)}
+          hint={`${report.session_count} session có analytics`}
+        />
+      </div>
+
+      {report.notes.length > 0 && (
+        <AdminAlert type="warning">
+          <ul className="list-disc space-y-1 pl-5">
+            {report.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </AdminAlert>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <AdminCard title="Latency breakdown" description="p95 theo các mốc search/chat/E2E phục vụ demo độ mượt.">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={latencyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => formatMs(Number(value))}
+                  contentStyle={{
+                    background: "#1a1a1a",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                />
+                <Bar dataKey="p95" name="p95 latency" fill="#D4AF37" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </AdminCard>
+
+        <AdminCard title="Offline report sources" description="Nguồn report offline được Product Eval đọc để lấy image/RAG metrics.">
+          <div className="space-y-3 text-sm">
+            {report.report_sources.map((source) => (
+              <div key={source.path} className="rounded-xl border border-white/10 p-3">
+                <div className={source.exists ? "text-emerald-300" : "text-amber-300"}>
+                  {source.exists ? "Có report" : "Chưa có report"}
+                </div>
+                <div className="admin-muted mt-1 break-all font-mono text-xs">{source.path}</div>
+              </div>
+            ))}
+          </div>
+        </AdminCard>
+      </div>
+
+      <AdminCard title="Feedback gần đây" description="Điểm storytelling, persona, voice và replay intent do người dùng chấm.">
+        <AdminDataTable rows={report.recent_feedback} emptyMessage="Chưa có feedback eval." minWidth="920px">
+          {(pageRows) => (
+            <>
+              <thead className="sticky top-0 z-10 bg-[#1a1510]">
+                <tr className="border-b border-white/10 text-left">
+                  <th className="max-w-[8rem] py-2 pr-3 font-medium">Thời gian</th>
+                  <th className="max-w-[11rem] py-2 pr-3 font-medium">Khu / hiện vật</th>
+                  <th className="py-2 pr-3 font-medium">Persona</th>
+                  <th className="py-2 pr-3 font-medium">Story</th>
+                  <th className="py-2 pr-3 font-medium">Voice</th>
+                  <th className="py-2 pr-3 font-medium">Replay</th>
+                  <th className="max-w-[14rem] py-2 pr-3 font-medium">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row, index) => (
+                  <tr key={`${row.created_at}-${index}`} className="border-b border-white/5 align-top">
+                    <td className="max-w-[8rem] py-2 pr-3">
+                      <TruncatedText text={formatShortDateTime(row.created_at)} maxLen={18} />
+                    </td>
+                    <td className="max-w-[11rem] py-2 pr-3">
+                      <TruncatedText
+                        text={row.item_name ? `${row.group_name ?? "—"} · ${row.item_name}` : (row.group_name ?? "—")}
+                        maxLen={28}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">{row.persona_score ?? "—"}</td>
+                    <td className="py-2 pr-3">{row.storytelling_score ?? "—"}</td>
+                    <td className="py-2 pr-3">{row.voice_naturalness_score ?? "—"}</td>
+                    <td className="py-2 pr-3">{row.replay_intent_score ?? "—"}</td>
+                    <td className="max-w-[14rem] py-2 pr-3">
+                      <TruncatedText text={row.comment} maxLen={46} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </>
+          )}
+        </AdminDataTable>
+      </AdminCard>
+    </div>
   );
 }
 

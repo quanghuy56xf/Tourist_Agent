@@ -22,7 +22,21 @@ from app.schemas.analytics import (
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_CLIENT_EVENT_TYPES = frozenset({"group_visit", "item_view"})
+ALLOWED_CLIENT_EVENT_TYPES = frozenset(
+    {
+        "group_visit",
+        "item_view",
+        "story_scan_started",
+        "story_first_meaningful_audio",
+        "story_completed",
+        "eval_feedback",
+        "quest_started",
+        "quest_completed",
+        "quest_abandoned",
+        "quiz_pre_submitted",
+        "quiz_post_submitted",
+    }
+)
 
 
 def get_client_ip(request) -> str:
