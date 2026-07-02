@@ -6,8 +6,10 @@ import { playChatTts, setChatTtsMuted, stopChatTts } from "@/lib/chatTts";
 import {
   addVisitedItem,
   advanceCompanionQuest,
+  getCompanionChatHistory,
   getCompanionQuestState,
   getVisitedItemIds,
+  setCompanionChatHistory,
   setCompanionQuestState,
   startCompanionQuest,
   unlockCompanionQuests,
@@ -26,6 +28,7 @@ import CompanionDiscoveryCard, { DiscoveryImage } from "./CompanionDiscoveryCard
 import CompanionQuestCards from "./CompanionQuestCards";
 import CompanionQuestProgress from "./CompanionQuestProgress";
 import CompanionQuestReward from "./CompanionQuestReward";
+import QuestCelebration from "./QuestCelebration";
 import {
   COMPANION_QUESTS,
   CompanionQuest,
@@ -145,11 +148,15 @@ export default function CompanionChat({
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
   const { t, language } = useVisitorLocale();
-  const [history, setHistory] = useState<ChatMessage[]>(
-    initialNarration
+  const [history, setHistory] = useState<ChatMessage[]>(() => {
+    if (typeof window !== "undefined") {
+      const savedHistory = getCompanionChatHistory(window.sessionStorage);
+      if (savedHistory.length > 0) return savedHistory;
+    }
+    return initialNarration
       ? [{ role: "assistant", content: initialNarration }]
-      : []
-  );
+      : [];
+  });
   
   // Add keyframes for the sound wave effect
   useEffect(() => {
@@ -208,6 +215,7 @@ export default function CompanionChat({
   const [completedQuestId, setCompletedQuestId] = useState<string | null>(null);
   const [questDetailExpanded, setQuestDetailExpanded] = useState(false);
   const [questFeedbackOpen, setQuestFeedbackOpen] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [discovery, setDiscovery] = useState<DiscoveryState | null>(null);
   const [lastScannedDiscovery, setLastScannedDiscovery] = useState<DiscoveryState | null>(null);
   const [awaitingQuizAnswer, setAwaitingQuizAnswer] = useState(false);
@@ -286,16 +294,16 @@ export default function CompanionChat({
   useEffect(() => {
     if (!initialNarration.trim()) return;
     setHistory((current) => {
-      if (current.some(
-        (entry) =>
-          entry.role === "assistant" && entry.content === initialNarration
-      )) {
-        return current;
-      }
-      return [{ role: "assistant", content: initialNarration }, ...current];
+      if (current.length > 0) return current;
+      return [{ role: "assistant", content: initialNarration }];
     });
   }, [initialNarration]);
 
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCompanionChatHistory(window.sessionStorage, history);
+  }, [history]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -692,7 +700,7 @@ export default function CompanionChat({
     setActiveQuestId(null);
     setQuestDetailExpanded(false);
     setCompletedQuestId(quest.id);
-    setQuestFeedbackOpen(true);
+    setShowCelebration(true);
     setActionButtons([]);
     void trackEvalEvent("quest_completed", {
       groupId: readStoredGroupId() ?? undefined,
@@ -1561,6 +1569,16 @@ export default function CompanionChat({
             }
           }}
           onClose={() => setDiscovery(null)}
+        />
+      )}
+
+      {showCelebration && completedQuest && (
+        <QuestCelebration
+          quest={completedQuest}
+          onClose={() => {
+            setShowCelebration(false);
+            setQuestFeedbackOpen(true);
+          }}
         />
       )}
 

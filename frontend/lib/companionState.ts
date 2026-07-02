@@ -2,6 +2,7 @@ export const COMPANION_MODE_KEY = "hera_companion_mode";
 export const COMPANION_INTRO_SEEN_KEY = "hera_companion_intro_seen";
 export const VISITED_ITEMS_KEY = "hera_companion_visited_items";
 export const COMPANION_QUEST_STATE_KEY = "hera_companion_quest_state";
+export const COMPANION_CHAT_HISTORY_KEY = "hera_companion_chat_history";
 
 export type CompanionQuestStatus =
   | "not_started"
@@ -17,6 +18,11 @@ export type CompanionQuestState = {
   completedStopIds?: string[];
   answeredStopIds?: string[];
   rewardClaimed?: boolean;
+};
+
+export type CompanionChatHistoryEntry = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 type ReadStorage = Pick<Storage, "getItem">;
@@ -36,6 +42,29 @@ export function addVisitedItem(storage: WriteStorage, id: number): void {
   if (!Number.isInteger(id)) return;
   const next = Array.from(new Set([...getVisitedItemIds(storage), id]));
   storage.setItem(VISITED_ITEMS_KEY, JSON.stringify(next));
+}
+
+export function getCompanionChatHistory(storage: ReadStorage): CompanionChatHistoryEntry[] {
+  try {
+    const parsed = JSON.parse(storage.getItem(COMPANION_CHAT_HISTORY_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is CompanionChatHistoryEntry =>
+        entry &&
+        typeof entry === "object" &&
+        (entry.role === "user" || entry.role === "assistant") &&
+        typeof entry.content === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function setCompanionChatHistory(
+  storage: Pick<Storage, "setItem">,
+  history: CompanionChatHistoryEntry[]
+): void {
+  storage.setItem(COMPANION_CHAT_HISTORY_KEY, JSON.stringify(history));
 }
 
 function readStringArray(value: unknown): string[] {
