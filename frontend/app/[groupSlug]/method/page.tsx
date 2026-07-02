@@ -1,63 +1,26 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
-import LoadingOverlay from "@/components/LoadingOverlay";
-import ResultModal from "@/components/ResultModal";
-import type { SearchResponse } from "@/lib/api/search";
-import { groupPath } from "@/lib/groupSlug";
-import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
-import { useObjectSearch } from "@/lib/useObjectSearch";
+import { useGroupPath } from "@/lib/useGroupPath";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import LanguageSelector from "@/components/LanguageSelector";
 import PersonaSelector from "@/components/PersonaSelector";
 
 const methods = [
   { id: "camera", icon: "📸", titleKey: "cameraTitle" as const, subKey: "cameraSubtitle" as const },
-  { id: "upload", icon: "🖼️", titleKey: "uploadTitle" as const, subKey: "uploadSubtitle" as const },
   { id: "tour", icon: "🗺️", titleKey: "tourTitle" as const, subKey: "tourSubtitle" as const },
 ];
 
 export default function MethodSelectionPage() {
   const router = useRouter();
-  const groupSlug = useGroupSlug();
   const scanPath = useGroupPath("/scan");
   const tourPath = useGroupPath("/tour");
   const companionPath = useGroupPath("/companion");
   const { t } = useVisitorLocale();
-  const { searchImage } = useObjectSearch();
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-    setLoading(true);
-    setErrorMsg(null);
-    setSearchResult(null);
-    try {
-      const response = await searchImage(e.target.files[0]);
-      if (response.found && response.results.length > 0) {
-        router.push(
-          `${groupPath(groupSlug, `/item/${response.results[0].item_id}`)}?similarity=${response.results[0].similarity}`
-        );
-      } else if (response.results.length > 0) {
-        setSearchResult(response);
-      } else {
-        setErrorMsg(response.message || t.method.noMatch);
-      }
-    } catch {
-      setErrorMsg(t.method.uploadError);
-    } finally {
-      setLoading(false);
-      e.target.value = "";
-    }
-  };
 
   const handleClick = (id: string) => {
     if (id === "camera") router.push(scanPath);
-    else if (id === "upload") document.getElementById("file-upload")?.click();
     else if (id === "companion") router.push(companionPath);
     else if (id === "tour") router.push(tourPath);
   };
@@ -99,14 +62,6 @@ export default function MethodSelectionPage() {
       </header>
 
       <div className="artifact-page-body flex-1 space-y-3">
-        {errorMsg && (
-          <div
-            className="rounded-xl px-4 py-3 text-sm"
-            style={{ background: "rgba(212,24,61,0.15)", border: "1px solid rgba(212,24,61,0.3)" }}
-          >
-            {errorMsg}
-          </div>
-        )}
         <button
           type="button"
           onClick={() => handleClick("companion")}
@@ -148,16 +103,6 @@ export default function MethodSelectionPage() {
         ))}
       </div>
 
-      <input id="file-upload" type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-      {loading && <LoadingOverlay />}
-      {searchResult && (
-        <ResultModal
-          found={searchResult.found}
-          results={searchResult.results.slice(0, 3)}
-          message={searchResult.message}
-          onClose={() => setSearchResult(null)}
-        />
-      )}
     </main>
   );
 }
