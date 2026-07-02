@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "🚀 Bắt đầu quá trình cập nhật mã nguồn và khởi động lại Docker..."
+echo "👤 User đang chạy script: $(whoami)"
 
 # 1. Kéo code mới nhất từ git
 echo "📥 Đang tải code mới từ GitHub..."
