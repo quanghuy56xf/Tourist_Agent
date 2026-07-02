@@ -4,6 +4,7 @@ echo "🚀 Bắt đầu quá trình cập nhật mã nguồn và khởi động 
 
 # 1. Kéo code mới nhất từ git
 echo "📥 Đang tải code mới từ GitHub..."
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
 git fetch origin
 git reset --hard origin/main
 
