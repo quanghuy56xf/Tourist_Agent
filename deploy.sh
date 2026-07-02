@@ -6,6 +6,7 @@ echo "👤 User đang chạy script: $(whoami)"
 # 1. Kéo code mới nhất từ git
 echo "📥 Đang tải code mới từ GitHub..."
 export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
+git config --global --add safe.directory /opt/c2-app/C2-App-060
 git fetch origin
 git reset --hard origin/main
 
