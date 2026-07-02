@@ -270,7 +270,7 @@ export default function ItemDetailPage() {
             <button
               type="button"
               onClick={() => setItemHelpOpen(true)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-200/30 bg-black/35 text-sm font-bold text-amber-100 backdrop-blur transition-colors hover:bg-black/55"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-300/40 bg-amber-500/20 text-sm font-bold text-amber-200 backdrop-blur transition-colors hover:bg-amber-500/30"
               aria-label="Giới thiệu tính năng trang hiện vật"
               title="Giới thiệu tính năng trang hiện vật"
             >

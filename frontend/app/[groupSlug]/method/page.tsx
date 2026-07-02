@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BackButton from "@/components/visitor/BackButton";
 import { useGroupPath } from "@/lib/useGroupPath";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import LanguageSelector from "@/components/LanguageSelector";
 import PersonaSelector from "@/components/PersonaSelector";
+import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
 
 const methods = [
   { id: "camera", icon: "📸", titleKey: "cameraTitle" as const, subKey: "cameraSubtitle" as const },
@@ -18,6 +20,7 @@ export default function MethodSelectionPage() {
   const tourPath = useGroupPath("/tour");
   const companionPath = useGroupPath("/companion");
   const { t } = useVisitorLocale();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const handleClick = (id: string) => {
     if (id === "camera") router.push(scanPath);
@@ -51,11 +54,22 @@ export default function MethodSelectionPage() {
           </div>
           <span className="artifact-section-label">{t.productName}</span>
         </div>
-        <h1 className="font-display mt-3 text-2xl">
-          {t.method.titleLine1}
-          <br />
-          {t.method.titleLine2}
-        </h1>
+        <div className="mt-3 flex items-start gap-2">
+          <h1 className="font-display min-w-0 text-2xl">
+            {t.method.titleLine1}
+            <br />
+            {t.method.titleLine2}
+          </h1>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-200/30 bg-black/20 text-sm font-bold text-amber-100 transition-colors hover:bg-black/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            aria-label="Hướng dẫn chọn cách bắt đầu khám phá"
+            title="Hướng dẫn chọn cách bắt đầu khám phá"
+          >
+            ?
+          </button>
+        </div>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
           {t.method.subtitle}
         </p>
@@ -103,6 +117,20 @@ export default function MethodSelectionPage() {
         ))}
       </div>
 
+      <VisitorInfoDialog
+        open={helpOpen}
+        title="Bắt đầu khám phá như thế nào?"
+        description="Trước khi bắt đầu, bạn có thể cá nhân hóa trải nghiệm để HERA hướng dẫn đúng ngôn ngữ, đúng phong cách và đúng nhu cầu tham quan."
+        onClose={() => setHelpOpen(false)}
+      >
+        <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
+          <li>• Chọn ngôn ngữ ở góc trên để HERA hiển thị và kể chuyện bằng ngôn ngữ bạn muốn.</li>
+          <li>• Chọn persona để điều chỉnh cách kể chuyện: dễ hiểu, học thuật, vui vẻ hoặc phù hợp nhóm khách.</li>
+          <li>• Chọn Companion nếu muốn trò chuyện, nghe hướng dẫn và làm quest trong suốt hành trình.</li>
+          <li>• Chọn Chụp ảnh trực tiếp nếu muốn scan hiện vật; trong màn hình camera bạn cũng có thể tải ảnh có sẵn lên.</li>
+          <li>• Chọn Tour khám phá nếu muốn đi theo lộ trình gợi ý.</li>
+        </ul>
+      </VisitorInfoDialog>
     </main>
   );
 }
