@@ -1590,8 +1590,12 @@ export default function CompanionChat({
               </p>
               {cameraMode === "bait" && (
                 <div className="rounded-2xl border border-amber-300/30 bg-amber-500/10 px-4 py-3 shadow-[0_0_22px_rgba(245,158,11,0.18)]">
-                  <div className="mx-auto mb-2 flex h-16 w-24 items-end justify-center rounded-t-full border-4 border-amber-200/60 border-b-0 bg-black/35 opacity-70 shadow-inner">
-                    <div className="mb-0 h-8 w-9 rounded-t-full border-2 border-amber-100/70 border-b-0" />
+                  <div className="relative mx-auto mb-2 h-20 w-32 overflow-hidden rounded-xl border border-amber-200/30 bg-black/50">
+                    <img 
+                      src="/images/cong-chinh-hint.png" 
+                      alt="Gợi ý Cổng chính" 
+                      className="h-full w-full object-cover opacity-60 blur-[2px] mix-blend-luminosity pointer-events-none select-none"
+                    />
                   </div>
                   <p className="text-xs font-medium text-amber-100/80">{t.companion.questBaitSilhouette}</p>
                 </div>

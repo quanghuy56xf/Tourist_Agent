@@ -246,7 +246,7 @@ def _audio_events(response_text: str):
     ]
 
 
-def test_companion_stream_emits_ack_audio_for_user_message(
+def test_companion_stream_does_not_emit_ack_audio_for_user_message(
     client,
     db_session,
     monkeypatch,
@@ -285,8 +285,8 @@ def test_companion_stream_emits_ack_audio_for_user_message(
 
     assert response.status_code == 200
     audio_events = _audio_events(response.text)
-    assert audio_events[0]["kind"] == "ack"
-    assert audio_events[0]["seq"] == -1
+    assert all(event["kind"] != "ack" for event in audio_events)
+    assert all(event["seq"] != -1 for event in audio_events)
 
 
 def test_companion_stream_keeps_parallel_tts_audio_order(
