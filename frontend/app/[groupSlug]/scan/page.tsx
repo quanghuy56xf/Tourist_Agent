@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CameraCapture from "@/components/CameraCapture";
 import ResultModal from "@/components/ResultModal";
@@ -22,6 +22,7 @@ export default function SearchPage() {
   const methodPath = useGroupPath("/method");
   const { t } = useVisitorLocale();
   const { searchImage } = useObjectSearch();
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [frozen, setFrozen] = useState(false);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
@@ -62,6 +63,7 @@ export default function SearchPage() {
   };
 
   const handleCapture = async (blob: Blob) => {
+    if (capturedUrl) URL.revokeObjectURL(capturedUrl);
     const url = URL.createObjectURL(blob);
     setCapturedUrl(url);
     setFrozen(true);
@@ -119,6 +121,13 @@ export default function SearchPage() {
     resetScan();
   };
 
+  const handleUploadImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || scanPhase !== "idle") return;
+    void handleCapture(file);
+  };
+
   return (
     <main className="flex flex-1 flex-col w-full">
       <header className="artifact-page-head pb-2">
@@ -161,20 +170,37 @@ export default function SearchPage() {
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => document.getElementById("camera-capture-btn")?.click()}
-          disabled={scanPhase !== "idle"}
-          className="artifact-btn-primary w-full max-w-xs disabled:opacity-50"
-        >
-          {scanPhase === "scanning" ? (
-            <>⟳ {t.scan.scanning}</>
-          ) : scanPhase === "found" ? (
-            <>✦ {t.results.found}</>
-          ) : (
-            <>📷 {t.scan.capture}</>
-          )}
-        </button>
+        <div className="flex w-full max-w-xs flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => document.getElementById("camera-capture-btn")?.click()}
+            disabled={scanPhase !== "idle"}
+            className="artifact-btn-primary w-full disabled:opacity-50"
+          >
+            {scanPhase === "scanning" ? (
+              <>⟳ {t.scan.scanning}</>
+            ) : scanPhase === "found" ? (
+              <>✦ {t.results.found}</>
+            ) : (
+              <>📷 {t.scan.capture}</>
+            )}
+          </button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUploadImage}
+          />
+          <button
+            type="button"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={scanPhase !== "idle"}
+            className="w-full rounded-full border border-amber-300/35 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-amber-100 transition-colors hover:bg-white/[0.1] disabled:opacity-50"
+          >
+            🖼️ {t.companion.uploadImage}
+          </button>
+        </div>
       </div>
 
       {searchResult && (

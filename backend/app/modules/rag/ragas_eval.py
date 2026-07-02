@@ -56,11 +56,12 @@ class RagasGoldenReport:
     targets: dict[str, float] = field(default_factory=lambda: dict(RAGAS_TARGETS))
     gate_results: dict[str, bool | None] = field(default_factory=dict)
     case_runs: list[RagasCaseRun] = field(default_factory=list)
+    case_scores: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
 
 class RagasEvaluator(Protocol):
-    def __call__(self, rows: list[dict[str, Any]], metrics: list[str]) -> dict[str, float]: ...
+    def __call__(self, rows: list[dict[str, Any]], metrics: list[str]) -> dict[str, Any]: ...
 
 
 def _contexts(documents: list[Document]) -> list[str]:
@@ -318,7 +319,7 @@ def _rows_for_ragas(runs: list[RagasCaseRun]) -> list[dict[str, Any]]:
 
 
 def _normalize_scores(
-    raw_scores: dict[str, float],
+    raw_scores: dict[str, Any],
     metrics: list[str],
     notes: list[str],
 ) -> dict[str, float | None]:
@@ -334,6 +335,52 @@ def _normalize_scores(
         else:
             scores[name] = round(numeric, 4)
     return scores
+
+
+def _normalize_case_scores(
+    raw_scores: dict[str, Any],
+    metrics: list[str],
+    notes: list[str],
+) -> list[dict[str, Any]]:
+    rows = raw_scores.get("case_scores") or raw_scores.get("cases") or raw_scores.get("results")
+    if not isinstance(rows, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        scores: dict[str, float] = {}
+        for name in metrics:
+            value = _extract_case_metric(row, name)
+            if value is None:
+                continue
+            if not math.isfinite(value):
+                notes.append(f"ragas_case_metric_not_finite:{index}:{name}")
+                continue
+            scores[name] = round(value, 4)
+        if scores:
+            normalized.append(
+                {
+                    "case_index": int(row.get("case_index", row.get("index", index))),
+                    "question": str(row.get("question") or "")[:300],
+                    "scores": scores,
+                }
+            )
+    return normalized
+
+
+def _extract_case_metric(row: dict[str, Any], metric: str) -> float | None:
+    value = row.get(metric)
+    if value is None and isinstance(row.get("scores"), dict):
+        value = row["scores"].get(metric)
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric
 
 
 @contextmanager
@@ -366,6 +413,41 @@ async def _run_ragas_evaluate(dataset: Any, selected_metrics: list[Any]) -> Any:
         return await task
 
 
+def _ragas_result_scores(result: Any, metrics: list[str]) -> dict[str, Any]:
+    frame = result.to_pandas()
+    averages = frame.mean(numeric_only=True).to_dict()
+    output: dict[str, Any] = {
+        name: round(float(averages[name]), 4)
+        for name in metrics
+        if name in averages
+    }
+
+    if hasattr(frame, "to_dict"):
+        case_rows: list[dict[str, Any]] = []
+        for index, row in enumerate(frame.to_dict(orient="records")):
+            scores: dict[str, float] = {}
+            for name in metrics:
+                if name not in row or row[name] is None:
+                    continue
+                try:
+                    numeric = float(row[name])
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(numeric):
+                    scores[name] = round(numeric, 4)
+            if scores:
+                case_rows.append(
+                    {
+                        "case_index": index,
+                        "question": str(row.get("question") or "")[:300],
+                        "scores": scores,
+                    }
+                )
+        if case_rows:
+            output["case_scores"] = case_rows
+    return output
+
+
 def _run_coroutine_sync(coro: Any) -> Any:
     try:
         asyncio.get_running_loop()
@@ -388,7 +470,7 @@ def _run_coroutine_sync(coro: Any) -> Any:
     return result.get("value")
 
 
-def _default_ragas_evaluator(rows: list[dict[str, Any]], metrics: list[str]) -> dict[str, float]:
+def _default_ragas_evaluator(rows: list[dict[str, Any]], metrics: list[str]) -> dict[str, Any]:
     try:
         from datasets import Dataset
         with _without_nest_asyncio_patch():
@@ -407,8 +489,7 @@ def _default_ragas_evaluator(rows: list[dict[str, Any]], metrics: list[str]) -> 
     selected_metrics = [metric_map[name] for name in metrics]
     dataset = Dataset.from_list(rows)
     result = _run_coroutine_sync(_run_ragas_evaluate(dataset, selected_metrics))
-    raw = result.to_pandas().mean(numeric_only=True).to_dict()
-    return {name: round(float(raw[name]), 4) for name in metrics if name in raw}
+    return _ragas_result_scores(result, metrics)
 
 
 def run_ragas_golden_eval(
@@ -434,10 +515,13 @@ def run_ragas_golden_eval(
     selected_metrics = metrics or list(RAGAS_TARGETS)
     notes: list[str] = []
     scores: dict[str, float | None] = {name: None for name in selected_metrics}
+    case_scores: list[dict[str, Any]] = []
     if rows:
         eval_fn = evaluator or _default_ragas_evaluator
         try:
-            scores.update(_normalize_scores(eval_fn(rows, selected_metrics), selected_metrics, notes))
+            raw_scores = eval_fn(rows, selected_metrics)
+            scores.update(_normalize_scores(raw_scores, selected_metrics, notes))
+            case_scores = _normalize_case_scores(raw_scores, selected_metrics, notes)
         except Exception as exc:
             notes.append(f"ragas_evaluation_failed:{type(exc).__name__}:{exc}")
     else:
@@ -457,6 +541,7 @@ def run_ragas_golden_eval(
         metrics=scores,
         gate_results=gate_results,
         case_runs=runs,
+        case_scores=case_scores,
         notes=notes,
     )
 
@@ -468,18 +553,53 @@ def _scope_counts(runs: list[RagasCaseRun]) -> dict[str, int]:
     }
 
 
+def _trustworthy_question_counts(report: RagasGoldenReport) -> tuple[int, int]:
+    required_metrics = ("faithfulness", "answer_relevancy")
+    case_scores = [
+        row
+        for row in report.case_scores
+        if isinstance(row.get("scores"), dict)
+        and all(row["scores"].get(metric) is not None for metric in required_metrics)
+    ]
+    if case_scores:
+        passed = sum(
+            1
+            for row in case_scores
+            if all(
+                float(row["scores"][metric]) >= report.targets[metric]
+                for metric in required_metrics
+            )
+        )
+        return passed, len(case_scores)
+
+    faithfulness = report.metrics.get("faithfulness")
+    answer_relevancy = report.metrics.get("answer_relevancy")
+    trustworthy_passed = (
+        faithfulness is not None
+        and answer_relevancy is not None
+        and float(faithfulness) >= report.targets["faithfulness"]
+        and float(answer_relevancy) >= report.targets["answer_relevancy"]
+    )
+    return (report.attempted_cases if trustworthy_passed else 0), report.attempted_cases
+
+
 def report_to_dict(report: RagasGoldenReport, *, include_cases: bool = False) -> dict[str, Any]:
+    passed_questions, total_questions = _trustworthy_question_counts(report)
     data: dict[str, Any] = {
         "dataset_path": report.dataset_path,
         "generated_at": report.generated_at,
         "total_cases": report.total_cases,
         "attempted_cases": report.attempted_cases,
         "errored_cases": report.errored_cases,
+        "passed_questions": passed_questions,
+        "total_questions": total_questions,
+        "trustworthy_answer_rate": round(passed_questions / total_questions, 4) if total_questions else None,
         "scope_counts": _scope_counts(report.case_runs),
         "scope_error_counts": _scope_counts([run for run in report.case_runs if run.error]),
         "metrics": report.metrics,
         "targets": report.targets,
         "gate_results": report.gate_results,
+        "case_scores": report.case_scores,
         "notes": report.notes,
     }
     if include_cases:

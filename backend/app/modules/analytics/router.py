@@ -17,6 +17,7 @@ from app.modules.analytics.chat_logs import (
     query_chat_logs,
     update_pricing_config,
 )
+from app.modules.analytics.product_eval import build_product_eval_report
 from app.modules.analytics.rag_eval import build_rag_eval_report
 from app.modules.analytics.service import (
     ALLOWED_CLIENT_EVENT_TYPES,
@@ -34,6 +35,7 @@ from app.schemas.analytics import (
     ChatLogListResponse,
     LlmPricingConfigResponse,
     LlmPricingConfigUpdate,
+    ProductEvalReportResponse,
     RagEvalReportResponse,
 )
 
@@ -73,6 +75,9 @@ def ingest_events(
                 session_id=event.session_id,
                 search_session_id=event.search_session_id,
                 client_ip=client_ip,
+                duration_ms=event.duration_ms,
+                success=event.success,
+                error_detail=event.error_detail,
                 metadata=event.metadata,
             )
         except Exception:
@@ -103,6 +108,24 @@ def rag_eval_report(
     _require_analytics_user(user)
     allowed_group_ids = resolve_allowed_analytics_groups(db, user, group_id)
     return build_rag_eval_report(
+        db,
+        days=days,
+        allowed_group_ids=allowed_group_ids,
+        limit=limit,
+    )
+
+
+@router.get("/product-eval", response_model=ProductEvalReportResponse)
+def product_eval_report(
+    days: int = Query(default=30, ge=1, le=365),
+    group_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    user: AuthUser | None = Depends(resolve_current_user),
+):
+    _require_analytics_user(user)
+    allowed_group_ids = resolve_allowed_analytics_groups(db, user, group_id)
+    return build_product_eval_report(
         db,
         days=days,
         allowed_group_ids=allowed_group_ids,

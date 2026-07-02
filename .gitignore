@@ -15,6 +15,9 @@ build/
 *.egg-info/
 backend/.test_tmp/
 backend/.pytest_tmp_review/
+backend/.pytest_tmp/
+.pytest-tmp/
+backend/evals/golden/images/
 .uv-cache-codex/
 # OS
 .DS_Store

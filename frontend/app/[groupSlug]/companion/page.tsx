@@ -6,6 +6,7 @@ import HomeButton from "@/components/visitor/HomeButton";
 import MuteButton from "@/components/visitor/MuteButton";
 import SpeedButton from "@/components/visitor/SpeedButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
+import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
 import {
   enableCompanionMode,
   hasSeenCompanionIntro,
@@ -26,6 +27,7 @@ export default function CompanionPage() {
   const [config, setConfig] = useState<MinimapConfig | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
+  const [companionHelpOpen, setCompanionHelpOpen] = useState(false);
 
   useEffect(() => {
     enableCompanionMode(window.sessionStorage);
@@ -66,7 +68,18 @@ export default function CompanionPage() {
           </h1>
         </div>
         <div className="flex flex-col items-end gap-2 pointer-events-auto">
-          <HomeButton />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCompanionHelpOpen(true)}
+              className="grid h-10 w-10 place-items-center rounded-full border border-amber-300/40 bg-[#251b0e]/95 text-sm font-bold text-amber-200 shadow-lg shadow-black/35 backdrop-blur transition hover:scale-105 hover:bg-[#332614] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              aria-label="Giới thiệu tính năng Companion"
+              title="Giới thiệu tính năng Companion"
+            >
+              ?
+            </button>
+            <HomeButton />
+          </div>
           <div className="flex gap-2">
             <SpeedButton
               speed={playbackRate}
@@ -86,6 +99,20 @@ export default function CompanionPage() {
         isMuted={isMuted}
         playbackRate={playbackRate}
       />
+
+      <VisitorInfoDialog
+        open={companionHelpOpen}
+        title="HERA Companion dùng để làm gì?"
+        description="Companion là hướng dẫn viên tương tác: bạn có thể trò chuyện, scan hiện vật, nghe kể chuyện và tham gia quest khám phá."
+        onClose={() => setCompanionHelpOpen(false)}
+      >
+        <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
+          <li>• Dùng giọng nói hoặc bàn phím để hỏi HERA.</li>
+          <li>• Bấm camera để scan hiện vật và nghe câu chuyện liên quan.</li>
+          <li>• Làm quest/challenge để khám phá theo từng điểm dừng.</li>
+          <li>• Khi HERA gợi ý điểm đến tiếp theo, bản đồ sẽ giúp bạn định hướng.</li>
+        </ul>
+      </VisitorInfoDialog>
 
       <MinimapModal
         open={minimapSuggestedId !== null}

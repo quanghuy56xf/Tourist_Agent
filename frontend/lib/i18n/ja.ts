@@ -47,8 +47,8 @@ export const ja: VisitorTranslations = {
     "uploadSubtitle": "端末から既存の写真を選択",
     "manualTitle": "手動で閲覧",
     "manualSubtitle": "利用可能な文化遺産をすべて表示",
-    "tourTitle": "探索ツアー",
-    "tourSubtitle": "おすすめルート — 各停留所を順番にスキャン",
+    "tourTitle": "探索ゲーム",
+    "tourSubtitle": "友達と一緒に遺跡を探索するゲーム",
     "companionTitle": "レ・クイ・ドンと旅を始める",
     "companionSubtitle": "18歳の案内人と音声チャットで会話",
     "uploadError": "写真をアップロードできませんでした。もう一度お試しください。",
@@ -75,7 +75,7 @@ export const ja: VisitorTranslations = {
     "empty": "利用可能な文化遺産はありません。"
   },
   "tour": {
-    "pageTitle": "探索ツアー",
+    "pageTitle": "探索ゲーム",
     "pageSubtitle": "ルートを選び、各停留所を順番に発見",
     "empty": "おすすめツアーはまだありません。少なくとも2つの遺物が必要です。",
     "stops": "停留所",

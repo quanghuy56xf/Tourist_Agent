@@ -47,8 +47,8 @@ export const fr: VisitorTranslations = {
     "uploadSubtitle": "Choisissez une photo existante sur votre appareil",
     "manualTitle": "Parcourir manuellement",
     "manualSubtitle": "Voir tous les objets du patrimoine disponibles",
-    "tourTitle": "Visite guidée d'exploration",
-    "tourSubtitle": "Itinéraires suggérés — scannez chaque étape dans l'ordre",
+    "tourTitle": "Jeu d'exploration",
+    "tourSubtitle": "Un jeu pour explorer le site entre amis",
     "companionTitle": "Commencer le voyage avec Lê Quý Đôn",
     "companionSubtitle": "Discutez avec votre compagnon de 18 ans via le chat vocal",
     "uploadError": "La photo n'a pas pu être téléchargée. Veuillez réessayer.",
@@ -75,7 +75,7 @@ export const fr: VisitorTranslations = {
     "empty": "Aucun objet du patrimoine n'est disponible."
   },
   "tour": {
-    "pageTitle": "Visites d'exploration",
+    "pageTitle": "Jeu d'exploration",
     "pageSubtitle": "Choisissez un itinéraire et découvrez chaque étape dans l'ordre",
     "empty": "Aucune visite suggérée pour le moment. Au moins 2 objets sont requis.",
     "stops": "étapes",

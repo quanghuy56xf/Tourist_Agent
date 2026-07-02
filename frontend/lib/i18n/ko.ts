@@ -47,8 +47,8 @@ export const ko: VisitorTranslations = {
     "uploadSubtitle": "기기에서 기존 사진을 선택하세요",
     "manualTitle": "수동으로 둘러보기",
     "manualSubtitle": "이용 가능한 모든 문화유산 보기",
-    "tourTitle": "탐색 투어",
-    "tourSubtitle": "추천 경로 — 각 정차지를 순서대로 스캔",
+    "tourTitle": "탐험 게임",
+    "tourSubtitle": "친구들과 함께 유적지를 탐험하는 게임",
     "companionTitle": "레 쿠이 돈과 여정 시작",
     "companionSubtitle": "18세 동행자와 음성 채팅으로 대화",
     "uploadError": "사진을 업로드할 수 없습니다. 다시 시도해 주세요.",
@@ -75,7 +75,7 @@ export const ko: VisitorTranslations = {
     "empty": "이용 가능한 문화유산이 없습니다."
   },
   "tour": {
-    "pageTitle": "탐색 투어",
+    "pageTitle": "탐험 게임",
     "pageSubtitle": "경로를 선택하고 각 정차지를 순서대로 발견하세요",
     "empty": "아직 추천 투어가 없습니다. 최소 2개의 유물이 필요합니다.",
     "stops": "정차지",

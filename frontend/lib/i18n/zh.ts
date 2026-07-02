@@ -47,8 +47,8 @@ export const zh: VisitorTranslations = {
     "uploadSubtitle": "从设备中选择已有照片",
     "manualTitle": "手动浏览",
     "manualSubtitle": "查看所有可用文化遗产",
-    "tourTitle": "探索之旅",
-    "tourSubtitle": "推荐路线 — 按顺序扫描每个站点",
+    "tourTitle": "探索游戏",
+    "tourSubtitle": "和朋友一起探索遗址的游戏",
     "companionTitle": "与黎贵惇一起开始旅程",
     "companionSubtitle": "通过语音聊天与18岁同伴交流",
     "uploadError": "照片无法上传，请重试。",
@@ -75,7 +75,7 @@ export const zh: VisitorTranslations = {
     "empty": "暂无可用文化遗产。"
   },
   "tour": {
-    "pageTitle": "探索之旅",
+    "pageTitle": "探索游戏",
     "pageSubtitle": "选择路线并按顺序发现每个站点",
     "empty": "暂无推荐路线，至少需要2件文物。",
     "stops": "站点",

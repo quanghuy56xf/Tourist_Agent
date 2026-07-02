@@ -13,7 +13,7 @@ import {
   unlockCompanionQuests,
 } from "@/lib/companionState";
 import { rememberMinimapSuggestion, rememberMinimapItem } from "@/lib/minimapState";
-import { getVisitorSessionId } from "@/lib/visitorAnalytics";
+import { getVisitorSessionId, readStoredGroupId, trackEvalEvent } from "@/lib/visitorAnalytics";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import {
   cancelRecording,
@@ -39,6 +39,8 @@ import ScanViewfinderFrame from "./ScanViewfinderFrame";
 import { useObjectSearch } from "@/lib/useObjectSearch";
 import type { SearchMatch } from "@/lib/api/search";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import EvalFeedbackPanel from "./EvalFeedbackPanel";
+import VisitorBottomSheet from "./VisitorBottomSheet";
 
 interface CompanionChatProps {
   itemId?: number;
@@ -205,6 +207,7 @@ export default function CompanionChat({
   const [activeQuestStopIndex, setActiveQuestStopIndex] = useState(0);
   const [completedQuestId, setCompletedQuestId] = useState<string | null>(null);
   const [questDetailExpanded, setQuestDetailExpanded] = useState(false);
+  const [questFeedbackOpen, setQuestFeedbackOpen] = useState(false);
   const [discovery, setDiscovery] = useState<DiscoveryState | null>(null);
   const [lastScannedDiscovery, setLastScannedDiscovery] = useState<DiscoveryState | null>(null);
   const [awaitingQuizAnswer, setAwaitingQuizAnswer] = useState(false);
@@ -228,6 +231,8 @@ export default function CompanionChat({
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const storyStartedAtRef = useRef<number | null>(null);
+  const firstAudioLoggedRef = useRef(false);
 
   const stopProgress = () => {
     if (progressTimer.current) {
@@ -492,6 +497,15 @@ export default function CompanionChat({
         } else if (chunk.type === "audio") {
           const audioBase64 = chunk.data.audio_base64;
           if (audioBase64) {
+            if (!firstAudioLoggedRef.current && storyStartedAtRef.current != null) {
+              firstAudioLoggedRef.current = true;
+              void trackEvalEvent("story_first_meaningful_audio", {
+                groupId: readStoredGroupId() ?? undefined,
+                itemId: overrideItemId ?? activeItemId ?? undefined,
+                durationMs: Math.round(performance.now() - storyStartedAtRef.current),
+                metadata: { source: "companion_stream" },
+              });
+            }
             const bytes = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
             const blob = new Blob([bytes], { type: 'audio/mpeg' });
             enqueueAudioBlob(URL.createObjectURL(blob));
@@ -500,6 +514,15 @@ export default function CompanionChat({
       }
       streamDoneRef.current = true;
       processAudioQueue();
+      if (storyStartedAtRef.current != null) {
+        void trackEvalEvent("story_completed", {
+          groupId: readStoredGroupId() ?? undefined,
+          itemId: overrideItemId ?? activeItemId ?? undefined,
+          durationMs: Math.round(performance.now() - storyStartedAtRef.current),
+          metadata: { source: "companion_stream", has_audio: firstAudioLoggedRef.current },
+        });
+        storyStartedAtRef.current = null;
+      }
 
       if (nextItemId !== null && nextItemName && onSuggestNextPoint) {
         setSuggestedNextPoint({ id: nextItemId, name: nextItemName });
@@ -561,7 +584,7 @@ export default function CompanionChat({
     setCompletedQuestId(null);
     setSuggestedNextPoint(null);
     setActionButtons([]);
-    unlockCompanionQuests(window.localStorage);
+    unlockCompanionQuests(window.sessionStorage);
   };
 
   const handleNormalTour = () => {
@@ -591,7 +614,7 @@ export default function CompanionChat({
   useEffect(() => {
     if (showIntro) return;
 
-    const questState = getCompanionQuestState(window.localStorage);
+    const questState = getCompanionQuestState(window.sessionStorage);
 
     if (questState.status === "quests_unlocked") {
       setShowQuestCards(true);
@@ -640,7 +663,16 @@ export default function CompanionChat({
   const handleSelectQuest = (quest: CompanionQuest) => {
     setShowQuestCards(false);
     setCompletedQuestId(null);
-    startCompanionQuest(window.localStorage, quest.id);
+    startCompanionQuest(window.sessionStorage, quest.id);
+    void trackEvalEvent("quest_started", {
+      groupId: readStoredGroupId() ?? undefined,
+      itemId: activeItemId ?? undefined,
+      metadata: {
+        quest_id: quest.id,
+        quest_title: quest.title,
+        quest_stop_count: quest.stops.length,
+      },
+    });
     setActiveQuestId(quest.id);
     setActiveQuestStopIndex(0);
     setSuggestedNextPoint(null);
@@ -653,17 +685,27 @@ export default function CompanionChat({
     setQuestDetailExpanded(false);
     setCompletedQuestId(null);
     setActionButtons([]);
-    unlockCompanionQuests(window.localStorage);
+    unlockCompanionQuests(window.sessionStorage);
   };
 
   const completeQuest = (quest: CompanionQuest, finalLine: string) => {
     setActiveQuestId(null);
     setQuestDetailExpanded(false);
     setCompletedQuestId(quest.id);
+    setQuestFeedbackOpen(true);
     setActionButtons([]);
+    void trackEvalEvent("quest_completed", {
+      groupId: readStoredGroupId() ?? undefined,
+      itemId: activeItemId ?? undefined,
+      metadata: {
+        quest_id: quest.id,
+        quest_title: quest.title,
+        quest_stop_count: quest.stops.length,
+      },
+    });
     const text = `${finalLine}\n\nBạn đã hoàn thành ${quest.title}! Thẻ Lưu Niệm độc quyền của bạn là: ${quest.reward}.`;
     setHistory((current) => [...current, { role: "assistant", content: text }]);
-    setCompanionQuestState(window.localStorage, {
+    setCompanionQuestState(window.sessionStorage, {
       status: "quest_completed",
       selectedQuestId: quest.id,
       currentStopIndex: quest.stops.length,
@@ -675,7 +717,7 @@ export default function CompanionChat({
 
   const advanceQuestAfterAnswer = (quest: CompanionQuest, stop: CompanionQuestStop, choiceId?: "A" | "B" | "C") => {
     const isCorrect = choiceId === stop.correctChoiceId;
-    const nextState = advanceCompanionQuest(window.localStorage, stop.id, quest.stops.length);
+    const nextState = advanceCompanionQuest(window.sessionStorage, stop.id, quest.stops.length);
     const prefix = isCorrect ? t.companion.questCorrectAnswer : t.companion.questWrongAnswer;
     const nextStop = quest.stops[nextState.currentStopIndex ?? quest.stops.length];
 
@@ -716,6 +758,13 @@ export default function CompanionChat({
     setFrozen(true);
     setScanPhase("scanning");
     setScanErrorMsg(null);
+    storyStartedAtRef.current = performance.now();
+    firstAudioLoggedRef.current = false;
+    void trackEvalEvent("story_scan_started", {
+      groupId: readStoredGroupId() ?? undefined,
+      itemId: activeItemId ?? undefined,
+      metadata: { camera_mode: cameraMode },
+    });
     startProgress();
 
     try {
@@ -905,7 +954,7 @@ export default function CompanionChat({
     if (history.length === 0 && !appOpenedFired.current) {
       appOpenedFired.current = true;
 
-      const questState = getCompanionQuestState(window.localStorage);
+      const questState = getCompanionQuestState(window.sessionStorage);
       if (
         questState.status === "quests_unlocked" ||
         questState.status === "quest_active" ||
@@ -920,7 +969,7 @@ export default function CompanionChat({
         { type: "quest_open_camera", label: t.companion.questOpenCamera },
         { type: "normal_tour", label: t.companion.questNormalTour },
       ]);
-      setCompanionQuestState(window.localStorage, { status: "bait_prompted" });
+      setCompanionQuestState(window.sessionStorage, { status: "bait_prompted" });
       void speak(text);
     }
   };
@@ -1514,6 +1563,19 @@ export default function CompanionChat({
           onClose={() => setDiscovery(null)}
         />
       )}
+
+      <VisitorBottomSheet
+        open={questFeedbackOpen}
+        title="Đánh giá nhanh trải nghiệm"
+        description="Bạn vừa hoàn thành quest. Hãy cho HERA biết trải nghiệm này có hữu ích và thú vị không."
+        onClose={() => setQuestFeedbackOpen(false)}
+      >
+        <EvalFeedbackPanel
+          compact
+          groupId={readStoredGroupId()}
+          itemId={activeItemId}
+        />
+      </VisitorBottomSheet>
 
       {showInlineCamera && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">

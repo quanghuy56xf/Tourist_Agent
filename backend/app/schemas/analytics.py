@@ -7,6 +7,9 @@ class AnalyticsEventIn(BaseModel):
     item_id: int | None = None
     session_id: str = Field(min_length=1, max_length=64)
     search_session_id: str | None = Field(default=None, max_length=64)
+    duration_ms: int | None = Field(default=None, ge=0)
+    success: bool = True
+    error_detail: str | None = Field(default=None, max_length=500)
     metadata: dict | None = None
 
 
@@ -254,3 +257,45 @@ class ChatCostSummaryResponse(BaseModel):
     total_tokens: int
     total_cost_usd: float
     daily: list[ChatCostDailyRow]
+
+
+class ProductEvalReportSource(BaseModel):
+    path: str
+    exists: bool
+
+
+class ProductEvalFeedbackRow(BaseModel):
+    created_at: str
+    session_id: str | None
+    group_name: str | None = None
+    item_name: str | None = None
+    persona_score: float | None = None
+    storytelling_score: float | None = None
+    voice_naturalness_score: float | None = None
+    replay_intent_score: float | None = None
+    comment: str | None = None
+
+
+class ProductEvalReportResponse(BaseModel):
+    range_days: int
+    top1_image_accuracy: float | None = None
+    trustworthy_answer_rate: float | None = None
+    time_to_first_story_avg_ms: int | None = None
+    time_to_first_story_p95_ms: int | None = None
+    persona_storytelling_score: float | None = None
+    voice_mos: float | None = None
+    quest_started_count: int = 0
+    quest_completed_count: int = 0
+    quest_completion_rate: float | None = None
+    learning_gain_avg: float | None = None
+    normalized_learning_gain_avg: float | None = None
+    replay_intent_score: float | None = None
+    avg_artifacts_per_session: float | None = None
+    p95_search_latency_ms: int | None = None
+    p95_chat_latency_ms: int | None = None
+    p95_e2e_latency_ms: int | None = None
+    feedback_count: int = 0
+    session_count: int = 0
+    report_sources: list[ProductEvalReportSource] = Field(default_factory=list)
+    recent_feedback: list[ProductEvalFeedbackRow] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)

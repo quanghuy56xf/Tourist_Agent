@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HERA - High Impact Pitch V3</title>
+    
+    <!-- Reveal.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.0.4/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.0.4/dist/theme/black.css" id="theme">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --brand-primary: #00f2fe;
+            --brand-secondary: #4facfe;
+            --brand-accent: #fa709a;
+            --bg-dark: #050505;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(79, 172, 254, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(250, 112, 154, 0.15), transparent 25%);
+        }
+
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+            font-family: 'Outfit', sans-serif;
+            text-transform: none;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, var(--brand-primary), var(--brand-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+        
+        .text-gradient-accent {
+            background: linear-gradient(to right, #fee140, #fa709a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--brand-primary);
+            box-shadow: 0 10px 40px rgba(0, 242, 254, 0.1);
+        }
+
+        .flow-row {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .flow-step {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .flow-arrow {
+            color: var(--brand-primary);
+            font-size: 1.2em;
+            animation: pulse-arrow 2s infinite;
+        }
+
+        @keyframes pulse-arrow {
+            0% { transform: translateX(0); opacity: 0.5; }
+            50% { transform: translateX(5px); opacity: 1; }
+            100% { transform: translateX(0); opacity: 0.5; }
+        }
+
+        .highlight-step {
+            border-color: var(--brand-accent);
+            box-shadow: 0 0 15px rgba(250, 112, 154, 0.3);
+        }
+
+        .arch-grid {
+            display: grid;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0; left: 0;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="particles-js"></div>
+
+    <div class="reveal">
+        <div class="slides">
+            
+            <!-- 1. INTRO -->
+            <section>
+                <h1 style="font-size: 5em; letter-spacing: 12px; margin-bottom: 0;">HERA</h1>
+                <h3 class="text-gradient" style="font-size: 2em;">Định Nghĩa Lại Trải Nghiệm Di Sản</h3>
+                <p style="color: #aaa; font-size: 0.9em; margin-top: 30px; letter-spacing: 2px;">Vượt xa giới hạn của một Chatbot RAG thông thường</p>
+            </section>
+
+            <!-- 2. THE PRODUCT VALUE -->
+            <section>
+                <h2>1. Hành Trình <span class="text-gradient">Nhập Vai</span></h2>
+                <div class="flow-row" style="margin-top: 40px; margin-bottom: 40px;">
+                    <div class="fragment zoom-in flow-step"><i class="fa-solid fa-camera"></i> Scan Ảnh</div>
+                    <div class="fragment fade-in flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="fragment zoom-in flow-step"><i class="fa-solid fa-brain"></i> AI Nhận Diện</div>
+                    <div class="fragment fade-in flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="fragment zoom-in flow-step"><i class="fa-solid fa-user-astronaut"></i> Kể Chuyện</div>
+                    <div class="fragment fade-in flow-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="fragment zoom-in flow-step highlight-step"><span class="text-gradient-accent"><i class="fa-solid fa-map-location-dot"></i> Dẫn Đường Mini-Map</span></div>
+                </div>
+            </section>
+
+            <!-- 3. FEATURE ECOSYSTEM -->
+            <section>
+                <h2 style="margin-bottom: 5px;">2. <span class="text-gradient">Tính Năng Độc Quyền</span></h2>
+                
+                <div class="arch-grid" style="grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px;">
+                    
+                    <div class="glass-card fragment fade-up" style="padding: 15px;">
+                        <i class="fa-solid fa-microphone-lines fa-2x" style="color: #ff4757; margin-bottom:10px;"></i>
+                        <h4 style="font-size: 0.9em; color: #fff; margin-bottom: 10px;">Voice-to-Voice</h4>
+                        <p style="font-size: 0.6em; color: #aaa; line-height: 1.4; margin: 0;">Đàm thoại thời gian thực (Streaming TTS) tự nhiên như người thật thay vì chỉ gõ văn bản.</p>
+                    </div>
+                    
+                    <div class="glass-card fragment fade-up" style="padding: 15px;">
+                        <i class="fa-solid fa-gamepad fa-2x" style="color: #ffa502; margin-bottom:10px;"></i>
+                        <h4 style="font-size: 0.9em; color: #fff; margin-bottom: 10px;">Game & Quests</h4>
+                        <p style="font-size: 0.6em; color: #aaa; line-height: 1.4; margin: 0;">Thi đua tìm hiện vật, làm nhiệm vụ cá nhân hoá cho trẻ em, học sinh và nhóm gia đình.</p>
+                    </div>
+                    
+                    <div class="glass-card fragment fade-up" style="padding: 15px;">
+                        <i class="fa-solid fa-book-atlas fa-2x" style="color: #2ed573; margin-bottom:10px;"></i>
+                        <h4 style="font-size: 0.9em; color: #fff; margin-bottom: 10px;">Kho Tàng Đồ Sộ</h4>
+                        <p style="font-size: 0.6em; color: #aaa; line-height: 1.4; margin: 0;">Hệ thống Hybrid RAG vượt xa giới hạn vật lý của các bảng thông tin truyền thống tại di tích.</p>
+                    </div>
+                    
+                    <div class="glass-card fragment fade-up" style="grid-column: span 3; display: flex; align-items: center; justify-content: center; gap: 20px; padding: 15px;">
+                        <i class="fa-solid fa-globe fa-2x" style="color: #1e90ff;"></i>
+                        <div style="text-align: left;">
+                            <h4 style="font-size: 0.9em; color: #fff; margin: 0 0 5px 0;">Sẵn Sàng Triển Khai Đa Điểm (Multi-site Ready)</h4>
+                            <p style="font-size: 0.6em; color: #aaa; line-height: 1.4; margin: 0;">Kiến trúc linh hoạt cho phép dễ dàng nhân bản và áp dụng cho bất kỳ khu di tích, bảo tàng nào khác.</p>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+
+            <!-- 4. GAMIFICATION & QUESTS -->
+            <section>
+                <h2 style="margin-bottom: 5px;">3. <span class="text-gradient">Gamification & Quests</span></h2>
+                <p style="font-size: 0.7em; color: #888; margin-bottom: 30px;">Biến di tích thành một thế giới tương tác thu nhỏ</p>
+                
+                <div class="arch-grid" style="grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <!-- Companion Quest Flow -->
+                    <div class="glass-card fragment fade-right" style="padding: 20px; text-align: left;">
+                        <h3 style="color: var(--brand-primary); font-size: 1.1em; margin-bottom: 15px;"><i class="fa-solid fa-scroll"></i> Companion Quests</h3>
+                        <p style="font-size: 0.6em; color: #ccc; line-height: 1.5; margin-bottom: 15px;">Hệ thống nhiệm vụ cá nhân hóa qua cốt truyện do AI dẫn dắt (VD: Cụ Lê Quý Đôn). Giao diện HUD tương tác liên tục.</p>
+                        <div class="flow-row" style="gap: 5px; font-size: 0.55em; margin-top: 10px; flex-wrap: nowrap; justify-content: center;">
+                            <div class="flow-step" style="padding: 10px;">1. Nhận Quest</div> <div class="flow-arrow">→</div>
+                            <div class="flow-step" style="padding: 10px;">2. Scan Hiện Vật</div> <div class="flow-arrow">→</div>
+                            <div class="flow-step" style="padding: 10px;">3. Giải Đố (Riddle)</div> <div class="flow-arrow">→</div>
+                            <div class="flow-step highlight-step" style="padding: 10px;"><span class="text-gradient-accent">4. Thẻ Thưởng</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Multiplayer Tour Match -->
+                    <div class="glass-card fragment fade-left" style="padding: 20px; text-align: left;">
+                        <h3 style="color: var(--brand-secondary); font-size: 1.1em; margin-bottom: 15px;"><i class="fa-solid fa-users-viewfinder"></i> Tour Match (Multiplayer)</h3>
+                        <p style="font-size: 0.6em; color: #ccc; line-height: 1.5; margin-bottom: 25px;">Phòng thi đua nhóm thực tế ảo dành cho học tập. Quét ảnh để ghi điểm theo thời gian thực giữa các thành viên.</p>
+                        <div style="font-size: 0.6em; color: #aaa; display: flex; flex-wrap: wrap; gap: 10px;">
+                            <span style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;"><i class="fa-solid fa-route"></i> Sequential Mode</span>
+                            <span style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;"><i class="fa-solid fa-shuffle"></i> Random Mode</span>
+                            <span style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;"><i class="fa-solid fa-unlock-keyhole"></i> Free Mode</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. THE TECH STACK -->
+            <section>
+                <h2 style="margin-bottom: 0;">4. Kiến Trúc <span class="text-gradient">Production-Ready</span></h2>
+                <div class="arch-grid" style="grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px;">
+                    <div class="glass-card fragment fade-up" style="border-top: 3px solid #e056fd;">
+                        <h3 style="font-size: 1.2em; color: #e056fd; margin-bottom: 10px;"><i class="fa-solid fa-brain"></i> AI Models</h3>
+                        <ul style="font-size: 0.7em; text-align: left; color: #ddd; line-height: 1.8;">
+                            <li><strong style="color: #fff;">Vision:</strong> DINOv2 (Nhận diện)</li>
+                            <li><strong style="color: #fff;">LLM:</strong> Tái tạo Persona lịch sử</li>
+                            <li><strong style="color: #fff;">Voice:</strong> Edge TTS Streaming</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="glass-card fragment fade-up" style="border-top: 3px solid #f39c12;">
+                        <h3 style="font-size: 1.2em; color: #f39c12; margin-bottom: 10px;"><i class="fa-solid fa-database"></i> Data Pipeline</h3>
+                        <ul style="font-size: 0.7em; text-align: left; color: #ddd; line-height: 1.8;">
+                            <li><strong style="color: #fff;">Processing:</strong> OCR & Chunking tự động</li>
+                            <li><strong style="color: #fff;">Retrieval:</strong> Hybrid Search siêu tốc</li>
+                            <li><strong style="color: #fff;">Scale:</strong> 1000+ Chunks, Golden QA</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="glass-card fragment fade-up" style="border-top: 3px solid #2ed573;">
+                        <h3 style="font-size: 1.2em; color: #2ed573; margin-bottom: 10px;"><i class="fa-solid fa-server"></i> Software Eng.</h3>
+                        <ul style="font-size: 0.7em; text-align: left; color: #ddd; line-height: 1.8;">
+                            <li><strong style="color: #fff;">Backend:</strong> FastAPI Microservices</li>
+                            <li><strong style="color: #fff;">DevOps:</strong> Docker & CI/CD Pipeline</li>
+                            <li><strong style="color: #fff;">Infra:</strong> Cloudflare & VM Hosting</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. EVERYTHING BEHIND ONE ANSWER -->
+            <section>
+                <h2 class="text-gradient">"Everything behind one answer"</h2>
+                <p style="font-size: 0.8em; color: #ddd; font-style: italic;">Người dùng chỉ hỏi: <strong style="color: #fff;">"Đây là gì?"</strong></p>
+                <p style="font-size: 0.6em; color: #888;">Hệ thống xử lý trong tích tắc qua chuỗi công nghệ chuyên sâu:</p>
+                
+                <div class="flow-row" style="gap: 5px; font-size: 0.6em; max-width: 950px; margin: 20px auto;">
+                    <div class="fragment fade-right flow-step">Ảnh Đầu Vào</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Preprocessing</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step highlight-step"><span class="text-gradient-accent">Vision Model</span></div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Artifact Recog.</div> <div class="fragment fade-in flow-arrow">→</div>
+                    
+                    <div class="fragment fade-right flow-step">Confidence Score</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Metadata Lookup</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step highlight-step"><span class="text-gradient-accent">Hybrid Retrieval</span></div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Re-ranking</div> <div class="fragment fade-in flow-arrow">→</div>
+                    
+                    <div class="fragment fade-right flow-step">Context Assembly</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Prompt Builder</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step highlight-step"><span class="text-gradient">LLM Inference</span></div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Persona Rewrite</div> <div class="fragment fade-in flow-arrow">→</div>
+                    
+                    <div class="fragment fade-right flow-step highlight-step"><span class="text-gradient">Edge TTS</span></div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Avatar Animation</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment fade-right flow-step">Analytics Logging</div> <div class="fragment fade-in flow-arrow">→</div>
+                    <div class="fragment zoom-in flow-step" style="font-size: 1.5em; padding: 10px 20px;"><span class="text-gradient-accent">Response</span></div>
+                </div>
+            </section>
+
+            <!-- 6. LIVE DEMO -->
+            <section data-background-color="#000" data-transition="zoom">
+                <div class="fragment zoom-in" style="margin-top: 60px;">
+                    <a href="#" class="flow-step highlight-step" style="font-size: 1.5em; padding: 40px 80px; text-decoration: none; display: inline-block; border-radius: 30px;">
+                        <span class="text-gradient-accent" style="font-weight: 800; font-size: 2em;"><i class="fa-solid fa-play"></i> LIVE DEMO</span>
+                    </a>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.0.4/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    
+    <script>
+        Reveal.initialize({
+            hash: true,
+            transition: 'slide',
+            backgroundTransition: 'fade',
+            center: true,
+            margin: 0.1,
+            disableLayout: false
+        });
+
+        particlesJS('particles-js', {
+            "particles": {
+                "number": { "value": 40, "density": { "enable": true, "value_area": 800 } },
+                "color": { "value": ["#00f2fe", "#4facfe", "#fa709a"] },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.3, "random": true },
+                "size": { "value": 3, "random": true },
+                "line_linked": { "enable": true, "distance": 150, "color": "#4facfe", "opacity": 0.15, "width": 1 },
+                "move": { "enable": true, "speed": 1, "direction": "none", "random": true, "straight": false, "out_mode": "out", "bounce": false }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": { "onhover": { "enable": true, "mode": "grab" }, "onclick": { "enable": true, "mode": "push" }, "resize": true },
+                "modes": { "grab": { "distance": 140, "line_linked": { "opacity": 0.5 } }, "push": { "particles_nb": 2 } }
+            },
+            "retina_detect": true
+        });
+    </script>
+</body>
+</html>

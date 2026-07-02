@@ -24,12 +24,28 @@ export function getActiveSearchSessionId(): string | null {
   return sessionStorage.getItem(SEARCH_SESSION_KEY);
 }
 
-export async function trackVisitorEvent(
-  eventType: "group_visit" | "item_view",
+export type VisitorEventType = "group_visit" | "item_view";
+
+export type EvalEventType =
+  | "story_scan_started"
+  | "story_first_meaningful_audio"
+  | "story_completed"
+  | "eval_feedback"
+  | "quest_started"
+  | "quest_completed"
+  | "quest_abandoned"
+  | "quiz_pre_submitted"
+  | "quiz_post_submitted";
+
+async function postAnalyticsEvent(
+  eventType: VisitorEventType | EvalEventType,
   payload: {
     groupId?: number;
     itemId?: number;
     searchSessionId?: string | null;
+    durationMs?: number;
+    success?: boolean;
+    errorDetail?: string | null;
     metadata?: Record<string, unknown>;
   }
 ): Promise<void> {
@@ -49,6 +65,9 @@ export async function trackVisitorEvent(
             item_id: payload.itemId ?? null,
             session_id: sessionId,
             search_session_id: payload.searchSessionId ?? getActiveSearchSessionId(),
+            duration_ms: payload.durationMs ?? null,
+            success: payload.success ?? true,
+            error_detail: payload.errorDetail ?? null,
             metadata: payload.metadata ?? null,
           },
         ],
@@ -58,6 +77,33 @@ export async function trackVisitorEvent(
   } catch {
     // Analytics must not block visitor UX.
   }
+}
+
+export async function trackVisitorEvent(
+  eventType: VisitorEventType,
+  payload: {
+    groupId?: number;
+    itemId?: number;
+    searchSessionId?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  return postAnalyticsEvent(eventType, payload);
+}
+
+export async function trackEvalEvent(
+  eventType: EvalEventType,
+  payload: {
+    groupId?: number;
+    itemId?: number;
+    searchSessionId?: string | null;
+    durationMs?: number;
+    success?: boolean;
+    errorDetail?: string | null;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  return postAnalyticsEvent(eventType, payload);
 }
 
 export interface SearchTrackingContext {
