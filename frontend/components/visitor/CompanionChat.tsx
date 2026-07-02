@@ -6,8 +6,10 @@ import { playChatTts, setChatTtsMuted, stopChatTts } from "@/lib/chatTts";
 import {
   addVisitedItem,
   advanceCompanionQuest,
+  getCompanionChatHistory,
   getCompanionQuestState,
   getVisitedItemIds,
+  setCompanionChatHistory,
   setCompanionQuestState,
   startCompanionQuest,
   unlockCompanionQuests,
@@ -145,11 +147,15 @@ export default function CompanionChat({
 }: CompanionChatProps) {
   const groupSlug = useGroupSlug();
   const { t, language } = useVisitorLocale();
-  const [history, setHistory] = useState<ChatMessage[]>(
-    initialNarration
+  const [history, setHistory] = useState<ChatMessage[]>(() => {
+    if (typeof window !== "undefined") {
+      const savedHistory = getCompanionChatHistory(window.sessionStorage);
+      if (savedHistory.length > 0) return savedHistory;
+    }
+    return initialNarration
       ? [{ role: "assistant", content: initialNarration }]
-      : []
-  );
+      : [];
+  });
   
   // Add keyframes for the sound wave effect
   useEffect(() => {
@@ -286,16 +292,16 @@ export default function CompanionChat({
   useEffect(() => {
     if (!initialNarration.trim()) return;
     setHistory((current) => {
-      if (current.some(
-        (entry) =>
-          entry.role === "assistant" && entry.content === initialNarration
-      )) {
-        return current;
-      }
-      return [{ role: "assistant", content: initialNarration }, ...current];
+      if (current.length > 0) return current;
+      return [{ role: "assistant", content: initialNarration }];
     });
   }, [initialNarration]);
 
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCompanionChatHistory(window.sessionStorage, history);
+  }, [history]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
