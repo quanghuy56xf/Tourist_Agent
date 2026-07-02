@@ -40,6 +40,7 @@ import { useObjectSearch } from "@/lib/useObjectSearch";
 import type { SearchMatch } from "@/lib/api/search";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import EvalFeedbackPanel from "./EvalFeedbackPanel";
+import VisitorBottomSheet from "./VisitorBottomSheet";
 
 interface CompanionChatProps {
   itemId?: number;
@@ -206,6 +207,7 @@ export default function CompanionChat({
   const [activeQuestStopIndex, setActiveQuestStopIndex] = useState(0);
   const [completedQuestId, setCompletedQuestId] = useState<string | null>(null);
   const [questDetailExpanded, setQuestDetailExpanded] = useState(false);
+  const [questFeedbackOpen, setQuestFeedbackOpen] = useState(false);
   const [discovery, setDiscovery] = useState<DiscoveryState | null>(null);
   const [lastScannedDiscovery, setLastScannedDiscovery] = useState<DiscoveryState | null>(null);
   const [awaitingQuizAnswer, setAwaitingQuizAnswer] = useState(false);
@@ -690,6 +692,7 @@ export default function CompanionChat({
     setActiveQuestId(null);
     setQuestDetailExpanded(false);
     setCompletedQuestId(quest.id);
+    setQuestFeedbackOpen(true);
     setActionButtons([]);
     void trackEvalEvent("quest_completed", {
       groupId: readStoredGroupId() ?? undefined,
@@ -1350,14 +1353,6 @@ export default function CompanionChat({
                 />
               )}
 
-              {history.length > 0 && !showIntro && (
-                <EvalFeedbackPanel
-                  compact
-                  groupId={readStoredGroupId()}
-                  itemId={activeItemId}
-                />
-              )}
-
               {history.length === 0 && (
                 <p className="rounded-xl border border-amber-300/15 bg-white/[0.04] p-4 text-center text-sm text-amber-100/70">
                   {t.companion.chatEmptyState}
@@ -1568,6 +1563,19 @@ export default function CompanionChat({
           onClose={() => setDiscovery(null)}
         />
       )}
+
+      <VisitorBottomSheet
+        open={questFeedbackOpen}
+        title="Đánh giá nhanh trải nghiệm"
+        description="Bạn vừa hoàn thành quest. Hãy cho HERA biết trải nghiệm này có hữu ích và thú vị không."
+        onClose={() => setQuestFeedbackOpen(false)}
+      >
+        <EvalFeedbackPanel
+          compact
+          groupId={readStoredGroupId()}
+          itemId={activeItemId}
+        />
+      </VisitorBottomSheet>
 
       {showInlineCamera && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4">

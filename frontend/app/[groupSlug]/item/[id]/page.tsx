@@ -32,6 +32,7 @@ import {
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
 import EvalFeedbackPanel from "@/components/visitor/EvalFeedbackPanel";
+import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -68,6 +69,8 @@ export default function ItemDetailPage() {
   const heraPanelRef = useRef<HeraGuidePanelHandle>(null);
   const [introActive, setIntroActive] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [itemHelpOpen, setItemHelpOpen] = useState(false);
+  const [itemFeedbackOpen, setItemFeedbackOpen] = useState(false);
 
   const stopGuideIntro = () => {
     heraPanelRef.current?.stopPlayback();
@@ -260,9 +263,29 @@ export default function ItemDetailPage() {
         )}
         <div className="absolute bottom-3 left-4 right-4 z-10">
           <p className="artifact-section-label mb-1">{t.item.objectLabel}</p>
-          <h1 className="font-display break-words text-xl" lang={locale}>
-            {item.name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display min-w-0 break-words text-xl" lang={locale}>
+              {item.name}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setItemHelpOpen(true)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-200/30 bg-black/35 text-sm font-bold text-amber-100 backdrop-blur transition-colors hover:bg-black/55"
+              aria-label="Giới thiệu tính năng trang hiện vật"
+              title="Giới thiệu tính năng trang hiện vật"
+            >
+              ?
+            </button>
+            <button
+              type="button"
+              onClick={() => setItemFeedbackOpen(true)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-300/40 bg-amber-500/20 text-sm text-amber-200 backdrop-blur transition-colors hover:bg-amber-500/30"
+              aria-label="Đánh giá nhanh trải nghiệm"
+              title="Đánh giá nhanh trải nghiệm"
+            >
+              ★
+            </button>
+          </div>
         </div>
       </div>
 
@@ -288,10 +311,6 @@ export default function ItemDetailPage() {
             slideshowAlt={item.name}
             onIntroActiveChange={setIntroActive}
           />
-        </div>
-
-        <div className="mb-4">
-          <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
         </div>
 
         <div className="mb-3 flex items-center gap-2">
@@ -406,6 +425,29 @@ export default function ItemDetailPage() {
           </div>
         </div>
       </div>
+
+      <VisitorInfoDialog
+        open={itemHelpOpen}
+        title="Trang hiện vật dùng để làm gì?"
+        description="Đây là nơi HERA giới thiệu hiện vật vừa nhận diện, phát câu chuyện theo persona/ngôn ngữ bạn chọn và cho phép bạn hỏi thêm về chi tiết đang quan tâm."
+        onClose={() => setItemHelpOpen(false)}
+      >
+        <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
+          <li>• Nghe hoặc đọc phần thuyết minh chính của hiện vật.</li>
+          <li>• Đặt câu hỏi tiếp theo để HERA giải thích sâu hơn.</li>
+          <li>• Quay lại scan nếu muốn nhận diện hiện vật khác.</li>
+          <li>• Khi đi tour, dùng nút tiếp tục để quay lại hành trình.</li>
+        </ul>
+      </VisitorInfoDialog>
+
+      <VisitorInfoDialog
+        open={itemFeedbackOpen}
+        title="Đánh giá nhanh trải nghiệm"
+        description="Phản hồi ngắn này giúp HERA đo Product Eval: độ đúng persona, chất lượng kể chuyện, giọng nói và ý định trải nghiệm tiếp."
+        onClose={() => setItemFeedbackOpen(false)}
+      >
+        <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
+      </VisitorInfoDialog>
 
       <MinimapButton elevated={inTour} />
     </main>

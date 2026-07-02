@@ -36,10 +36,12 @@ export default function EvalFeedbackPanel({
   groupId,
   itemId,
   compact = false,
+  onSubmitted,
 }: {
   groupId?: number | null;
   itemId?: number | null;
   compact?: boolean;
+  onSubmitted?: () => void;
 }) {
   const [personaScore, setPersonaScore] = useState(5);
   const [storytellingScore, setStorytellingScore] = useState(5);
@@ -66,6 +68,7 @@ export default function EvalFeedbackPanel({
         },
       });
       setSubmitted(true);
+      onSubmitted?.();
     } finally {
       setSubmitting(false);
     }
