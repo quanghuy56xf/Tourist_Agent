@@ -584,7 +584,7 @@ export default function CompanionChat({
     setCompletedQuestId(null);
     setSuggestedNextPoint(null);
     setActionButtons([]);
-    unlockCompanionQuests(window.localStorage);
+    unlockCompanionQuests(window.sessionStorage);
   };
 
   const handleNormalTour = () => {
@@ -614,7 +614,7 @@ export default function CompanionChat({
   useEffect(() => {
     if (showIntro) return;
 
-    const questState = getCompanionQuestState(window.localStorage);
+    const questState = getCompanionQuestState(window.sessionStorage);
 
     if (questState.status === "quests_unlocked") {
       setShowQuestCards(true);
@@ -663,7 +663,7 @@ export default function CompanionChat({
   const handleSelectQuest = (quest: CompanionQuest) => {
     setShowQuestCards(false);
     setCompletedQuestId(null);
-    startCompanionQuest(window.localStorage, quest.id);
+    startCompanionQuest(window.sessionStorage, quest.id);
     void trackEvalEvent("quest_started", {
       groupId: readStoredGroupId() ?? undefined,
       itemId: activeItemId ?? undefined,
@@ -685,7 +685,7 @@ export default function CompanionChat({
     setQuestDetailExpanded(false);
     setCompletedQuestId(null);
     setActionButtons([]);
-    unlockCompanionQuests(window.localStorage);
+    unlockCompanionQuests(window.sessionStorage);
   };
 
   const completeQuest = (quest: CompanionQuest, finalLine: string) => {
@@ -705,7 +705,7 @@ export default function CompanionChat({
     });
     const text = `${finalLine}\n\nBạn đã hoàn thành ${quest.title}! Thẻ Lưu Niệm độc quyền của bạn là: ${quest.reward}.`;
     setHistory((current) => [...current, { role: "assistant", content: text }]);
-    setCompanionQuestState(window.localStorage, {
+    setCompanionQuestState(window.sessionStorage, {
       status: "quest_completed",
       selectedQuestId: quest.id,
       currentStopIndex: quest.stops.length,
@@ -717,7 +717,7 @@ export default function CompanionChat({
 
   const advanceQuestAfterAnswer = (quest: CompanionQuest, stop: CompanionQuestStop, choiceId?: "A" | "B" | "C") => {
     const isCorrect = choiceId === stop.correctChoiceId;
-    const nextState = advanceCompanionQuest(window.localStorage, stop.id, quest.stops.length);
+    const nextState = advanceCompanionQuest(window.sessionStorage, stop.id, quest.stops.length);
     const prefix = isCorrect ? t.companion.questCorrectAnswer : t.companion.questWrongAnswer;
     const nextStop = quest.stops[nextState.currentStopIndex ?? quest.stops.length];
 
@@ -954,7 +954,7 @@ export default function CompanionChat({
     if (history.length === 0 && !appOpenedFired.current) {
       appOpenedFired.current = true;
 
-      const questState = getCompanionQuestState(window.localStorage);
+      const questState = getCompanionQuestState(window.sessionStorage);
       if (
         questState.status === "quests_unlocked" ||
         questState.status === "quest_active" ||
@@ -969,7 +969,7 @@ export default function CompanionChat({
         { type: "quest_open_camera", label: t.companion.questOpenCamera },
         { type: "normal_tour", label: t.companion.questNormalTour },
       ]);
-      setCompanionQuestState(window.localStorage, { status: "bait_prompted" });
+      setCompanionQuestState(window.sessionStorage, { status: "bait_prompted" });
       void speak(text);
     }
   };
