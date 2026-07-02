@@ -1,3 +1,38 @@
+## 2026-07-02 - Product Eval và tinh chỉnh UX khách tham quan
+
+Bối cảnh:
+- Cần hoàn thiện Product Eval cho demo/pitch, đồng thời giảm độ nhiễu của giao diện khách tham quan.
+- Luồng khách cần gom thao tác tải ảnh vào màn hình scan, thêm hướng dẫn ngắn tại các điểm chính và điều chỉnh vòng đời Quest của Companion theo từng tab.
+
+Các thay đổi đã làm:
+- Triển khai và tài liệu hóa Product Eval với 9 KPI: image accuracy, trustworthy answer rate, time-to-first-story, persona/storytelling, voice MOS, quest completion, learning gain, replay intent và p95 latency.
+- Cập nhật Trustworthy Answer Rate theo hướng chi tiết hơn: ưu tiên đếm từng case RAGAS có đủ `faithfulness` và `answer_relevancy` vượt ngưỡng thay vì shortcut pass/fail theo điểm trung bình toàn report.
+- Tạo hướng dẫn `docs/eval_guide.md` và sample `backend/evals/golden/images/labels.csv` cho image eval.
+- Tinh chỉnh feedback UX:
+  - Ẩn feedback panel inline ở trang hiện vật và Companion.
+  - Thêm popup `?` hướng dẫn trang hiện vật, `★` đánh giá nhanh ở trang hiện vật.
+  - Thêm `?` cạnh nút Home ở Companion.
+  - Hiện bottom sheet feedback sau khi hoàn thành quest.
+- Tinh chỉnh trang chính và scan:
+  - Bỏ lựa chọn tải ảnh lên riêng ở trang chọn phương thức.
+  - Đưa nút tải ảnh lên vào màn hình camera/scan, dùng chung flow nhận diện với ảnh chụp trực tiếp.
+  - Thêm popup `?` cạnh tiêu đề “Chọn cách bắt đầu khám phá” để hướng dẫn chọn ngôn ngữ, persona và cách khám phá.
+- Đổi quest state của Companion từ `localStorage` sang `sessionStorage`, giữ tiến độ khi F5 nhưng tự reset khi đóng tab/trình duyệt.
+
+Xác nhận:
+- Backend Product Eval/RAGAS targeted tests đã pass trong phiên triển khai backend eval.
+- Frontend lint pass, chỉ còn warning `<img>` cũ của project.
+- Frontend production build pass sau thay đổi scan/upload.
+- Các thay đổi chính đã commit:
+  - `f346fc7 Add product evaluation dashboard`
+  - `ffdb21d Refine visitor help and feedback UI`
+  - `c79f8db Move image upload into scan flow`
+  - `0a27b7d Use session storage for companion quest state`
+
+Còn lại / follow-up:
+- Commit phần popup hướng dẫn mới ở trang chính nếu chưa được commit cùng lô tiếp theo.
+- Nếu cần release, chạy lại full frontend build và kiểm tra thủ công các flow mobile: chọn persona/ngôn ngữ, scan/upload, item feedback, Companion quest.
+
 ## 2026-07-01 - Hoàn thiện RAGAS golden eval và báo cáo RAG production
 
 Bối cảnh:

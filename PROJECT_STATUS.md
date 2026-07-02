@@ -1,6 +1,6 @@
 # PROJECT STATUS: HERA - AI Heritage Guide V2
 
-**Cập nhật gần nhất:** 2026-06-28
+**Cập nhật gần nhất:** 2026-07-02
 Tài liệu này là ảnh chụp ngắn gọn về trạng thái hiện tại của dự án, dành cho AI Agent và developer mới. Lịch sử triển khai chi tiết được lưu tại `WORKLOG.md`.
 
 ## 1. Tổng quan
@@ -15,7 +15,7 @@ Trải nghiệm chính của khách tham quan gồm:
 - Phát giọng đọc tự nhiên và hỗ trợ tương tác bằng giọng nói.
 - Hiển thị Minimap và gợi ý điểm tham quan tiếp theo.
 
-Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri thức và cấu hình Minimap.
+Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri thức, cấu hình Minimap và theo dõi Product Eval.
 
 ## 2. Kiến trúc và công nghệ
 
@@ -35,7 +35,8 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Kiến trúc V1 dựa trên Supabase đã được chuyển sang V2 self-hosted với FastAPI và SQLite.
 - Cấu hình môi trường đã được chuẩn hóa về một file `.env` duy nhất tại thư mục gốc.
 - Visitor có thể khám phá các Group qua `GET /api/groups/discover`.
-- Luồng nhận diện ảnh, truy xuất RAG, sinh nội dung, chat và TTS đã hoạt động xuyên suốt.
+- Luồng nhận diện ảnh, truy xuất RAG, sinh nội dung, chat và TTS đã hoạt động xuyên suốt; tải ảnh lên hiện nằm trong màn hình scan/camera thay vì là lựa chọn riêng ở trang chính.
+- Product Eval đã có dashboard/analytics, tài liệu 9 KPI và các điểm thu feedback nhẹ trong visitor UI.
 - Hệ thống phòng thủ Prompt Injection (Shield Clause) đã được gia cố hoàn chỉnh cho cả hai luồng Hướng dẫn viên và Companion.
 - RAG đã được cải thiện để chấp nhận từ khóa chính và tận dụng tài liệu thuộc đúng Group.
 - TTS được tạo theo yêu cầu, tránh gọi trùng; frontend chỉ gửi 10 tin nhắn gần nhất lên API chat.
@@ -62,7 +63,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Nội dung chat được truyền trực tiếp (Streaming) qua Backend-Driven Pipeline; đã tối ưu thêm cached acknowledgement audio, early phrase chunking và 2 TTS workers để giảm độ trễ câu nói đầu tiên và khoảng lặng giữa các đoạn.
 - Nếu chưa quét hiện vật, Companion yêu cầu khách quét trước thay vì trả lời ngoài ngữ cảnh.
 - UX cơ bản đã hoàn thiện (collapsible avatar, floating scanner, smart idle timer). Tính năng hỗ trợ Tiếng Anh (i18n) đã được triển khai hoàn tất với giọng đọc `en-US-GuyNeural` và các luồng UI được dịch đầy đủ.
-- Companion Quest MVP đã có onboarding/bait scan, 2 quest, HUD compact dưới avatar, câu đố theo điểm dừng và reward; Phase 2 Hidden Gems đã được lưu plan để triển khai sau.
+- Companion Quest MVP đã có onboarding/bait scan, 2 quest, HUD compact dưới avatar, câu đố theo điểm dừng và reward; quest state dùng `sessionStorage` để giữ qua F5 nhưng reset khi đóng tab; Phase 2 Hidden Gems đã được lưu plan để triển khai sau.
 
 ### Định hướng giao diện Companion
 
@@ -72,9 +73,9 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 
 ## 4. Current focus và TODO ưu tiên
 
-1. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
+1. **Kiểm thử demo visitor trên thiết bị thật:** xác nhận help popup, scan/upload, feedback popup, Companion quest, quest state, microphone, camera, TTS, inline scan và Minimap trên Safari iPhone/Android.
+2. **Tối ưu hình ảnh frontend:** chuyển dần các ảnh chịu tải cao sang `next/image` sau khi kiểm tra hành vi responsive và fallback.
 3. **Dọn state Admin:** thay thế hoàn toàn `localStorage` và window events còn sót lại (`adminAuth`, `groups-changed`) bằng Context hoặc store để quản lý trạng thái đồng nhất hơn.
-4. **Kiểm thử thiết bị thật:** xác nhận microphone, camera, TTS, inline scan và Minimap trên Safari iPhone.
 
 ## 5. Quy tắc quan trọng
 
