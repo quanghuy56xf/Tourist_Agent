@@ -43,7 +43,10 @@ _ORIGINAL_BUILD_CHAT_ITEM_CONTEXT = build_chat_item_context
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
-TTS_WORKER_COUNT = 2
+TTS_WORKER_COUNT = 3
+TTS_MAX_ATTEMPTS = 3
+TTS_RETRY_BACKOFF_SECONDS = (0.3, 0.8)
+ENABLE_COMPANION_ACK_AUDIO = False
 FIRST_SEGMENT_SOFT_LIMIT = 45
 NORMAL_SEGMENT_SOFT_LIMIT = 90
 SEGMENT_HARD_LIMIT = 150
@@ -604,24 +607,49 @@ async def chat_with_companion_stream(
                     break
                 seq, text = item
                 tts_started_ms = elapsed_ms()
-                try:
-                    audio_bytes, _ = await _synthesize_speech_async(
-                        text,
-                        request.language,
-                        "Companion",
-                    )
-                    logger.debug(
-                        "Companion TTS segment worker=%s seq=%s start_ms=%s done_ms=%s chars=%s",
-                        worker_id,
-                        seq,
-                        tts_started_ms,
-                        elapsed_ms(),
-                        len(text),
-                    )
-                    await tts_result_queue.put((seq, text, audio_bytes))
-                except Exception:
-                    logger.exception("Companion TTS segment failed seq=%s", seq)
-                    await tts_result_queue.put((seq, text, None))
+                audio_bytes: bytes | None = None
+                for attempt in range(1, TTS_MAX_ATTEMPTS + 1):
+                    try:
+                        audio_bytes, _ = await _synthesize_speech_async(
+                            text,
+                            request.language,
+                            "Companion",
+                        )
+                        logger.debug(
+                            "Companion TTS segment worker=%s seq=%s attempt=%s start_ms=%s done_ms=%s chars=%s",
+                            worker_id,
+                            seq,
+                            attempt,
+                            tts_started_ms,
+                            elapsed_ms(),
+                            len(text),
+                        )
+                        break
+                    except Exception as exc:
+                        if attempt >= TTS_MAX_ATTEMPTS:
+                            logger.exception(
+                                "Companion TTS segment failed after retries worker=%s seq=%s attempts=%s text_preview=%r",
+                                worker_id,
+                                seq,
+                                attempt,
+                                text[:100],
+                            )
+                            break
+                        backoff = TTS_RETRY_BACKOFF_SECONDS[
+                            min(attempt - 1, len(TTS_RETRY_BACKOFF_SECONDS) - 1)
+                        ]
+                        logger.warning(
+                            "Companion TTS segment retry worker=%s seq=%s attempt=%s/%s backoff=%.1fs error=%s text_preview=%r",
+                            worker_id,
+                            seq,
+                            attempt,
+                            TTS_MAX_ATTEMPTS,
+                            backoff,
+                            exc,
+                            text[:100],
+                        )
+                        await asyncio.sleep(backoff)
+                await tts_result_queue.put((seq, text, audio_bytes))
 
         async def audio_orderer():
             next_seq_to_send = 0
@@ -653,6 +681,12 @@ async def chat_with_companion_stream(
                                         "audio_base64": audio_base64,
                                     },
                                 )
+                            )
+                        else:
+                            logger.warning(
+                                "Companion TTS segment skipped seq=%s text_preview=%r",
+                                next_seq_to_send,
+                                ordered_text[:100],
                             )
                         next_seq_to_send += 1
             except Exception:
@@ -719,14 +753,22 @@ async def chat_with_companion_stream(
             except Exception:
                 logger.exception("Companion acknowledgement TTS failed")
 
-        ack_task = asyncio.create_task(ack_producer())
+        ack_task = (
+            asyncio.create_task(ack_producer())
+            if ENABLE_COMPANION_ACK_AUDIO
+            else None
+        )
         producer_task = asyncio.create_task(llm_producer())
         worker_tasks = [
             asyncio.create_task(tts_worker(worker_id))
             for worker_id in range(TTS_WORKER_COUNT)
         ]
         orderer_task = asyncio.create_task(audio_orderer())
-        tasks = [ack_task, producer_task, *worker_tasks, orderer_task]
+        tasks = [
+            task
+            for task in [ack_task, producer_task, *worker_tasks, orderer_task]
+            if task is not None
+        ]
         try:
             while True:
                 event = await event_queue.get()
