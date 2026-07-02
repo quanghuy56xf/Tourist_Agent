@@ -59,6 +59,7 @@ services:
       - rag_data:/app/data/rag
       - group_docs_data:/app/data/group_docs
       - hf_cache:/app/data/huggingface
+      - ./docs/reports:/app/docs/reports:ro
     depends_on:
       postgres:
         condition: service_healthy
