@@ -9,6 +9,7 @@ import {
   getCompanionChatHistory,
   getCompanionQuestState,
   getVisitedItemIds,
+  VISITED_ITEMS_KEY,
   setCompanionChatHistory,
   setCompanionQuestState,
   startCompanionQuest,
@@ -453,7 +454,7 @@ export default function CompanionChat({
         overrideItemId ?? activeItemId,
         cleaned,
         previous,
-        getVisitedItemIds(window.localStorage),
+        getVisitedItemIds(window.sessionStorage),
         getVisitorSessionId(),
         requestSuggestNext,
         language
@@ -784,7 +785,7 @@ export default function CompanionChat({
         setScanPhase("found");
         const bestMatch = response.results[0];
 
-        addVisitedItem(window.localStorage, bestMatch.item_id);
+        addVisitedItem(window.sessionStorage, bestMatch.item_id);
         rememberMinimapItem(groupSlug, bestMatch.item_id);
 
         if (cameraMode === "bait") {
@@ -909,7 +910,7 @@ export default function CompanionChat({
     setFallbackSuggestions(null);
     setScanPhase("found");
     
-    addVisitedItem(window.localStorage, match.item_id);
+    addVisitedItem(window.sessionStorage, match.item_id);
     rememberMinimapItem(groupSlug, match.item_id);
     
     setTimeout(() => {
@@ -1185,7 +1186,7 @@ export default function CompanionChat({
                           key={idx}
                           type="button"
                           onClick={() => {
-                            window.localStorage.removeItem("visited_item_ids");
+                            window.sessionStorage.removeItem(VISITED_ITEMS_KEY);
                             window.location.reload();
                           }}
                           className="inline-flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/30 hover:bg-blue-500/25 px-3 py-1.5 rounded-full transition-colors text-blue-100 text-sm font-medium shadow-sm"

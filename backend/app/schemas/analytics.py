@@ -259,6 +259,45 @@ class ChatCostSummaryResponse(BaseModel):
     daily: list[ChatCostDailyRow]
 
 
+class SttCostDailyRow(BaseModel):
+    date: str
+    request_count: int
+    success_count: int
+    error_count: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cost_usd: float
+
+
+class SttSessionCostRow(BaseModel):
+    session_id: str | None
+    group_id: int | None
+    group_name: str | None = None
+    request_count: int
+    success_count: int
+    error_count: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cost_usd: float
+    first_at: str
+    last_at: str
+
+
+class SttCostSummaryResponse(BaseModel):
+    range_days: int
+    total_requests: int
+    success_count: int
+    error_count: int
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    daily: list[SttCostDailyRow]
+    sessions: list[SttSessionCostRow]
+
+
 class ProductEvalReportSource(BaseModel):
     path: str
     exists: bool

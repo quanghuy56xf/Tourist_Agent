@@ -43,6 +43,7 @@ import {
   fetchLlmPricing,
   fetchProductEvalReport,
   fetchRagEvalReport,
+  fetchSttCostSummary,
   getGroupItems,
   GroupSummary,
   listGroups,
@@ -51,6 +52,7 @@ import {
   RagIndexHealthGroupRow,
   RagTraceRow,
   saveLlmPricing,
+  SttCostSummary,
 } from "@/lib/api";
 import { canAccessGroup, getAdminSession } from "@/lib/adminAuth";
 
@@ -568,7 +570,10 @@ export default function AdminAnalyticsPage() {
       )}
 
       {activeTab === "overview" && (
-        <ChatAnalyticsSection days={days} groupId={groupId === "" ? undefined : groupId} />
+        <>
+          <ChatAnalyticsSection days={days} groupId={groupId === "" ? undefined : groupId} />
+          <SttCostSection days={days} groupId={groupId === "" ? undefined : groupId} />
+        </>
       )}
 
       {activeTab === "rag-eval" && ragReport && <RagEvalSection report={ragReport} />}
@@ -1122,6 +1127,169 @@ function IssueTable({
 function formatUsd(value: number): string {
   if (value < 0.0001 && value > 0) return "< $0.0001";
   return `$${value.toFixed(4)}`;
+}
+
+function SttCostSection({
+  days,
+  groupId,
+}: {
+  days: number;
+  groupId?: number;
+}) {
+  const [summary, setSummary] = useState<SttCostSummary | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadSttCost = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await fetchSttCostSummary({ days, groupId });
+      setSummary(data);
+    } catch (err) {
+      setSummary(null);
+      setError(err instanceof Error ? err.message : "Không tải được chi phí STT");
+    } finally {
+      setLoading(false);
+    }
+  }, [days, groupId]);
+
+  useEffect(() => {
+    void loadSttCost();
+  }, [loadSttCost]);
+
+  const dailyChartData = useMemo(
+    () =>
+      summary?.daily.map((row) => ({
+        date: row.date.slice(5),
+        requests: row.request_count,
+        tokens: row.total_tokens,
+        cost: row.cost_usd,
+      })) ?? [],
+    [summary]
+  );
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Speech-to-text"
+        title="Chi phí STT Gemini"
+        description="Theo dõi request, token và chi phí Speech-to-text theo ngày và theo session."
+        action={
+          <AdminButton type="button" onClick={() => void loadSttCost()} disabled={loading}>
+            {loading ? "Đang tải..." : "Làm mới STT"}
+          </AdminButton>
+        }
+      />
+
+      {error && <AdminAlert type="error">{error}</AdminAlert>}
+
+      {summary && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminCard title="Tổng request STT">
+              <p className="text-3xl font-semibold">{summary.total_requests}</p>
+              <p className="admin-muted mt-1 text-xs">Trong {summary.range_days} ngày</p>
+            </AdminCard>
+            <AdminCard title="Request lỗi">
+              <p className="text-3xl font-semibold text-red-300">{summary.error_count}</p>
+              <p className="admin-muted mt-1 text-xs">{summary.success_count} request OK</p>
+            </AdminCard>
+            <AdminCard title="Tổng token STT">
+              <p className="text-3xl font-semibold">{summary.total_tokens.toLocaleString()}</p>
+              <p className="admin-muted mt-1 text-xs">
+                In/out {summary.total_input_tokens.toLocaleString()}/{summary.total_output_tokens.toLocaleString()}
+              </p>
+            </AdminCard>
+            <AdminCard title="Tổng chi phí STT">
+              <p className="text-3xl font-semibold">{formatUsd(summary.total_cost_usd)}</p>
+              <p className="admin-muted mt-1 text-xs">Gemini Speech-to-text</p>
+            </AdminCard>
+          </div>
+
+          <AdminCard title="Chi phí STT theo ngày" description="Request, token và USD theo từng ngày trong khoảng đang chọn.">
+            {dailyChartData.length > 0 ? (
+              <div className="h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dailyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                    <YAxis yAxisId="tokens" tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }} />
+                    <YAxis
+                      yAxisId="cost"
+                      orientation="right"
+                      tick={{ fill: "rgba(255,255,255,0.65)", fontSize: 12 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#1a1a1a",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                      }}
+                    />
+                    <Legend />
+                    <Line yAxisId="tokens" type="monotone" dataKey="requests" name="Request" stroke="#90EE90" />
+                    <Line yAxisId="tokens" type="monotone" dataKey="tokens" name="Token" stroke="#7CB5EC" />
+                    <Line yAxisId="cost" type="monotone" dataKey="cost" name="USD" stroke="#D4AF37" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="admin-muted text-sm">Chưa có dữ liệu STT trong khoảng này.</p>
+            )}
+          </AdminCard>
+
+          <AdminCard title="Chi phí STT theo session" description="Tổng hợp tối đa 50 session gần nhất có sử dụng Speech-to-text.">
+            <AdminDataTable rows={summary.sessions} emptyMessage="Chưa có session STT." minWidth="900px">
+              {(pageRows) => (
+                <>
+                  <thead className="sticky top-0 z-10 bg-[#1a1510]">
+                    <tr className="border-b border-white/10 text-left">
+                      <th className="max-w-[10rem] py-2 pr-3 font-medium">Session</th>
+                      <th className="max-w-[11rem] py-2 pr-3 font-medium">Khu di tích</th>
+                      <th className="py-2 pr-3 font-medium">Request</th>
+                      <th className="py-2 pr-3 font-medium">OK/Lỗi</th>
+                      <th className="py-2 pr-3 font-medium">Token in/out</th>
+                      <th className="py-2 pr-3 font-medium">Chi phí</th>
+                      <th className="max-w-[8rem] py-2 pr-3 font-medium">Lần đầu</th>
+                      <th className="max-w-[8rem] py-2 pr-3 font-medium">Lần cuối</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((row, index) => (
+                      <tr key={`${row.session_id ?? "unknown"}-${row.group_id ?? 0}-${index}`} className="border-b border-white/5 align-top">
+                        <td className="max-w-[10rem] py-2 pr-3">
+                          <TruncatedText text={row.session_id ?? "—"} maxLen={18} mono />
+                        </td>
+                        <td className="max-w-[11rem] py-2 pr-3">
+                          <TruncatedText text={row.group_name ?? "—"} maxLen={28} />
+                        </td>
+                        <td className="py-2 pr-3">{row.request_count}</td>
+                        <td className="whitespace-nowrap py-2 pr-3">
+                          <span className="text-emerald-300">{row.success_count}</span>
+                          <span className="admin-muted"> / </span>
+                          <span className={row.error_count ? "text-red-300" : "admin-muted"}>{row.error_count}</span>
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-3 text-xs">
+                          {row.input_tokens.toLocaleString()}/{row.output_tokens.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-3">{formatUsd(row.cost_usd)}</td>
+                        <td className="max-w-[8rem] py-2 pr-3">
+                          <TruncatedText text={formatShortDateTime(row.first_at)} maxLen={18} />
+                        </td>
+                        <td className="max-w-[8rem] py-2 pr-3">
+                          <TruncatedText text={formatShortDateTime(row.last_at)} maxLen={18} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </>
+              )}
+            </AdminDataTable>
+          </AdminCard>
+        </>
+      )}
+    </div>
+  );
 }
 
 function ChatAnalyticsSection({

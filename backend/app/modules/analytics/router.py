@@ -25,6 +25,7 @@ from app.modules.analytics.service import (
     get_client_ip,
     record_event,
 )
+from app.modules.analytics.stt_cost import build_stt_cost_summary
 from app.modules.auth.dependencies import resolve_current_user
 from app.modules.auth.service import AuthUser
 from app.schemas.analytics import (
@@ -37,6 +38,7 @@ from app.schemas.analytics import (
     LlmPricingConfigUpdate,
     ProductEvalReportResponse,
     RagEvalReportResponse,
+    SttCostSummaryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -234,6 +236,23 @@ def chat_cost_summary(
         group_id=group_id,
         item_id=item_id,
         status=status,
+    )
+
+
+@router.get("/stt-cost/summary", response_model=SttCostSummaryResponse)
+def stt_cost_summary(
+    days: int = Query(default=30, ge=1, le=365),
+    group_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: AuthUser | None = Depends(resolve_current_user),
+):
+    _require_analytics_user(user)
+    allowed_group_ids = resolve_allowed_analytics_groups(db, user, group_id)
+    return build_stt_cost_summary(
+        db,
+        days=days,
+        allowed_group_ids=allowed_group_ids,
+        group_id=group_id,
     )
 
 

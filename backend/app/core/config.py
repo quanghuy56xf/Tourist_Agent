@@ -58,8 +58,12 @@ CHROMA_PATH = _backend_path_env("CHROMA_PATH", BASE_DIR / "data" / "chroma")
 # RAG paths and keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
+STT_PROVIDER = os.getenv("STT_PROVIDER", "gemini").strip().lower()
+_DEFAULT_STT_MODEL = "whisper-1" if STT_PROVIDER == "openai" else "gemini-2.5-flash-lite"
+STT_MODEL = os.getenv("STT_MODEL", _DEFAULT_STT_MODEL)
 _DEFAULT_LLM_MODEL = "deepseek-chat" if LLM_PROVIDER == "deepseek" else "gemini-2.5-flash"
 LLM_MODEL = os.getenv("LLM_MODEL", _DEFAULT_LLM_MODEL)
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
@@ -76,6 +80,8 @@ LLM_INPUT_CACHE_MISS_PRICE_PER_1M = float(
     )
 )
 LLM_OUTPUT_PRICE_PER_1M = float(os.getenv("LLM_OUTPUT_PRICE_PER_1M", "0.30"))
+STT_INPUT_PRICE_PER_1M = float(os.getenv("STT_INPUT_PRICE_PER_1M", "0.10"))
+STT_OUTPUT_PRICE_PER_1M = float(os.getenv("STT_OUTPUT_PRICE_PER_1M", "0.40"))
 RAG_CHROMA_PATH = _backend_path_env("RAG_CHROMA_PATH", BASE_DIR / "data" / "rag_chroma")
 RAG_BM25_PATH = _backend_path_env("RAG_BM25_PATH", BASE_DIR / "data" / "rag" / "bm25_index.pkl")
 RAG_CHUNKS_PATH = _backend_path_env("RAG_CHUNKS_PATH", BASE_DIR / "data" / "rag" / "chunks.pkl")

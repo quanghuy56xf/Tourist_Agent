@@ -107,7 +107,7 @@ export default function ItemDetailPage() {
         const data = await getItem(itemId);
         if (cancelled) return;
         rememberMinimapItem(groupSlug, itemId);
-        addVisitedItem(window.localStorage, itemId);
+        addVisitedItem(window.sessionStorage, itemId);
         setItem(data);
         setLoadingItem(false);
         try {
