@@ -22,6 +22,7 @@ from app.modules.content.language_support import LANGUAGE_VI, normalize_language
 from app.modules.rag.service import (
     build_chat_item_context,
     build_chat_item_context_with_trace,
+    build_group_chat_context_with_trace,
     no_item_knowledge_message,
 )
 from app.modules.rag.security import (
@@ -486,10 +487,19 @@ async def chat_with_companion_stream(
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
     else:
         item = None
-        docs = []
-        rag_trace = None
-        group_id = None
+        group_id = request.group_id
         current_item_name = None
+        if group_id is not None:
+            docs, has_verified, rag_trace = build_group_chat_context_with_trace(
+                query=request.message,
+                group_id=group_id,
+                retriever=try_get_rag_retriever(),
+                top_k=RAG_CHAT_TOP_K,
+            )
+        else:
+            docs = []
+            has_verified = False
+            rag_trace = None
 
     query_visited = db.query(Item.id, Item.name).filter(Item.id.in_(request.visited_item_ids))
     if group_id is not None:

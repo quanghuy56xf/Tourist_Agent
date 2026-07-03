@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
 
 class CompanionChatRequest(BaseModel):
     item_id: int | None = None
+    group_id: int | None = None
     language: str = "Tiếng Việt"
     suggest_next: bool = False
     history: list[ChatMessage] = Field(default_factory=list, max_length=20)
