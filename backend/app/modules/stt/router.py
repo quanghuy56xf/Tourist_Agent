@@ -3,9 +3,18 @@ import logging
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.modules.stt.gemini_stt import transcribe_audio
+from app.core.config import STT_PROVIDER
 
 logger = logging.getLogger(__name__)
+
+
+def _transcribe(audio_bytes: bytes, mime_type: str) -> str:
+    """Route to the configured STT provider."""
+    if STT_PROVIDER == "openai":
+        from app.modules.stt.openai_stt import transcribe_audio
+    else:
+        from app.modules.stt.gemini_stt import transcribe_audio
+    return transcribe_audio(audio_bytes, mime_type)
 
 router = APIRouter(prefix="/api", tags=["stt"])
 
@@ -45,7 +54,7 @@ async def transcribe_uploaded_audio(
         )
 
     try:
-        transcript = transcribe_audio(audio_bytes, mime_type)
+        transcript = _transcribe(audio_bytes, mime_type)
     except ValueError as exc:
         logger.warning("STT validation failed: %s", exc)
         raise HTTPException(
@@ -54,7 +63,8 @@ async def transcribe_uploaded_audio(
         ) from exc
     except Exception as exc:
         logger.exception(
-            "Gemini STT failed: type=%s code=%s status=%s message=%s",
+            "STT (%s) failed: type=%s code=%s status=%s message=%s",
+            STT_PROVIDER,
             type(exc).__name__,
             getattr(exc, "code", None),
             getattr(exc, "status", None),

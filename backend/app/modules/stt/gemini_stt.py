@@ -3,9 +3,7 @@ from typing import Any
 from google import genai
 from google.genai import types
 
-from app.core.config import GOOGLE_API_KEY
-
-STT_MODEL = "gemini-2.5-flash-lite"
+from app.core.config import GOOGLE_API_KEY, STT_MODEL
 STT_PROMPT = (
     "Chép chính xác lời nói trong đoạn âm thanh thành văn bản tiếng Việt. "
     "Chỉ trả về nội dung đã chép, không giải thích, không thêm dấu ngoặc kép."
