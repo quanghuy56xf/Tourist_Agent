@@ -5,7 +5,9 @@ import re
 from langchain_core.documents import Document
 
 from app.models.item import Item
+from app.models.rag_trace import RagTrace
 from app.modules.llm import chat_router
+from app.modules.rag.tracing import RagTraceContext
 
 
 class FakeStreamingCompanionGenerator:
@@ -23,6 +25,13 @@ class FakeCompanionGenerator:
         assert kwargs["visited_items"] == ["C?ng ch?nh", "Khu? V?n C?c"]
         assert kwargs["retrieved_docs"][0].page_content == "Primary description"
         yield "Ta nh? b?n ?? gh? C?ng ch?nh."
+
+
+class FakeGlobalCompanionGenerator:
+    async def generate_companion_chat_stream(self, **kwargs):
+        assert kwargs["current_item"] is None
+        assert kwargs["retrieved_docs"][0].page_content == "Văn Miếu có bia tiến sĩ."
+        yield "Ta tìm được thông tin trong tài liệu khu di tích."
 
 
 def test_companion_chat_resolves_visited_items_in_current_group(
@@ -78,6 +87,106 @@ def test_companion_chat_rejects_empty_message(client):
     )
 
     assert response.status_code == 422
+
+
+def test_companion_stream_records_rag_trace(client, db_session, monkeypatch):
+    current = Item(name="Khuê Văn Các", description="Primary", group_id=1)
+    db_session.add(current)
+    db_session.commit()
+
+    def fake_context_with_trace(**kwargs):
+        return [Document(page_content="Verified")], True, RagTraceContext(
+            retrieval_query=kwargs["query"],
+            top_k=kwargs["top_k"],
+            dense_max_score=0.72,
+            context_chunks=[{"chunk_id": "doc-1", "snippet": "Verified"}],
+            confidence_score=0.83,
+            confidence_reasons=["matched_group_doc"],
+        )
+
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(
+        chat_router,
+        "build_chat_item_context_with_trace",
+        fake_context_with_trace,
+    )
+    monkeypatch.setattr(chat_router, "get_rag_generator", lambda: FakeStreamingCompanionGenerator())
+    monkeypatch.setattr(
+        chat_router,
+        "_synthesize_speech_async",
+        fake_synthesize_speech_async,
+    )
+
+    response = client.post(
+        "/api/companion/chat/stream",
+        json={
+            "item_id": current.id,
+            "message": "Kể ta nghe về hiện vật này",
+            "history": [],
+            "visited_item_ids": [],
+            "session_id": "session-companion",
+        },
+    )
+
+    assert response.status_code == 200
+    trace = db_session.query(RagTrace).one()
+    assert trace.conversation_id == "session-companion:companion"
+    assert trace.item_id == current.id
+    assert trace.query == "Kể ta nghe về hiện vật này"
+    assert trace.retrieval_query == "Kể ta nghe về hiện vật này"
+    assert trace.has_verified_knowledge == 1
+    assert trace.confidence_score == 0.83
+    assert trace.chat_turn_id is not None
+
+
+def test_companion_stream_uses_group_rag_without_item(client, db_session, monkeypatch):
+    def fake_group_context_with_trace(**kwargs):
+        assert kwargs["group_id"] == 1
+        return [Document(page_content="Văn Miếu có bia tiến sĩ.")], True, RagTraceContext(
+            retrieval_query=kwargs["query"],
+            top_k=kwargs["top_k"],
+            dense_max_score=0.69,
+            context_chunks=[{"chunk_id": "group-doc-1", "snippet": "Văn Miếu có bia tiến sĩ."}],
+            confidence_score=0.81,
+            confidence_reasons=["matched_group_doc"],
+        )
+
+    monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
+    monkeypatch.setattr(
+        chat_router,
+        "build_group_chat_context_with_trace",
+        fake_group_context_with_trace,
+    )
+    monkeypatch.setattr(chat_router, "get_rag_generator", lambda: FakeGlobalCompanionGenerator())
+    monkeypatch.setattr(
+        chat_router,
+        "_synthesize_speech_async",
+        fake_synthesize_speech_async,
+    )
+
+    response = client.post(
+        "/api/companion/chat/stream",
+        json={
+            "group_id": 1,
+            "message": "vị tiến sĩ đầu tiên được khắc tên trên văn miếu",
+            "history": [],
+            "visited_item_ids": [],
+            "session_id": "session-global-companion",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "event: chunk" in response.text
+    assert "event: done" in response.text
+    trace = db_session.query(RagTrace).one()
+    assert trace.conversation_id == "session-global-companion:companion"
+    assert trace.group_id == 1
+    assert trace.item_id is None
+    assert trace.query == "vị tiến sĩ đầu tiên được khắc tên trên văn miếu"
+    assert trace.retrieval_query == "vị tiến sĩ đầu tiên được khắc tên trên văn miếu"
+    assert trace.has_verified_knowledge == 1
+    assert trace.confidence_score == 0.81
+    assert trace.chat_turn_id is not None
 
 
 def test_companion_chat_fallback_stream_records_with_item_group(

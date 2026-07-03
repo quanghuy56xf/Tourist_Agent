@@ -845,6 +845,7 @@ export async function* chatWithCompanionStream(
   history: ChatMessage[],
   visitedItemIds: number[],
   sessionId?: string,
+  groupId?: number,
   suggestNext = false,
   language = "Tiếng Việt"
 ): AsyncGenerator<{ type: 'metadata' | 'chunk' | 'audio' | 'done' | 'error' | 'actions', data: any }, void, unknown> {
@@ -857,6 +858,7 @@ export async function* chatWithCompanionStream(
       history,
       visited_item_ids: visitedItemIds,
       session_id: sessionId,
+      group_id: groupId,
       suggest_next: suggestNext,
       language,
     }),

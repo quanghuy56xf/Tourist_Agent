@@ -456,6 +456,7 @@ export default function CompanionChat({
         previous,
         getVisitedItemIds(window.sessionStorage),
         getVisitorSessionId(),
+        readStoredGroupId() ?? undefined,
         requestSuggestNext,
         language
       );

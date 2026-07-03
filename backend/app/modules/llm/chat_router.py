@@ -22,6 +22,7 @@ from app.modules.content.language_support import LANGUAGE_VI, normalize_language
 from app.modules.rag.service import (
     build_chat_item_context,
     build_chat_item_context_with_trace,
+    build_group_chat_context_with_trace,
     no_item_knowledge_message,
 )
 from app.modules.rag.security import (
@@ -202,14 +203,14 @@ def _record_companion_chat(
     error_detail: str | None = None,
     token_usage=None,
     prompt_text_for_estimate: str = "",
-) -> None:
+):
     conversation_id = resolve_conversation_id(
         session_id=request.session_id,
         search_session_id=None,
         item_id=item_id,
         chat_mode="companion",
     )
-    record_chat_turn(
+    return record_chat_turn(
         db,
         conversation_id=conversation_id,
         chat_mode="companion",
@@ -421,15 +422,27 @@ async def chat_with_companion_stream(
 
         group_id = item.group_id
         current_item_name = item.name
-        docs, has_verified = build_chat_item_context(
-            item_id=item.id,
-            item_name=item.name,
-            item_description=item.description,
-            group_id=group_id,
-            retriever=try_get_rag_retriever(),
-            top_k=RAG_CHAT_TOP_K,
-            query=request.message,
-        )
+        if build_chat_item_context is not _ORIGINAL_BUILD_CHAT_ITEM_CONTEXT:
+            docs, has_verified = build_chat_item_context(
+                item_id=item.id,
+                item_name=item.name,
+                item_description=item.description,
+                group_id=group_id,
+                retriever=try_get_rag_retriever(),
+                top_k=RAG_CHAT_TOP_K,
+                query=request.message,
+            )
+            rag_trace = RagTraceContext(retrieval_query=request.message, top_k=RAG_CHAT_TOP_K)
+        else:
+            docs, has_verified, rag_trace = build_chat_item_context_with_trace(
+                item_id=item.id,
+                item_name=item.name,
+                item_description=item.description,
+                group_id=group_id,
+                retriever=try_get_rag_retriever(),
+                top_k=RAG_CHAT_TOP_K,
+                query=request.message,
+            )
         if not has_verified:
             async def generate_fallback():
                 is_vi = normalize_language_label(request.language) == LANGUAGE_VI
@@ -442,7 +455,7 @@ async def chat_with_companion_stream(
                 yield f"event: chunk\ndata: {json.dumps({'text': fallback_msg})}\n\n"
                 yield "event: done\ndata: {}\n\n"
                 duration_ms = int((time.perf_counter() - started) * 1000)
-                _record_companion_chat(
+                chat_turn = _record_companion_chat(
                     db,
                     request=request,
                     group_id=group_id,
@@ -455,12 +468,38 @@ async def chat_with_companion_stream(
                         completion_text=fallback_msg,
                     ),
                 )
+                conversation_id = resolve_conversation_id(
+                    session_id=request.session_id,
+                    search_session_id=None,
+                    item_id=item.id if item else None,
+                    chat_mode="companion",
+                )
+                record_rag_trace(
+                    db,
+                    chat_turn_id=chat_turn.id if chat_turn else None,
+                    conversation_id=conversation_id,
+                    group_id=group_id,
+                    item_id=item.id if item else None,
+                    query=request.message,
+                    trace=rag_trace,
+                    has_verified_knowledge=False,
+                )
             return StreamingResponse(generate_fallback(), media_type="text/event-stream")
     else:
         item = None
-        docs = []
-        group_id = None
+        group_id = request.group_id
         current_item_name = None
+        if group_id is not None:
+            docs, has_verified, rag_trace = build_group_chat_context_with_trace(
+                query=request.message,
+                group_id=group_id,
+                retriever=try_get_rag_retriever(),
+                top_k=RAG_CHAT_TOP_K,
+            )
+        else:
+            docs = []
+            has_verified = False
+            rag_trace = None
 
     query_visited = db.query(Item.id, Item.name).filter(Item.id.in_(request.visited_item_ids))
     if group_id is not None:
@@ -579,7 +618,7 @@ async def chat_with_companion_stream(
                     prompt_text=prompt_text,
                     completion_text=assistant_message or "",
                 )
-                _record_companion_chat(
+                chat_turn = _record_companion_chat(
                     db,
                     request=request,
                     group_id=group_id,
@@ -591,6 +630,23 @@ async def chat_with_companion_stream(
                     token_usage=token_usage,
                     prompt_text_for_estimate=prompt_text,
                 )
+                if rag_trace is not None:
+                    conversation_id = resolve_conversation_id(
+                        session_id=request.session_id,
+                        search_session_id=None,
+                        item_id=item.id if item else None,
+                        chat_mode="companion",
+                    )
+                    record_rag_trace(
+                        db,
+                        chat_turn_id=chat_turn.id if chat_turn else None,
+                        conversation_id=conversation_id,
+                        group_id=group_id,
+                        item_id=item.id if item else None,
+                        query=request.message,
+                        trace=rag_trace,
+                        has_verified_knowledge=has_verified,
+                    )
                 logger.info(
                     "Companion stream text latency session=%s item=%s first_chunk_ms=%s first_segment_ms=%s",
                     request.session_id,

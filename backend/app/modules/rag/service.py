@@ -447,3 +447,73 @@ def build_chat_item_context_with_trace(
         vague_follow_up=vague_follow_up,
     )
     return chat_docs, has_verified_knowledge, trace
+
+
+def build_group_chat_context_with_trace(
+    *,
+    query: str,
+    group_id: int,
+    retriever: Retriever | None,
+    top_k: int = 8,
+) -> tuple[list[Document], bool, RagTraceContext]:
+    retrieval_query = query or ""
+    trace = RagTraceContext(retrieval_query=retrieval_query, top_k=top_k)
+    retrieved: list[Document] = []
+
+    if retriever is not None:
+        try:
+            candidate_top_k = top_k * max(1, RAG_RERANK_CANDIDATE_MULTIPLIER)
+            if hasattr(retriever, "retrieve_with_trace"):
+                retrieved, retrieval_trace = retriever.retrieve_with_trace(
+                    retrieval_query,
+                    top_k=candidate_top_k,
+                    group_id=group_id,
+                )
+                trace.fallback_used = retrieval_trace.fallback_used
+                trace.fallback_reason = retrieval_trace.fallback_reason
+                trace.dense_max_score = retrieval_trace.dense_max_score
+                trace.retrieved_chunks = retrieval_trace.retrieved_chunks
+                trace.reranked_chunks = retrieval_trace.reranked_chunks
+            else:
+                retrieved = retriever.retrieve(
+                    retrieval_query,
+                    top_k=candidate_top_k,
+                    group_id=group_id,
+                )
+                trace.retrieved_chunks = evidence_list(retrieved)
+        except (MemoryError, OSError, RuntimeError, FileNotFoundError) as exc:
+            logger.warning("Group RAG unavailable; using empty context: %s", exc)
+            trace.fallback_used = True
+            trace.fallback_reason = type(exc).__name__
+            retrieved = []
+
+        if RAG_ENABLE_RERANKER and retrieved:
+            retrieved = rerank_documents(
+                query=retrieval_query,
+                item_name="",
+                item_description="",
+                documents=retrieved,
+            )
+            trace.reranked_chunks = evidence_list(retrieved)
+
+    docs: list[Document] = []
+    seen: set[str] = set()
+    for document in retrieved:
+        content = document.page_content.strip()
+        if content and content not in seen:
+            docs.append(document)
+            seen.add(content)
+        if len(docs) >= top_k:
+            break
+
+    docs = _trim_context_documents(docs)
+    has_verified_knowledge = bool(docs)
+    trace.context_chunks = evidence_list(docs)
+    trace.confidence_score, trace.confidence_reasons = compute_confidence(
+        has_substantive_description=False,
+        relevant_group_docs=docs,
+        fallback_used=trace.fallback_used,
+        dense_max_score=trace.dense_max_score,
+        vague_follow_up=False,
+    )
+    return docs, has_verified_knowledge, trace
