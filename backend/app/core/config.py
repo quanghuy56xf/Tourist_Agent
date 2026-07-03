@@ -80,6 +80,8 @@ LLM_INPUT_CACHE_MISS_PRICE_PER_1M = float(
     )
 )
 LLM_OUTPUT_PRICE_PER_1M = float(os.getenv("LLM_OUTPUT_PRICE_PER_1M", "0.30"))
+STT_INPUT_PRICE_PER_1M = float(os.getenv("STT_INPUT_PRICE_PER_1M", "0.10"))
+STT_OUTPUT_PRICE_PER_1M = float(os.getenv("STT_OUTPUT_PRICE_PER_1M", "0.40"))
 RAG_CHROMA_PATH = _backend_path_env("RAG_CHROMA_PATH", BASE_DIR / "data" / "rag_chroma")
 RAG_BM25_PATH = _backend_path_env("RAG_BM25_PATH", BASE_DIR / "data" / "rag" / "bm25_index.pkl")
 RAG_CHUNKS_PATH = _backend_path_env("RAG_CHUNKS_PATH", BASE_DIR / "data" / "rag" / "chunks.pkl")

@@ -1,5 +1,5 @@
 import { AdminRole, getAdminSession } from "./adminAuth";
-import type { SearchTrackingContext } from "./visitorAnalytics";
+import { getVisitorSessionId, readStoredGroupId, type SearchTrackingContext } from "./visitorAnalytics";
 
 // De trong = dung Next.js rewrite (hoat dong qua ngrok frontend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -922,9 +922,15 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
       : "webm";
   formData.append("audio", audioBlob, `speech.${extension}`);
 
+  const headers: Record<string, string> = { ...(apiHeaders() as Record<string, string>) };
+  const sessionId = getVisitorSessionId();
+  const groupId = readStoredGroupId();
+  if (sessionId) headers["X-Visitor-Session-Id"] = sessionId;
+  if (groupId != null) headers["X-Group-Id"] = String(groupId);
+
   const res = await fetch(`${API_URL}/api/stt`, {
     method: "POST",
-    headers: apiHeaders(),
+    headers,
     body: formData,
   });
   if (!res.ok) {
@@ -1458,6 +1464,45 @@ export interface ChatCostSummary {
   daily: ChatCostDailyRow[];
 }
 
+export interface SttCostDailyRow {
+  date: string;
+  request_count: number;
+  success_count: number;
+  error_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+}
+
+export interface SttSessionCostRow {
+  session_id: string | null;
+  group_id: number | null;
+  group_name: string | null;
+  request_count: number;
+  success_count: number;
+  error_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  first_at: string;
+  last_at: string;
+}
+
+export interface SttCostSummary {
+  range_days: number;
+  total_requests: number;
+  success_count: number;
+  error_count: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  daily: SttCostDailyRow[];
+  sessions: SttSessionCostRow[];
+}
+
 export interface ChatLogFilters {
   days?: number;
   groupId?: number;
@@ -1545,6 +1590,19 @@ export async function fetchChatCostSummary(
   });
   if (!res.ok) {
     throw new Error(await parseApiError(res, "Không tải được tổng hợp chi phí chat"));
+  }
+  return res.json();
+}
+
+export async function fetchSttCostSummary(
+  filters: Pick<ChatLogFilters, "days" | "groupId"> = {}
+): Promise<SttCostSummary> {
+  const params = buildChatLogParams(filters);
+  const res = await fetch(`${API_URL}/api/analytics/stt-cost/summary?${params}`, {
+    headers: apiHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Không tải được tổng hợp chi phí STT"));
   }
   return res.json();
 }
