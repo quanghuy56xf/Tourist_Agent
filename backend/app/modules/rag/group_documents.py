@@ -35,6 +35,11 @@ STORAGE_EXTENSIONS = {
 }
 
 
+def chunks_from_canonical_markdown(canonical_text: str):
+    canonical_sections = parse_flat_text_sections(canonical_text, source_hint="canonical")
+    return canonical_sections, sections_to_chunks_with_meta(canonical_sections)
+
+
 class GroupDocumentService:
     def list_documents(self, db: Session, group_id: int) -> list[GroupDocument]:
         get_group_or_404(db, group_id)
@@ -133,12 +138,9 @@ class GroupDocumentService:
             document.visibility = governance.visibility
             document.trust_level = governance.trust_level
             document.governance_warnings = json.dumps(governance.warnings, ensure_ascii=False)
-            chunk_drafts = sections_to_chunks_with_meta(
-                parse_flat_text_sections(
-                    document.canonical_text or document.extracted_text,
-                    source_hint="canonical",
-                )
-            )[0]
+            _canonical_sections, (chunk_drafts, _truncation_warning) = chunks_from_canonical_markdown(
+                document.canonical_text or document.extracted_text
+            )
             self._index_document(document, group_id, chunk_drafts)
             db.commit()
             db.refresh(document)
@@ -168,10 +170,12 @@ class GroupDocumentService:
             trust_level=next_trust_level,
         )
         original_filename = governance.sanitized_filename
-        chunk_drafts, truncation_warning = sections_to_chunks_with_meta(sections)
+        canonical_sections, (chunk_drafts, truncation_warning) = chunks_from_canonical_markdown(
+            canonical_text
+        )
         initial_report = build_quality_report(
             canonical_text=canonical_text,
-            section_count=len(sections),
+            section_count=len(canonical_sections),
             chunk_count=len(chunk_drafts),
             truncated=bool(truncation_warning),
         )
@@ -183,7 +187,7 @@ class GroupDocumentService:
         )
         quality_report = build_quality_report(
             canonical_text=canonical_text,
-            section_count=len(sections),
+            section_count=len(canonical_sections),
             chunk_count=len(chunk_drafts),
             duplicate=duplicate,
             truncated=bool(truncation_warning),
@@ -287,10 +291,12 @@ class GroupDocumentService:
                 trust_level=trust_level,
             )
             original_filename = governance.sanitized_filename
-            chunk_drafts, truncation_warning = sections_to_chunks_with_meta(sections)
+            canonical_sections, (chunk_drafts, truncation_warning) = chunks_from_canonical_markdown(
+                canonical_text
+            )
             initial_report = build_quality_report(
                 canonical_text=canonical_text,
-                section_count=len(sections),
+                section_count=len(canonical_sections),
                 chunk_count=len(chunk_drafts),
                 truncated=bool(truncation_warning),
             )
@@ -301,7 +307,7 @@ class GroupDocumentService:
             )
             quality_report = build_quality_report(
                 canonical_text=canonical_text,
-                section_count=len(sections),
+                section_count=len(canonical_sections),
                 chunk_count=len(chunk_drafts),
                 duplicate=duplicate,
                 truncated=bool(truncation_warning),
