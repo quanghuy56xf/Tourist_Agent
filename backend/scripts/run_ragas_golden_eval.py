@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
