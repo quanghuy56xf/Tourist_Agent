@@ -62,3 +62,6 @@ data/
 raw/
 .superpowers/
 draft/
+docs/reports/history/
+*.db
+backend/scratch/

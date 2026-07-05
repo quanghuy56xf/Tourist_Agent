@@ -1,3 +1,5 @@
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from app.core.config import (
     RAG_CHUNK_OVERLAP,
     RAG_MAX_CHUNKS_PER_DOCUMENT,
@@ -98,18 +100,12 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
         return [text]
 
     overlap = min(max(0, overlap), max(chunk_size - 1, 0))
-    chunks: list[str] = []
-    start = 0
-    while start < len(text):
-        end = min(start + chunk_size, len(text))
-        chunks.append(text[start:end])
-        if end >= len(text):
-            break
-        next_start = end - overlap if overlap > 0 else end
-        if next_start <= start:
-            next_start = start + 1
-        start = next_start
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", ". ", "? ", "! ", "; ", ", ", " ", ""],
+    )
+    return splitter.split_text(text)
 
 
 def _enforce_chunk_limit(
