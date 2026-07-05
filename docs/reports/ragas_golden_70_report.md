@@ -1,26 +1,26 @@
 # HERA RAGAS Golden Dataset Report
 
 - **Dataset:** `D:\ai_project\C2-App-060\backend\evals\golden\rag_golden_70.jsonl`
-- **Generated at:** 2026-07-05T10:18:15.202845Z
-- **Release status:** **GO for canary**
+- **Generated at:** 2026-07-05T12:56:06.375440Z
+- **Release status:** **NO-GO / needs fixes**
 - **Total cases:** 70
 - **Attempted by RAGAS:** 70
 - **Scope attempted:** corpus=50, item=20
 - **Errored cases:** 0 (corpus=0, item=0)
-- **Gate score:** 4/4
+- **Gate score:** 3/4
 
 ## 1. RAGAS Metrics
 
 | Metric | Score | Target | Gate |
 |---|---:|---:|---:|
-| faithfulness | 0.8950 | 0.85 | ✅ |
-| answer_relevancy | 0.8432 | 0.80 | ✅ |
-| context_recall | 0.9779 | 0.75 | ✅ |
-| context_precision | 0.8715 | 0.70 | ✅ |
+| faithfulness | 0.8599 | 0.85 | ✅ |
+| answer_relevancy | 0.8727 | 0.80 | ✅ |
+| context_recall | 1.0000 | 0.75 | ✅ |
+| context_precision | not run | 0.70 | ⚠️ not run |
 
 ## 2. Dataset / Runtime Notes
 
-- RAGAS evaluation completed without runtime notes.
+- ragas_metric_not_finite:context_precision
 
 ## 3. Case Risk Summary
 

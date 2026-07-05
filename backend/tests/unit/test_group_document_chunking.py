@@ -54,6 +54,26 @@ def test_flat_text_sections_skip_heuristic_split():
     assert len(flat_chunks) < len(heuristic_chunks)
 
 
+def test_split_text_prefers_paragraph_boundaries():
+    text = "Đoạn một đủ dài để tách riêng.\n\nĐoạn hai cũng đủ dài để tạo chunk riêng."
+    chunks = _split_text(text, chunk_size=45, overlap=0)
+
+    assert len(chunks) == 2
+    assert chunks[0] == "Đoạn một đủ dài để tách riêng."
+    assert chunks[1] == "Đoạn hai cũng đủ dài để tạo chunk riêng."
+
+
+def test_split_text_prefers_word_boundaries_before_character_fallback():
+    text = "alpha beta gamma delta epsilon zeta eta theta"
+    chunks = _split_text(text, chunk_size=18, overlap=0)
+
+    assert len(chunks) >= 2
+    assert all(len(chunk) <= 18 for chunk in chunks)
+    assert all(not chunk.startswith(" ") and not chunk.endswith(" ") for chunk in chunks)
+    assert "".join(chunks) != text
+    assert " ".join(chunks) == text
+
+
 def test_split_text_advances_when_overlap_equals_chunk_size():
     text = "a" * 100
     chunks = _split_text(text, chunk_size=20, overlap=20)

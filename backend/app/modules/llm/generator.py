@@ -59,7 +59,7 @@ def _build_llm(model_name: str | None, temperature: float):
 
 
 class RAGGenerator:
-    def __init__(self, model_name: str | None = None, temperature: float = 0.2):
+    def __init__(self, model_name: str | None = None, temperature: float = 0.1):
         self.llm = _build_llm(model_name, temperature)
         self.last_token_usage: TokenUsage | None = None
 
@@ -152,6 +152,8 @@ Câu hỏi về hiện vật cần tìm hiểu:
 {base_instructions}
 
 {persona_instructions}
+
+QUY TẮC SINH TỬ: Cấm tuyệt đối việc suy luận, thêm thắt hoặc dùng kiến thức bên ngoài. Mỗi một ý bạn viết ra BẮT BUỘC phải trích xuất trực tiếp từ Context. Nếu Context không đủ, hãy dũng cảm nói 'Tài liệu không đề cập'.
 
 Câu trả lời:"""
 
