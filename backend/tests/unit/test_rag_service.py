@@ -12,6 +12,7 @@ from app.modules.rag.service import (
     filter_group_docs_for_item,
     is_substantive_item_description,
     is_vague_follow_up,
+    _preserve_sparse_winners,
 )
 
 
@@ -58,6 +59,20 @@ class InvalidRetriever:
 class RuntimeFailureRetriever:
     def retrieve(self, query: str, top_k: int, group_id: int | None = None):
         raise RuntimeError("model out of memory")
+
+
+def test_preserve_sparse_winners_moves_bm25_winner_first():
+    documents = [
+        Document(page_content="Dense winner", metadata={"page": "dense", "rerank_score": 0.9}),
+        Document(
+            page_content="BM25 winner",
+            metadata={"page": "sparse", "sparse_rank": 1, "rerank_score": 0.2},
+        ),
+    ]
+
+    preserved = _preserve_sparse_winners(documents)
+
+    assert [document.metadata["page"] for document in preserved] == ["sparse", "dense"]
 
 
 def test_retrieval_query_includes_registered_description():

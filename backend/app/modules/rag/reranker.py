@@ -1,8 +1,16 @@
+import re
+import unicodedata
+
 from langchain_core.documents import Document
 
 
 def normalize_text(value: str) -> str:
-    return " ".join((value or "").split()).strip().lower()
+    normalized = unicodedata.normalize("NFD", value or "")
+    without_accents = "".join(
+        char for char in normalized if unicodedata.category(char) != "Mn"
+    )
+    separated = re.sub(r"[-_/]+", " ", without_accents)
+    return " ".join(separated.split()).strip().lower()
 
 
 def _query_terms(query: str) -> set[str]:
@@ -35,6 +43,7 @@ def rerank_documents(
         metadata = dict(document.metadata or {})
         text = normalize_text(document.page_content)
         section = normalize_text(str(metadata.get("section_title") or ""))
+        document_title = normalize_text(str(metadata.get("document_title") or ""))
         score = 0.0
         reasons: list[str] = []
 
@@ -48,13 +57,22 @@ def rerank_documents(
             score += 0.22
             reasons.append("item_term_match")
         if terms:
-            overlap = len([term for term in terms if term in text or term in section])
+            overlap = len(
+                [
+                    term
+                    for term in terms
+                    if term in text or term in section or term in document_title
+                ]
+            )
             if overlap:
                 score += min(0.25, overlap * 0.04)
                 reasons.append("query_term_overlap")
         if section and any(term in section for term in terms):
             score += 0.08
             reasons.append("section_overlap")
+        if document_title and any(term in document_title for term in terms):
+            score += 0.12
+            reasons.append("document_title_overlap")
         quality_score = metadata.get("quality_score")
         if isinstance(quality_score, (int, float)):
             score += min(0.08, max(0.0, float(quality_score)) * 0.08)

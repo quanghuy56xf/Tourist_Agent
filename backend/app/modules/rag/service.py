@@ -344,6 +344,29 @@ def build_chat_item_context(
     return chat_docs, has_verified_knowledge
 
 
+def _preserve_sparse_winners(documents: list[Document], *, top_n: int = 1) -> list[Document]:
+    sparse_winners = [
+        document
+        for document in documents
+        if isinstance(document.metadata.get("sparse_rank"), int)
+        and document.metadata["sparse_rank"] <= top_n
+    ]
+    if not sparse_winners:
+        return documents
+
+    winner_keys = {
+        str(document.metadata.get("page") or document.page_content)
+        for document in sparse_winners
+    }
+    others = [
+        document
+        for document in documents
+        if str(document.metadata.get("page") or document.page_content) not in winner_keys
+    ]
+    sparse_winners.sort(key=lambda document: document.metadata["sparse_rank"])
+    return sparse_winners + others
+
+
 def _trim_context_documents(documents: list[Document]) -> list[Document]:
     if RAG_MAX_CONTEXT_CHARS <= 0:
         return documents
@@ -411,6 +434,7 @@ def build_chat_item_context_with_trace(
                 item_description=item_description,
                 documents=retrieved,
             )
+            retrieved = _preserve_sparse_winners(retrieved)
             trace.reranked_chunks = evidence_list(retrieved)
 
         seen = {item_description.strip()}
@@ -494,6 +518,7 @@ def build_group_chat_context_with_trace(
                 item_description="",
                 documents=retrieved,
             )
+            retrieved = _preserve_sparse_winners(retrieved)
             trace.reranked_chunks = evidence_list(retrieved)
 
     docs: list[Document] = []

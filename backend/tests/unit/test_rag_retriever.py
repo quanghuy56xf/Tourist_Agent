@@ -64,3 +64,25 @@ def test_retrieve_falls_back_to_bm25_when_dense_unavailable():
 
     assert len(results) == 1
     assert "Văn Miếu" in results[0].page_content
+    assert results[0].metadata["sparse_rank"] == 1
+
+
+def test_sparse_search_scores_only_requested_group():
+    retriever = HybridRetriever.__new__(HybridRetriever)
+    retriever.chunks = [
+        Document(
+            page_content="Nguyễn Trực được khắc tên trên bia Tiến sĩ.",
+            metadata={"source": "group_doc", "group_id": 2, "page": "target"},
+        ),
+        Document(
+            page_content="Nguyễn Trực Nguyễn Trực Nguyễn Trực ở tài liệu khác.",
+            metadata={"source": "group_doc", "group_id": 3, "page": "other-group"},
+        ),
+    ]
+
+    results = retriever._sparse_search("Nguyễn Trực", top_k=1, group_id=2)
+
+    assert len(results) == 1
+    assert results[0].metadata["page"] == "target"
+    assert results[0].metadata["sparse_rank"] == 1
+    assert isinstance(results[0].metadata["sparse_score"], float)
