@@ -79,70 +79,132 @@ class HybridRetriever:
 
         return self._dense_available
 
+    @staticmethod
+    def _with_retrieval_metadata(
+        document: Document,
+        **metadata_updates,
+    ) -> Document:
+        metadata = dict(document.metadata or {})
+        metadata.update(metadata_updates)
+        return Document(page_content=document.page_content, metadata=metadata)
+
     def _dense_search(
         self,
         query: str,
         top_k: int = 5,
+        group_id: int | None = None,
     ) -> Tuple[List[Document], float]:
         if not self._ensure_dense() or self._vector_store is None:
             return [], 0.0
 
-        results_with_scores = (
-            self._vector_store.similarity_search_with_relevance_scores(
-                query,
-                k=top_k,
-            )
+        search_kwargs = {"k": top_k}
+        if group_id is not None:
+            search_kwargs["filter"] = {"group_id": group_id}
+        results_with_scores = self._vector_store.similarity_search_with_relevance_scores(
+            query,
+            **search_kwargs,
         )
         if not results_with_scores:
             return [], 0.0
 
         max_score = results_with_scores[0][1]
-        docs = [result[0] for result in results_with_scores]
+        docs = [
+            self._with_retrieval_metadata(
+                result[0],
+                dense_rank=index + 1,
+                dense_score=float(result[1]),
+            )
+            for index, result in enumerate(results_with_scores)
+        ]
         return docs, max_score
 
     def _sparse_search(
         self,
         query: str,
         top_k: int = 5,
+        group_id: int | None = None,
     ) -> List[Document]:
         tokenized_query = query.lower().split()
-        scores = self.bm25.get_scores(tokenized_query)
+        if group_id is None:
+            scores = self.bm25.get_scores(tokenized_query)
+            top_indices = sorted(
+                range(len(scores)),
+                key=lambda index: scores[index],
+                reverse=True,
+            )[:top_k]
+            return [
+                self._with_retrieval_metadata(
+                    self.chunks[index],
+                    sparse_rank=rank + 1,
+                    sparse_score=float(scores[index]),
+                )
+                for rank, index in enumerate(top_indices)
+            ]
+
+        scoped_chunks = [
+            chunk
+            for chunk in self.chunks
+            if self._matches_group_scope(chunk, group_id)
+        ]
+        if not scoped_chunks:
+            return []
+        scoped_bm25 = BM25Okapi(
+            [chunk.page_content.lower().split() for chunk in scoped_chunks]
+        )
+        scores = scoped_bm25.get_scores(tokenized_query)
         top_indices = sorted(
             range(len(scores)),
             key=lambda index: scores[index],
             reverse=True,
         )[:top_k]
-        return [self.chunks[index] for index in top_indices]
+        return [
+            self._with_retrieval_metadata(
+                scoped_chunks[index],
+                sparse_rank=rank + 1,
+                sparse_score=float(scores[index]),
+            )
+            for rank, index in enumerate(top_indices)
+        ]
+
+    @staticmethod
+    def _document_key(document: Document) -> str:
+        page = document.metadata.get("page") if document.metadata else None
+        return str(page or document.page_content)
 
     def _rrf(
         self,
         dense_docs: List[Document],
         sparse_docs: List[Document],
-        k: int = 60,
+        k: int = 10,
     ) -> List[Document]:
         rrf_scores: Dict[str, float] = {}
-        content_to_doc = {}
+        key_to_doc = {}
 
         for rank, doc in enumerate(dense_docs):
-            content = doc.page_content
-            content_to_doc[content] = doc
-            rrf_scores[content] = (
-                rrf_scores.get(content, 0.0) + 1.0 / (k + rank + 1)
+            key = self._document_key(doc)
+            key_to_doc[key] = doc
+            rrf_scores[key] = (
+                rrf_scores.get(key, 0.0) + 1.0 / (k + rank + 1)
             )
 
         for rank, doc in enumerate(sparse_docs):
-            content = doc.page_content
-            content_to_doc[content] = doc
-            rrf_scores[content] = (
-                rrf_scores.get(content, 0.0) + 1.0 / (k + rank + 1)
+            key = self._document_key(doc)
+            if key in key_to_doc:
+                metadata = dict(key_to_doc[key].metadata or {})
+                metadata.update(doc.metadata or {})
+                key_to_doc[key] = Document(page_content=doc.page_content, metadata=metadata)
+            else:
+                key_to_doc[key] = doc
+            rrf_scores[key] = (
+                rrf_scores.get(key, 0.0) + 1.0 / (k + rank + 1)
             )
 
-        sorted_contents = sorted(
+        sorted_keys = sorted(
             rrf_scores,
-            key=lambda content: rrf_scores[content],
+            key=lambda key: rrf_scores[key],
             reverse=True,
         )
-        return [content_to_doc[content] for content in sorted_contents]
+        return [key_to_doc[key] for key in sorted_keys]
 
     @staticmethod
     def _matches_group_scope(document: Document, group_id: int | None) -> bool:
@@ -193,12 +255,13 @@ class HybridRetriever:
         from app.modules.rag.tracing import RetrievalTrace, evidence_list
 
         with self._index_lock:
-            search_k = top_k * 3 if group_id is not None else top_k
+            search_k = top_k
             dense_docs, max_dense_score = self._dense_search(
                 query,
                 top_k=search_k,
+                group_id=group_id,
             )
-            sparse_docs = self._sparse_search(query, top_k=search_k)
+            sparse_docs = self._sparse_search(query, top_k=search_k, group_id=group_id)
 
             dense_docs = self._filter_group_scope(dense_docs, group_id)
             sparse_docs = self._filter_group_scope(sparse_docs, group_id)
