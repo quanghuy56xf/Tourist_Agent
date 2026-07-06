@@ -52,7 +52,14 @@ export const ko: VisitorTranslations = {
     "companionTitle": "동반 어시스턴트",
     "companionSubtitle": "레뀌돈과의 인터랙티브 대화",
     "uploadError": "사진을 업로드할 수 없습니다. 다시 시도해 주세요.",
-    "noMatch": "이 유물을 식별할 수 없습니다. 다른 사진을 시도해 주세요."
+    "noMatch": "이 유물을 식별할 수 없습니다. 다른 사진을 시도해 주세요.",
+    "helpTitle": "어떻게 탐색을 시작할까요?",
+    "helpDescription": "시작하기 전에 HERA가 올바른 언어, 스타일 및 필요에 맞게 안내할 수 있도록 경험을 개인화할 수 있습니다.",
+    "helpLang": "상단 모서리에서 언어를 선택하여 HERA가 원하는 언어로 이야기를 보여주고 들려주도록 하세요.",
+    "helpPersona": "이해하기 쉽고, 학술적이며, 재미있거나 그룹에 맞는 스토리텔링 스타일을 조정하려면 페르소나를 선택하세요.",
+    "helpCompanion": "여정 내내 대화하고, 가이드를 듣고, 퀘스트를 완료하려면 동반자를 선택하세요.",
+    "helpCamera": "유물을 스캔하려면 유산 렌즈를 선택하세요. 카메라 화면에서 기존 사진을 업로드할 수도 있습니다.",
+    "helpTour": "그룹 게임을 하거나 설정된 경로를 탐색하려면 대화형 챌린지를 선택하세요."
   },
   "scan": {
     "brand": "HERA 스캔",
@@ -237,7 +244,17 @@ export const ko: VisitorTranslations = {
     "chatPlaceholder": "여기에 질문을 입력하세요...",
     "send": "보내기",
     "continueTour": "투어의 다음 정차지",
-    "scanAgain": "다시 촬영"
+    "scanAgain": "다시 촬영",
+    "helpAria": "유물 페이지 기능 소개",
+    "helpTitle": "유물 페이지는 무엇을 위한 것인가요?",
+    "helpDesc": "이곳은 HERA가 식별된 유물을 소개하고, 선택한 페르소나/언어에 따라 이야기를 재생하며, 관심 있는 세부 사항에 대해 더 물어볼 수 있는 곳입니다.",
+    "helpPoint1": "유물의 주요 내레이션을 듣거나 읽습니다.",
+    "helpPoint2": "HERA가 더 깊이 설명할 수 있도록 후속 질문을 하세요.",
+    "helpPoint3": "다른 유물을 식별하려면 스캔으로 돌아가세요.",
+    "helpPoint4": "투어 중일 때는 계속 버튼을 사용하여 여정으로 돌아가세요.",
+    "feedbackAria": "빠른 경험 평가",
+    "feedbackTitle": "빠른 경험 평가",
+    "feedbackDesc": "이 짧은 피드백은 HERA가 제품 평가를 측정하는 데 도움이 됩니다: 페르소나 정확도, 스토리텔링 품질, 음성 및 경험을 계속할 의향."
   },
   "results": {
     "found": "일치 항목을 찾았습니다!",
@@ -250,6 +267,14 @@ export const ko: VisitorTranslations = {
   },
   "companion": {
     "role": "당신의 유산 가이드",
+    "helpAria": "컴패니언 기능 소개",
+    "helpTitle": "HERA 컴패니언은 무엇을 위한 것인가요?",
+    "helpDesc": "컴패니언은 대화형 가이드입니다: 채팅, 유물 스캔, 이야기 듣기 및 탐색 퀘스트에 참여할 수 있습니다.",
+    "helpPoint1": "음성이나 키보드를 사용하여 HERA에게 질문하세요.",
+    "helpPoint2": "카메라를 탭하여 유물을 스캔하고 관련 이야기를 들어보세요.",
+    "helpPoint3": "퀘스트/챌린지를 완료하여 정거장마다 탐색하세요.",
+    "helpPoint4": "HERA가 다음 목적지를 제안할 때, 지도가 탐색을 도와줄 것입니다.",
+    "helpDevNote": "이 기능은 개발 중이며, 베트남어가 가장 잘 지원되며 영어도 일부 지원됩니다.",
     "name": "레 쿠이 돈",
     "scan": "가장 가까운 유물 스캔",
     "newJourney": "새 여정 시작",
@@ -339,5 +364,17 @@ export const ko: VisitorTranslations = {
     "notAvailable": "이 유산 사이트에서는 지도를 사용할 수 없습니다.",
     "currentLocationAria": "현재 위치: {name}",
     "suggestedLocationAria": "추천 지점: {name}"
+  },
+  "eval": {
+    "success": "감사합니다! 제품 평가를 위해 피드백이 기록되었습니다.",
+    "title": "빠른 경험 평가",
+    "subtitle": "이 데이터는 관리자 대시보드의 제품 평가 탭에 사용됩니다.",
+    "persona": "페르소나 정확도",
+    "story": "매력적인 이야기",
+    "voice": "자연스러운 음성",
+    "replay": "다시 체험할 의향",
+    "comment": "간단한 메모 (선택 사항)...",
+    "submitting": "제출 중...",
+    "submit": "평가 제출"
   }
 };

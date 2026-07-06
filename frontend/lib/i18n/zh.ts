@@ -52,7 +52,14 @@ export const zh: VisitorTranslations = {
     "companionTitle": "同行助手",
     "companionSubtitle": "与黎贵惇的互动对话",
     "uploadError": "照片无法上传，请重试。",
-    "noMatch": "无法识别此文物，请换一张照片。"
+    "noMatch": "无法识别此文物，请换一张照片。",
+    "helpTitle": "如何开始探索？",
+    "helpDescription": "在开始之前，您可以个性化您的体验，以便HERA以正确的语言、风格和需求为您提供指导。",
+    "helpLang": "在顶部角落选择一种语言，让HERA以您首选的语言显示和讲述故事。",
+    "helpPersona": "选择一个角色来调整讲故事的风格：通俗易懂、学术、有趣或适合团队。",
+    "helpCompanion": "如果您想在旅途中聊天、听向导讲解并完成任务，请选择伴侣。",
+    "helpCamera": "如果您想扫描文物，请选择遗产镜头；您也可以从相机屏幕上传现有照片。",
+    "helpTour": "如果您想玩团队游戏或探索设定路线，请选择互动挑战。"
   },
   "scan": {
     "brand": "HERA扫描",
@@ -237,7 +244,17 @@ export const zh: VisitorTranslations = {
     "chatPlaceholder": "在此输入你的问题...",
     "send": "发送",
     "continueTour": "之旅下一站",
-    "scanAgain": "继续拍摄"
+    "scanAgain": "继续拍摄",
+    "helpAria": "介绍文物页面功能",
+    "helpTitle": "文物页面是用来做什么的？",
+    "helpDesc": "在这里，HERA 会介绍识别出的文物，根据您选择的角色/语言播放故事，并允许您就感兴趣的细节提出更多问题。",
+    "helpPoint1": "聆听或阅读文物的主要解说。",
+    "helpPoint2": "提出后续问题，让 HERA 进行更深入的解释。",
+    "helpPoint3": "如果您想识别其他文物，请返回扫描。",
+    "helpPoint4": "在导览时，使用继续按钮返回旅程。",
+    "feedbackAria": "快速体验评分",
+    "feedbackTitle": "快速体验评分",
+    "feedbackDesc": "这个简短的反馈有助于 HERA 衡量产品评估：角色的准确性、讲故事的质量、声音以及继续体验的意愿。"
   },
   "results": {
     "found": "找到匹配！",
@@ -250,6 +267,14 @@ export const zh: VisitorTranslations = {
   },
   "companion": {
     "role": "你的遗产向导",
+    "helpAria": "介绍同行助手功能",
+    "helpTitle": "HERA 同行助手是用来做什么的？",
+    "helpDesc": "同行助手是互动指南：您可以聊天、扫描文物、听故事并参与探索任务。",
+    "helpPoint1": "使用语音或键盘向 HERA 提问。",
+    "helpPoint2": "点击相机扫描文物并听相关故事。",
+    "helpPoint3": "完成任务/挑战，逐站探索。",
+    "helpPoint4": "当 HERA 建议下一个目的地时，地图将帮助您导航。",
+    "helpDevNote": "此功能正在开发中，最好在越南语中获得支持，并且部分支持英语。",
     "name": "黎贵惇",
     "scan": "扫描最近的文物",
     "newJourney": "开始新旅程",
@@ -339,5 +364,17 @@ export const zh: VisitorTranslations = {
     "notAvailable": "此遗产站点暂无地图。",
     "currentLocationAria": "当前位置：{name}",
     "suggestedLocationAria": "推荐地点：{name}"
+  },
+  "eval": {
+    "success": "谢谢您！您的反馈已记录用于产品评估。",
+    "title": "快速体验评分",
+    "subtitle": "此数据用于管理控制台中的产品评估选项卡。",
+    "persona": "角色准确性",
+    "story": "引人入胜的故事",
+    "voice": "自然的声音",
+    "replay": "再次体验的意愿",
+    "comment": "简短备注（如有）...",
+    "submitting": "正在提交...",
+    "submit": "提交评分"
   }
 };
