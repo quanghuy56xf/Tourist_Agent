@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getActiveSearchSessionId, trackEvalEvent } from "@/lib/visitorAnalytics";
+import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5];
 
@@ -43,6 +44,7 @@ export default function EvalFeedbackPanel({
   compact?: boolean;
   onSubmitted?: () => void;
 }) {
+  const { t } = useVisitorLocale();
   const [personaScore, setPersonaScore] = useState(5);
   const [storytellingScore, setStorytellingScore] = useState(5);
   const [voiceScore, setVoiceScore] = useState(5);
@@ -77,7 +79,7 @@ export default function EvalFeedbackPanel({
   if (submitted) {
     return (
       <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-        Cảm ơn bạn! Đánh giá đã được ghi nhận cho Product Eval.
+        {t.eval.success}
       </div>
     );
   }
@@ -85,19 +87,19 @@ export default function EvalFeedbackPanel({
   return (
     <div className="rounded-2xl border border-amber-200/15 bg-white/[0.04] p-4">
       <div className="mb-3">
-        <p className="text-sm font-semibold text-amber-100">Đánh giá nhanh trải nghiệm</p>
-        <p className="text-xs text-amber-100/55">Dữ liệu này dùng cho tab Product Eval trong quản trị.</p>
+        <p className="text-sm font-semibold text-amber-100">{t.eval.title}</p>
+        <p className="text-xs text-amber-100/55">{t.eval.subtitle}</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <ScoreSelect label="Đúng vai/persona" value={personaScore} onChange={setPersonaScore} />
-        <ScoreSelect label="Kể chuyện hấp dẫn" value={storytellingScore} onChange={setStorytellingScore} />
-        <ScoreSelect label="Giọng nói tự nhiên" value={voiceScore} onChange={setVoiceScore} />
-        <ScoreSelect label="Muốn trải nghiệm tiếp" value={replayScore} onChange={setReplayScore} />
+        <ScoreSelect label={t.eval.persona} value={personaScore} onChange={setPersonaScore} />
+        <ScoreSelect label={t.eval.story} value={storytellingScore} onChange={setStorytellingScore} />
+        <ScoreSelect label={t.eval.voice} value={voiceScore} onChange={setVoiceScore} />
+        <ScoreSelect label={t.eval.replay} value={replayScore} onChange={setReplayScore} />
       </div>
       <textarea
         value={comment}
         onChange={(event) => setComment(event.target.value)}
-        placeholder="Ghi chú ngắn nếu có..."
+        placeholder={t.eval.comment}
         rows={compact ? 2 : 3}
         className="mt-3 w-full rounded-xl border border-amber-200/15 bg-black/20 px-3 py-2 text-sm text-amber-50 outline-none placeholder:text-amber-100/35"
       />
@@ -107,7 +109,7 @@ export default function EvalFeedbackPanel({
         disabled={submitting}
         className="mt-3 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
       >
-        {submitting ? "Đang gửi..." : "Gửi đánh giá"}
+        {submitting ? t.eval.submitting : t.eval.submit}
       </button>
     </div>
   );

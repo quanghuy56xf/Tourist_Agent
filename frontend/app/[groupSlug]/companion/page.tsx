@@ -73,8 +73,8 @@ export default function CompanionPage() {
               type="button"
               onClick={() => setCompanionHelpOpen(true)}
               className="grid h-10 w-10 place-items-center rounded-full border border-amber-300/40 bg-[#251b0e]/95 text-sm font-bold text-amber-200 shadow-lg shadow-black/35 backdrop-blur transition hover:scale-105 hover:bg-[#332614] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-              aria-label="Giới thiệu tính năng Companion"
-              title="Giới thiệu tính năng Companion"
+              aria-label={t.companion.helpAria}
+              title={t.companion.helpAria}
             >
               ?
             </button>
@@ -102,15 +102,18 @@ export default function CompanionPage() {
 
       <VisitorInfoDialog
         open={companionHelpOpen}
-        title="HERA Companion dùng để làm gì?"
-        description="Companion là hướng dẫn viên tương tác: bạn có thể trò chuyện, scan hiện vật, nghe kể chuyện và tham gia quest khám phá."
+        title={t.companion.helpTitle}
+        description={t.companion.helpDesc}
         onClose={() => setCompanionHelpOpen(false)}
       >
         <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
-          <li>• Dùng giọng nói hoặc bàn phím để hỏi HERA.</li>
-          <li>• Bấm camera để scan hiện vật và nghe câu chuyện liên quan.</li>
-          <li>• Làm quest/challenge để khám phá theo từng điểm dừng.</li>
-          <li>• Khi HERA gợi ý điểm đến tiếp theo, bản đồ sẽ giúp bạn định hướng.</li>
+          <li>• {t.companion.helpPoint1}</li>
+          <li>• {t.companion.helpPoint2}</li>
+          <li>• {t.companion.helpPoint3}</li>
+          <li>• {t.companion.helpPoint4}</li>
+          <li className="text-amber-300 font-medium pt-1 border-t border-amber-500/20 mt-2">
+            • {t.companion.helpDevNote}
+          </li>
         </ul>
       </VisitorInfoDialog>
 

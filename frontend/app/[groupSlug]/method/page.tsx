@@ -19,8 +19,10 @@ export default function MethodSelectionPage() {
   const scanPath = useGroupPath("/scan");
   const tourPath = useGroupPath("/tour");
   const companionPath = useGroupPath("/companion");
-  const { t } = useVisitorLocale();
+  const { t, locale } = useVisitorLocale();
   const [helpOpen, setHelpOpen] = useState(false);
+
+  const isCompanionSupported = locale === "vi" || locale === "en";
 
   const handleClick = (id: string) => {
     if (id === "camera") router.push(scanPath);
@@ -76,24 +78,6 @@ export default function MethodSelectionPage() {
       </header>
 
       <div className="artifact-page-body flex-1 space-y-3">
-        <button
-          type="button"
-          onClick={() => handleClick("companion")}
-          className="artifact-card flex w-full items-center gap-4 border-amber-400/35 p-5 text-left transition-transform active:scale-[0.98]"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/15 text-xl">
-            📜
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-amber-200">
-              {t.method.companionTitle}
-            </h3>
-            <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {t.method.companionSubtitle}
-            </p>
-          </div>
-        </button>
-
         {methods.map((m) => (
           <button
             key={m.id}
@@ -115,20 +99,48 @@ export default function MethodSelectionPage() {
             </div>
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={() => handleClick("companion")}
+          disabled={!isCompanionSupported}
+          className={`artifact-card flex w-full items-center gap-4 p-5 text-left transition-transform relative ${
+            isCompanionSupported
+              ? "border-amber-400/35 active:scale-[0.98]"
+              : "opacity-50 grayscale-[50%]"
+          }`}
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-400/15 text-xl">
+            📜
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-bold text-amber-200 flex items-center gap-2 flex-wrap">
+              {t.method.companionTitle}
+              {!isCompanionSupported && (
+                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 border border-amber-500/30 whitespace-nowrap">
+                  EN & VI Only
+                </span>
+              )}
+            </h3>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              {t.method.companionSubtitle}
+            </p>
+          </div>
+        </button>
       </div>
 
       <VisitorInfoDialog
         open={helpOpen}
-        title="Bắt đầu khám phá như thế nào?"
-        description="Trước khi bắt đầu, bạn có thể cá nhân hóa trải nghiệm để HERA hướng dẫn đúng ngôn ngữ, đúng phong cách và đúng nhu cầu tham quan."
+        title={t.method.helpTitle}
+        description={t.method.helpDescription}
         onClose={() => setHelpOpen(false)}
       >
         <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
-          <li>• Chọn ngôn ngữ ở góc trên để HERA hiển thị và kể chuyện bằng ngôn ngữ bạn muốn.</li>
-          <li>• Chọn persona để điều chỉnh cách kể chuyện: dễ hiểu, học thuật, vui vẻ hoặc phù hợp nhóm khách.</li>
-          <li>• Chọn Trợ Lý Đồng Hành nếu muốn trò chuyện, nghe hướng dẫn và làm quest trong suốt hành trình.</li>
-          <li>• Chọn Ống Kính Di Sản nếu muốn scan hiện vật; trong màn hình camera bạn cũng có thể tải ảnh có sẵn lên.</li>
-          <li>• Chọn Thử Thách Tương Tác nếu muốn chơi game theo nhóm hoặc khám phá lộ trình.</li>
+          <li>• {t.method.helpLang}</li>
+          <li>• {t.method.helpPersona}</li>
+          <li>• {t.method.helpCompanion}</li>
+          <li>• {t.method.helpCamera}</li>
+          <li>• {t.method.helpTour}</li>
         </ul>
       </VisitorInfoDialog>
     </main>

@@ -271,8 +271,8 @@ export default function ItemDetailPage() {
               type="button"
               onClick={() => setItemHelpOpen(true)}
               className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-300/40 bg-amber-500/20 text-sm font-bold text-amber-200 backdrop-blur transition-colors hover:bg-amber-500/30"
-              aria-label="Giới thiệu tính năng trang hiện vật"
-              title="Giới thiệu tính năng trang hiện vật"
+              aria-label={t.item.helpAria}
+              title={t.item.helpAria}
             >
               ?
             </button>
@@ -280,8 +280,8 @@ export default function ItemDetailPage() {
               type="button"
               onClick={() => setItemFeedbackOpen(true)}
               className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-amber-300/40 bg-amber-500/20 text-sm text-amber-200 backdrop-blur transition-colors hover:bg-amber-500/30"
-              aria-label="Đánh giá nhanh trải nghiệm"
-              title="Đánh giá nhanh trải nghiệm"
+              aria-label={t.item.feedbackAria}
+              title={t.item.feedbackAria}
             >
               ★
             </button>
@@ -428,22 +428,22 @@ export default function ItemDetailPage() {
 
       <VisitorInfoDialog
         open={itemHelpOpen}
-        title="Trang hiện vật dùng để làm gì?"
-        description="Đây là nơi HERA giới thiệu hiện vật vừa nhận diện, phát câu chuyện theo persona/ngôn ngữ bạn chọn và cho phép bạn hỏi thêm về chi tiết đang quan tâm."
+        title={t.item.helpTitle}
+        description={t.item.helpDesc}
         onClose={() => setItemHelpOpen(false)}
       >
         <ul className="space-y-2 text-sm leading-relaxed text-amber-100/75">
-          <li>• Nghe hoặc đọc phần thuyết minh chính của hiện vật.</li>
-          <li>• Đặt câu hỏi tiếp theo để HERA giải thích sâu hơn.</li>
-          <li>• Quay lại scan nếu muốn nhận diện hiện vật khác.</li>
-          <li>• Khi đi tour, dùng nút tiếp tục để quay lại hành trình.</li>
+          <li>• {t.item.helpPoint1}</li>
+          <li>• {t.item.helpPoint2}</li>
+          <li>• {t.item.helpPoint3}</li>
+          <li>• {t.item.helpPoint4}</li>
         </ul>
       </VisitorInfoDialog>
 
       <VisitorInfoDialog
         open={itemFeedbackOpen}
-        title="Đánh giá nhanh trải nghiệm"
-        description="Phản hồi ngắn này giúp HERA đo Product Eval: độ đúng persona, chất lượng kể chuyện, giọng nói và ý định trải nghiệm tiếp."
+        title={t.item.feedbackTitle}
+        description={t.item.feedbackDesc}
         onClose={() => setItemFeedbackOpen(false)}
       >
         <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />

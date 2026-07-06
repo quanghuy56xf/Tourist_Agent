@@ -52,7 +52,14 @@ export const fr: VisitorTranslations = {
     "companionTitle": "Assistant Accompagnateur",
     "companionSubtitle": "Discussion interactive avec Le Quy Don",
     "uploadError": "La photo n'a pas pu être téléchargée. Veuillez réessayer.",
-    "noMatch": "Nous n'avons pas pu identifier cet objet. Veuillez essayer une autre photo."
+    "noMatch": "Nous n'avons pas pu identifier cet objet. Veuillez essayer une autre photo.",
+    "helpTitle": "Comment commencer à explorer ?",
+    "helpDescription": "Avant de commencer, vous pouvez personnaliser votre expérience pour que HERA vous guide dans la bonne langue, le bon style et selon vos besoins.",
+    "helpLang": "Sélectionnez une langue dans le coin supérieur pour que HERA affiche et raconte des histoires dans la langue de votre choix.",
+    "helpPersona": "Choisissez un personnage pour ajuster le style de narration : facile à comprendre, académique, amusant ou adapté aux groupes.",
+    "helpCompanion": "Sélectionnez Compagnon si vous souhaitez discuter, écouter des guides et accomplir des quêtes tout au long de votre voyage.",
+    "helpCamera": "Sélectionnez Objectif du Patrimoine si vous souhaitez numériser des artefacts ; vous pouvez également télécharger des photos existantes depuis l'écran de la caméra.",
+    "helpTour": "Sélectionnez Défi Interactif si vous souhaitez jouer à un jeu de groupe ou explorer un itinéraire défini."
   },
   "scan": {
     "brand": "HERA Scan",
@@ -237,7 +244,17 @@ export const fr: VisitorTranslations = {
     "chatPlaceholder": "Saisissez votre question ici...",
     "send": "Envoyer",
     "continueTour": "Prochaine étape de la visite",
-    "scanAgain": "Scanner a nouveau"
+    "scanAgain": "Scanner a nouveau",
+    "helpAria": "Présentation des fonctionnalités de la page",
+    "helpTitle": "À quoi sert la page de l'artefact ?",
+    "helpDesc": "C'est ici qu'HERA présente l'artefact identifié, lit l'histoire selon le personnage/la langue que vous avez choisis et vous permet de poser plus de questions sur les détails qui vous intéressent.",
+    "helpPoint1": "Écoutez ou lisez la narration principale de l'artefact.",
+    "helpPoint2": "Posez des questions de suivi pour qu'HERA vous explique plus en profondeur.",
+    "helpPoint3": "Retournez à la numérisation si vous souhaitez identifier un autre artefact.",
+    "helpPoint4": "Lors d'une visite, utilisez le bouton Continuer pour revenir au voyage.",
+    "feedbackAria": "Évaluation rapide de l'expérience",
+    "feedbackTitle": "Évaluation rapide de l'expérience",
+    "feedbackDesc": "Ces courts commentaires aident HERA à mesurer l'évaluation du produit : précision de la personnalité, qualité de la narration, voix et intention de poursuivre l'expérience."
   },
   "results": {
     "found": "Correspondance trouvée !",
@@ -250,6 +267,14 @@ export const fr: VisitorTranslations = {
   },
   "companion": {
     "role": "Votre guide du patrimoine",
+    "helpAria": "Présentation de la fonctionnalité Compagnon",
+    "helpTitle": "À quoi sert HERA Compagnon ?",
+    "helpDesc": "Compagnon est un guide interactif : vous pouvez discuter, numériser des artefacts, écouter des histoires et participer à des quêtes de découverte.",
+    "helpPoint1": "Utilisez votre voix ou votre clavier pour poser des questions à HERA.",
+    "helpPoint2": "Appuyez sur l'appareil photo pour numériser des artefacts et écouter des histoires connexes.",
+    "helpPoint3": "Terminez des quêtes/défis pour explorer étape par étape.",
+    "helpPoint4": "Lorsque HERA suggère la destination suivante, la carte vous aidera à naviguer.",
+    "helpDevNote": "Cette fonctionnalité est en cours de développement, mieux prise en charge en vietnamien et partiellement prise en charge en anglais.",
     "name": "Lê Quý Đôn",
     "scan": "Scanner l'objet le plus proche",
     "newJourney": "Commencer un nouveau voyage",
@@ -339,5 +364,17 @@ export const fr: VisitorTranslations = {
     "notAvailable": "La carte n'est pas disponible pour ce site patrimonial.",
     "currentLocationAria": "Emplacement actuel : {name}",
     "suggestedLocationAria": "Point suggere : {name}"
+  },
+  "eval": {
+    "success": "Merci ! Vos commentaires ont été enregistrés pour l'évaluation du produit.",
+    "title": "Évaluation rapide de l'expérience",
+    "subtitle": "Ces données sont utilisées pour l'onglet d'évaluation du produit dans le tableau de bord d'administration.",
+    "persona": "Précision du personnage",
+    "story": "Histoire captivante",
+    "voice": "Voix naturelle",
+    "replay": "Intention de rejouer",
+    "comment": "Petite note si vous en avez une...",
+    "submitting": "Soumission...",
+    "submit": "Soumettre l'évaluation"
   }
 };
