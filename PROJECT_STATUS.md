@@ -38,7 +38,7 @@ Admin có thể quản lý Group, hiện vật, nội dung, tài liệu tri th�
 - Luồng nhận diện ảnh, truy xuất RAG, sinh nội dung, chat và TTS đã hoạt động xuyên suốt; tải ảnh lên hiện nằm trong màn hình scan/camera thay vì là lựa chọn riêng ở trang chính.
 - Product Eval đã có dashboard/analytics, tài liệu 9 KPI và các điểm thu feedback nhẹ trong visitor UI.
 - Hệ thống phòng thủ Prompt Injection (Shield Clause) đã được gia cố hoàn chỉnh cho cả hai luồng Hướng dẫn viên và Companion.
-- RAG đã được cải thiện để chấp nhận từ khóa chính và tận dụng tài liệu thuộc đúng Group.
+- RAG đã được cải thiện để chấp nhận từ khóa chính và tận dụng tài liệu thuộc đúng Group, đồng thời tinh chỉnh tham số `search_K` và cơ chế Reranker để tối ưu kết quả tìm kiếm.
 - TTS được tạo theo yêu cầu, tránh gọi trùng; frontend chỉ gửi 10 tin nhắn gần nhất lên API chat.
 - Giao diện mobile sử dụng chiều cao động `100dvh` và wrapper chung để giảm layout shift.
 

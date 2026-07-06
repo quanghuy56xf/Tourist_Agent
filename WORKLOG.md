@@ -1,3 +1,12 @@
+## 2026-07-06 - Tinh chỉnh Reranker và tham số truy xuất RAG
+
+Bối cảnh:
+- Ở cuối phiên làm việc trước, người dùng đã chủ động cập nhật cơ chế reranker và điều chỉnh các tham số truy xuất (k, search_K) để tối ưu hóa kết quả tìm kiếm tài liệu.
+
+Các thay đổi:
+- Đã điều chỉnh tham số `k` và `search_K` trong luồng code truy xuất (`backend/app/modules/rag/retriever.py`).
+- Cập nhật cơ chế Reranker để cải thiện độ chính xác của ngữ cảnh được chọn.
+
 ## 2026-07-02 - Product Eval và tinh chỉnh UX khách tham quan
 
 Bối cảnh:

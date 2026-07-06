@@ -107,6 +107,63 @@ function makeDiscoveryState(match: SearchMatch, fallbackHook: string): Discovery
   };
 }
 
+type CompanionFallbackLabels = {
+  chatFallbackNetwork: string;
+  chatFallbackTimeout: string;
+  chatFallbackServer: string;
+  chatFallbackStream: string;
+  chatFallbackUnknown: string;
+};
+
+function getCompanionFallbackMessage(error: unknown, labels: CompanionFallbackLabels): string {
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = `${name} ${message}`.toLowerCase();
+
+  if (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("load failed") ||
+    normalized.includes("err_network") ||
+    (error instanceof TypeError && normalized.includes("fetch"))
+  ) {
+    return labels.chatFallbackNetwork;
+  }
+
+  if (
+    normalized.includes("aborterror") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("aborted")
+  ) {
+    return labels.chatFallbackTimeout;
+  }
+
+  if (
+    normalized.includes("luồng dữ liệu rỗng") ||
+    normalized.includes("stream") ||
+    normalized.includes("body missing") ||
+    normalized.includes("unexpected end")
+  ) {
+    return labels.chatFallbackStream;
+  }
+
+  if (
+    normalized.includes("500") ||
+    normalized.includes("502") ||
+    normalized.includes("503") ||
+    normalized.includes("504") ||
+    normalized.includes("server") ||
+    normalized.includes("backend") ||
+    normalized.includes("không thể trò chuyện") ||
+    normalized.includes("service unavailable")
+  ) {
+    return labels.chatFallbackServer;
+  }
+
+  return labels.chatFallbackUnknown;
+}
+
 function useStreamingText(text: string): string {
   const [length, setLength] = useState(0);
   const prevTextRef = useRef("");
@@ -539,8 +596,11 @@ export default function CompanionChat({
       } else {
         setSuggestedNextPoint(null);
       }
-    } catch (err: any) {
-      const errMsg = err?.message || String(err);
+    } catch (err) {
+      console.error("Companion chat failed", err);
+      const fallbackMessage = getCompanionFallbackMessage(err, t.companion);
+      setActionButtons([]);
+      setSuggestedNextPoint(null);
       setHistory((current) => {
         const newHistory = [...current];
         const lastMsg = newHistory[newHistory.length - 1];
@@ -548,12 +608,12 @@ export default function CompanionChat({
           if (lastMsg.content.trim()) {
             newHistory[newHistory.length - 1] = {
               ...lastMsg,
-              content: lastMsg.content + `\n\n*(${t.companion.errorPrefix}${errMsg})*`,
+              content: `${lastMsg.content.trim()}\n\n${fallbackMessage}`,
             };
           } else {
             newHistory[newHistory.length - 1] = {
               ...lastMsg,
-              content: `${t.companion.errorPrefix}${errMsg}`,
+              content: fallbackMessage,
             };
           }
         }
