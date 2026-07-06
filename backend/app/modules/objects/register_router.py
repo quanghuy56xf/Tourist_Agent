@@ -1,3 +1,9 @@
+"""Admin object registration endpoints for items, images, vector data, and prewarm jobs.
+
+Registration writes item metadata, ingests multiple image angles, refreshes ChromaDB
+embeddings, syncs the item into RAG, and schedules generated content prewarming.
+"""
+
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -54,6 +60,11 @@ async def bulk_register_item(
     db: Session = Depends(get_db),
     staff=Depends(require_admin_if_enabled),
 ):
+    """Register one item from a multi-image admin upload workflow.
+
+    The endpoint supports dry runs and skip-existing checks for bulk tools, then stores
+    up to three canonical image angles while keeping additional images as embeddings.
+    """
     normalized_name = name.strip()
     normalized_description = description.strip()
     if not normalized_name:
@@ -155,6 +166,11 @@ async def register_object(
     db: Session = Depends(get_db),
     staff=Depends(require_admin_if_enabled),
 ):
+    """Register a single object with required front image and optional side/back images.
+
+    This path is used by the admin form, so it also resolves or creates the target group,
+    enforces manager access, cleans reused item artifacts, and schedules content prewarm.
+    """
     if not name.strip():
         raise HTTPException(
             status_code=400,

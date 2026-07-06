@@ -1,3 +1,9 @@
+"""Chat and Companion streaming endpoints backed by RAG and LLM generation.
+
+This module coordinates item-scoped chat, Companion persona responses, RAG trace logging,
+and streaming text/audio Server-Sent Events for the visitor experience.
+"""
+
 import asyncio
 import base64
 import json
@@ -415,6 +421,13 @@ async def chat_with_companion_stream(
     request: CompanionChatRequest,
     db: Session = Depends(get_db),
 ):
+    """Stream a Companion response with optional group/item context and TTS audio.
+
+    The endpoint validates item/group scope, prepares RAG context from the current and
+    visited artifacts, emits navigation metadata, and records analytics/RAG traces after
+    the stream completes. It stays monolithic today to keep SSE ordering and cleanup in
+    one place; refactor only with end-to-end streaming tests.
+    """
     if request.item_id is not None:
         item = db.query(Item).filter(Item.id == request.item_id).first()
         if item is None:
@@ -546,6 +559,11 @@ async def chat_with_companion_stream(
             tour_completed = True
 
     async def event_generator():
+        """Coordinate text chunks, ordered TTS audio, and terminal SSE events.
+
+        Three internal producers share queues: the LLM stream, parallel TTS workers, and
+        an audio orderer that preserves segment order before sending audio events.
+        """
         is_vi = normalize_language_label(request.language) == LANGUAGE_VI
         started = time.perf_counter()
         event_queue: asyncio.Queue[str | None] = asyncio.Queue()

@@ -1,3 +1,9 @@
+"""Visitor analytics aggregation utilities for the admin dashboard.
+
+The functions in this module turn raw analytics events into group-scoped summary rows,
+latency metrics, and content quality signals used by the admin UI.
+"""
+
 import json
 import logging
 from collections import defaultdict
@@ -187,6 +193,12 @@ def build_summary(
     days: int = 30,
     allowed_group_ids: list[int] | None = None,
 ) -> AnalyticsSummaryResponse:
+    """Aggregate visitor analytics for the admin overview page.
+
+    The summary intentionally spans multiple event families in one response: group visits,
+    searches, chat-per-search, latency, slow events, and content issue rows. Preserve the
+    optional group filter across every query to enforce manager-scoped analytics.
+    """
     since = _since(days)
     group_filter = allowed_group_ids
 
