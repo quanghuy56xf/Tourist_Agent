@@ -61,7 +61,7 @@ assert.match(avatarSource, /onError/);
 
 const introSource = read("components/visitor/CompanionIntro.tsx");
 assert.match(introSource, /companion-intro\.mp4/);
-assert.match(introSource, /Bỏ qua/);
+assert.match(introSource, /skipIntro/);
 assert.match(introSource, /onError/);
 
 const chatSource = read("components/visitor/CompanionChat.tsx");
@@ -71,14 +71,16 @@ assert.match(chatSource, /transcribeAudio/);
 assert.match(chatSource, /chatWithCompanion/);
 assert.match(chatSource, /playChatTts\([\s\S]*"Companion"/);
 assert.match(chatSource, /CompanionAvatar/);
+assert.match(chatSource, /getCompanionFallbackMessage/);
+assert.match(chatSource, /chatFallbackNetwork/);
+assert.doesNotMatch(chatSource, /errorPrefix\}\$\{errMsg\}/);
 
 const methodSource = read("app/[groupSlug]/method/page.tsx");
 assert.match(methodSource, /\/companion/);
-assert.match(methodSource, /Lê Quý Đôn/);
+assert.match(methodSource, /companionTitle/);
 
 const itemSource = read("app/[groupSlug]/item/[id]/page.tsx");
-assert.match(itemSource, /isCompanionMode/);
 assert.match(itemSource, /addVisitedItem/);
-assert.match(itemSource, /CompanionChat/);
+assert.match(itemSource, /rememberMinimapItem/);
 
 console.log("Companion feature checks passed.");
