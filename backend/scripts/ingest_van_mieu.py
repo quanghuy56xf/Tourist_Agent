@@ -1,3 +1,9 @@
+"""Bulk ingest local Văn Miếu image folders into item records and embeddings.
+
+The script is an operator tool for rebuilding demo data: it creates or updates items,
+stores canonical images, adds extra ChromaDB embeddings, and syncs item text into RAG.
+"""
+
 import os
 import sys
 import argparse
@@ -56,6 +62,11 @@ def ingest_extra_embeddings(item_id: int, file_path: Path, extra_index: int) -> 
     return len(vectors)
 
 def process_folder(db, folder: Path, group: Group, dry_run: bool, skip_existing: bool):
+    """Import one artifact folder into the database, vector index, and RAG metadata.
+
+    The first three images become canonical front/side/back images; remaining images are
+    embedded as extra recognition views without adding upload records.
+    """
     folder_name = folder.name
     image_files = sorted([f for f in folder.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS])
     

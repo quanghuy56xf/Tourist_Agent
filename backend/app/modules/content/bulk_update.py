@@ -1,3 +1,9 @@
+"""Bulk content regeneration helpers for item text, variants, and audio.
+
+These jobs are used after item/document changes to refresh generated content without
+blocking admin requests; keep database sessions isolated per worker thread.
+"""
+
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

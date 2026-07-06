@@ -1,3 +1,9 @@
+"""Synchronize frontend minimap item IDs from backend group/item APIs.
+
+This legacy helper maps zone names in the old static minimap config to current backend
+item IDs, using exact and fuzzy name matching for local demo maintenance.
+"""
+
 import sys
 if sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -18,6 +24,7 @@ def fetch_json(url):
         return None
 
 def main():
+    """Fetch backend groups/items and patch matching itemIds in the minimap config file."""
     parser = argparse.ArgumentParser(description="Tự động cập nhật ID hiện vật vào minimapConfig.ts từ Backend API.")
     parser.add_argument("--api", default="http://localhost:8000/api", help="URL base của Backend API (mặc định: http://localhost:8000/api)")
     parser.add_argument("--config", default="../frontend/lib/minimapConfig.ts", help="Đường dẫn tới file minimapConfig.ts")

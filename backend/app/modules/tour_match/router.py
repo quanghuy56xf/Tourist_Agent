@@ -1,3 +1,9 @@
+"""HTTP and WebSocket routes for real-time tour match rooms.
+
+The WebSocket endpoint forwards client events to the room manager and centralizes
+connection cleanup so players leave consistently on disconnects or errors.
+"""
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -47,6 +53,11 @@ async def tour_match_websocket(
     player_id: str,
     nickname: str = Query(..., description="Biệt danh người chơi"),
 ):
+    """Run the live match control loop for one connected player.
+
+    Incoming JSON events are deliberately handled in a single loop to preserve ordering
+    for readiness, moderation, progress, and chat updates within a room.
+    """
     await websocket.accept()
 
     success = await manager.join_room(room_id, player_id, nickname, websocket)

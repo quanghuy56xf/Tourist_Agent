@@ -1,3 +1,9 @@
+"""Product evaluation report assembly for visitor experience KPIs.
+
+The report combines persisted analytics events with optional offline image and RAGAS
+reports so the admin dashboard can show both live UX signals and batch eval results.
+"""
+
 from __future__ import annotations
 
 import json
@@ -206,6 +212,12 @@ def build_product_eval_report(
     image_report_path: Path | None = None,
     ragas_report_path: Path | None = None,
 ) -> ProductEvalReportResponse:
+    """Build the Product Eval dashboard payload from live and offline signals.
+
+    This intentionally aggregates several KPI families in one pass: visitor feedback,
+    quest/quiz events, latency traces, and optional image/RAGAS report files. Keep group
+    filtering applied consistently so managers only see their allowed heritage sites.
+    """
     since = _since(days)
     group_filter = allowed_group_ids
     image_path = image_report_path or DEFAULT_IMAGE_REPORT

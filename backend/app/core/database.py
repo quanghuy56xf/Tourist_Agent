@@ -1,3 +1,9 @@
+"""Database engine, schema migration, and startup seed helpers.
+
+This module keeps lightweight SQLite-compatible migrations close to the SQLAlchemy
+metadata setup so self-hosted deployments can upgrade without a separate migration tool.
+"""
+
 import logging
 from pathlib import Path
 
@@ -39,6 +45,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def _migrate_schema() -> None:
+    """Apply additive schema upgrades required by older self-hosted SQLite databases.
+
+    The checks are intentionally defensive and idempotent: every column is added only
+    when missing, preserving existing museum/group data and vector-store references.
+    """
     inspector = inspect(engine)
     if inspector.has_table("items"):
         columns = {col["name"] for col in inspector.get_columns("items")}
