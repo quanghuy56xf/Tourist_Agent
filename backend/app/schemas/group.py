@@ -25,6 +25,8 @@ class MinimapZoneConfig(BaseModel):
     x: float = Field(ge=0, le=100)
     y: float = Field(ge=0, le=100)
     itemNames: list[str]
+    lat: float | None = None
+    lng: float | None = None
 
 
 class MinimapConfigPayload(BaseModel):
@@ -38,6 +40,8 @@ class MinimapVisitorZone(BaseModel):
     x: float
     y: float
     itemIds: list[int]
+    lat: float | None = None
+    lng: float | None = None
 
 
 class MinimapVisitorConfig(BaseModel):

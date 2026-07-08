@@ -65,7 +65,8 @@ export async function playMpegStreamResponse(
   const objectUrl = URL.createObjectURL(mediaSource);
   hooks?.onObjectUrl?.(objectUrl);
 
-  const audio = new Audio(objectUrl);
+  const audio = getSharedTtsAudio();
+  audio.src = objectUrl;
   configurePlaybackAudio(audio);
   hooks?.onAudio?.(audio);
 

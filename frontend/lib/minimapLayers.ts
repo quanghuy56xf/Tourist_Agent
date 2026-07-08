@@ -4,6 +4,7 @@ import { readRememberedMinimapItem } from "@/lib/minimapState";
 
 export type MapMarkerVariant =
   | "user"
+  | "user-gps"
   | "suggested"
   | "game-pending"
   | "game-found"
@@ -166,16 +167,6 @@ export function buildTourMatchMapMarkers(
       title: zone.zoneName,
       zIndex: 10,
     });
-  }
-
-  const userLocation = resolveUserLocation(config, groupSlug);
-  if (userLocation) {
-    markers.push(
-      buildUserMarker(
-        userLocation.zone,
-        userLocationAria(userLocation.zone.zoneName)
-      )
-    );
   }
 
   return markers;

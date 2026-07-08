@@ -45,6 +45,8 @@ DEFAULT_MINIMAP_TEMPLATE = {
             "x": 50,
             "y": 94,
             "itemNames": ["Cổng chính"],
+            "lat": None,
+            "lng": None,
         }
     ],
 }
@@ -242,6 +244,8 @@ def get_group_minimap(
                 zoneName=zone.zoneName,
                 x=zone.x,
                 y=zone.y,
+                lat=zone.lat,
+                lng=zone.lng,
                 itemIds=_resolve_minimap_item_ids(zone.itemNames, ids_by_name, items),
             )
             for zone in payload.zones

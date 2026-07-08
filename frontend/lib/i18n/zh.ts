@@ -368,7 +368,10 @@ export const zh: VisitorTranslations = {
     "unknownLocation": "未知位置",
     "notAvailable": "此遗产站点暂无地图。",
     "currentLocationAria": "当前位置：{name}",
-    "suggestedLocationAria": "推荐地点：{name}"
+    "suggestedLocationAria": "推荐地点：{name}",
+    "userGpsLabel": "您的位置 (GPS)",
+    "gpsCoords": "GPS定位: {coords}",
+    "outOfBounds": "超出地图范围"
   },
   "eval": {
     "success": "谢谢您！您的反馈已记录用于产品评估。",

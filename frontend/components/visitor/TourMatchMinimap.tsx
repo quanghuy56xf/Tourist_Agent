@@ -6,6 +6,7 @@ import { buildTourMatchMapMarkers } from "@/lib/minimapLayers";
 import HeritageMapCanvas from "@/components/visitor/HeritageMapCanvas";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
+import { useGeolocation, calculateUserMapPosition } from "@/lib/minimapGps";
 
 interface TourMatchMinimapProps {
   config: MinimapConfig | null;
@@ -35,29 +36,47 @@ export default function TourMatchMinimap({
   const groupSlug = useGroupSlug();
   const { t } = useVisitorLocale();
 
-  const markers = useMemo(
-    () =>
-      config
-        ? buildTourMatchMapMarkers(config, {
-            tourItemIds,
-            foundItemIds,
-            currentTargetItemId,
-            showCurrentTarget,
-            groupSlug,
-            userLocationAria: (name) =>
-              t.minimap.currentLocationAria.replace("{name}", name),
-          })
-        : [],
-    [
-      config,
+  const { position: userGps } = useGeolocation(true);
+
+  const userMapPos = useMemo(
+    () => calculateUserMapPosition(userGps, config?.zones ?? []),
+    [userGps, config?.zones]
+  );
+
+  const markers = useMemo(() => {
+    if (!config) return [];
+    const list = buildTourMatchMapMarkers(config, {
       tourItemIds,
       foundItemIds,
       currentTargetItemId,
       showCurrentTarget,
       groupSlug,
-      t.minimap.currentLocationAria,
-    ]
-  );
+      userLocationAria: (name) =>
+        t.minimap.currentLocationAria.replace("{name}", name),
+    });
+
+    if (userMapPos) {
+      list.push({
+        id: "user-gps",
+        x: userMapPos.x,
+        y: userMapPos.y,
+        variant: "user-gps",
+        ariaLabel: "Vị trí GPS của bạn",
+        title: "Vị trí của bạn (GPS)",
+        zIndex: 40,
+      });
+    }
+    return list;
+  }, [
+    config,
+    tourItemIds,
+    foundItemIds,
+    currentTargetItemId,
+    showCurrentTarget,
+    groupSlug,
+    t.minimap.currentLocationAria,
+    userMapPos,
+  ]);
 
   if (!config) {
     return (
@@ -97,8 +116,8 @@ export default function TourMatchMinimap({
           </span>
         ) : null}
         <span className="inline-flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-          {t.minimap.nearestLocation}
+          <span className="h-2.5 w-2.5 rounded-full border border-white bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+          {t.minimap.userGpsLabel}
         </span>
       </div>
     </div>

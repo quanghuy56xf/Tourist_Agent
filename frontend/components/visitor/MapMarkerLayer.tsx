@@ -11,6 +11,11 @@ const MARKER_STYLES: Record<
     ping: "bg-red-400/70",
     size: "h-4 w-4",
   },
+  "user-gps": {
+    dot: "bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.9)]",
+    ping: "bg-blue-400/70",
+    size: "h-4 w-4",
+  },
   suggested: {
     dot: "bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]",
     ping: "bg-amber-300/60",
@@ -58,7 +63,7 @@ export default function MapMarkerLayer({ markers }: MapMarkerLayerProps) {
           >
             {style.ping ? (
               <span
-                className={`absolute ${marker.variant === "user" ? "-inset-2" : "-inset-3"} animate-ping rounded-full ${style.ping}`}
+                className={`absolute ${(marker.variant === "user" || marker.variant === "user-gps") ? "-inset-2" : "-inset-3"} animate-ping rounded-full ${style.ping}`}
               />
             ) : null}
             <span

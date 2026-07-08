@@ -74,21 +74,40 @@ export default function TourMatchLobbyPage() {
   }, []);
 
   // Fetch active rooms
-  const refreshRooms = async () => {
-    setLoadingRooms(true);
+  const refreshRooms = async (showLoading = false) => {
+    if (showLoading) setLoadingRooms(true);
     try {
-      const data = await fetchApi("/api/tour-match/rooms");
-      setRooms(data);
+      const data = (await fetchApi("/api/tour-match/rooms")) as MatchRoomSummary[];
+      setRooms((prevRooms) => {
+        if (prevRooms.length === 0) {
+          return data;
+        }
+        const prevMap = new Map(prevRooms.map((r) => [r.room_id, r]));
+        const nextMap = new Map(data.map((r) => [r.room_id, r]));
+
+        // Lọc các phòng mới chưa có trong danh sách cũ để đưa lên đầu
+        const newRooms = data.filter((r) => !prevMap.has(r.room_id));
+
+        // Lọc các phòng cũ vẫn còn tồn tại trong dữ liệu mới và cập nhật thông tin mới nhất
+        const updatedPrevRooms = prevRooms
+          .filter((r) => nextMap.has(r.room_id))
+          .map((r) => {
+            const latest = nextMap.get(r.room_id)!;
+            return { ...r, ...latest };
+          });
+
+        return [...newRooms, ...updatedPrevRooms];
+      });
     } catch (err) {
       console.error("Failed to fetch rooms:", err);
     } finally {
-      setLoadingRooms(false);
+      if (showLoading) setLoadingRooms(false);
     }
   };
 
   // Fetch rooms and tours
   useEffect(() => {
-    refreshRooms();
+    void refreshRooms(true);
     const groupId = readStoredGroupId() ?? undefined;
     loadSuggestedTours(groupId)
       .then((data) => {
@@ -102,8 +121,8 @@ export default function TourMatchLobbyPage() {
       .catch((err) => console.error("Failed to load tours:", err))
       .finally(() => setLoadingTours(false));
 
-    // Polling rooms list every 5 seconds
-    const interval = setInterval(refreshRooms, 5000);
+    // Polling rooms list every 5 seconds (chạy ngầm không hiện loading)
+    const interval = setInterval(() => void refreshRooms(false), 5000);
     return () => clearInterval(interval);
   }, [groupSlug, preselectedTour]);
 
@@ -402,7 +421,7 @@ export default function TourMatchLobbyPage() {
                 {t.tour.matchWaitingListTitle}
               </h2>
               <button
-                onClick={refreshRooms}
+                onClick={() => void refreshRooms(true)}
                 className="text-xs px-3 py-1 rounded-full"
                 style={{
                   background: "var(--secondary)",

@@ -154,6 +154,8 @@ export interface MinimapZone {
   x: number;
   y: number;
   itemIds: number[];
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface MinimapConfig {
@@ -167,6 +169,8 @@ export interface MinimapTemplateZone {
   x: number;
   y: number;
   itemNames: string[];
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface MinimapTemplateConfig {

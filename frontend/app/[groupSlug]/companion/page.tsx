@@ -7,6 +7,7 @@ import MuteButton from "@/components/visitor/MuteButton";
 import SpeedButton from "@/components/visitor/SpeedButton";
 import MinimapModal from "@/components/visitor/MinimapModal";
 import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
+import MinimapButton from "@/components/visitor/MinimapButton";
 import {
   enableCompanionMode,
   hasSeenCompanionIntro,
@@ -128,6 +129,7 @@ export default function CompanionPage() {
         suggestedItemId={minimapSuggestedId || null}
         suggestedItemName={minimapSuggestedName}
       />
+      <MinimapButton elevated />
       </main>
     </div>
   );

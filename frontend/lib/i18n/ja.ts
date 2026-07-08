@@ -368,7 +368,10 @@ export const ja: VisitorTranslations = {
     "unknownLocation": "不明な場所",
     "notAvailable": "この遺産サイトでは地図を利用できません。",
     "currentLocationAria": "現在地: {name}",
-    "suggestedLocationAria": "おすすめ地点: {name}"
+    "suggestedLocationAria": "おすすめ地点: {name}",
+    "userGpsLabel": "現在地 (GPS)",
+    "gpsCoords": "GPS位置: {coords}",
+    "outOfBounds": "地図の範囲外"
   },
   "eval": {
     "success": "ありがとうございます！フィードバックは製品評価のために記録されました。",

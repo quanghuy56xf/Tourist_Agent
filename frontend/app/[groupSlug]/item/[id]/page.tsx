@@ -32,6 +32,7 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
 import EvalFeedbackPanel from "@/components/visitor/EvalFeedbackPanel";
 import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
+import MinimapButton from "@/components/visitor/MinimapButton";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -403,9 +404,7 @@ export default function ItemDetailPage() {
             value={chatInput}
             onChange={(e) => {
               setChatInput(e.target.value);
-              if (e.target.value.trim()) stopGuideIntro();
             }}
-            onFocus={stopGuideIntro}
             onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
             placeholder={t.item.chatPlaceholder}
             className="min-w-0 flex-1 rounded-full px-5 py-3 text-base outline-none"
@@ -449,6 +448,7 @@ export default function ItemDetailPage() {
       >
         <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
       </VisitorInfoDialog>
+      <MinimapButton elevated />
     </main>
   );
 }
