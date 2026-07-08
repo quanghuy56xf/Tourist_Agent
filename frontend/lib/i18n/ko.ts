@@ -368,7 +368,10 @@ export const ko: VisitorTranslations = {
     "unknownLocation": "알 수 없는 위치",
     "notAvailable": "이 유산 사이트에서는 지도를 사용할 수 없습니다.",
     "currentLocationAria": "현재 위치: {name}",
-    "suggestedLocationAria": "추천 지점: {name}"
+    "suggestedLocationAria": "추천 지점: {name}",
+    "userGpsLabel": "내 위치 (GPS)",
+    "gpsCoords": "GPS 위치: {coords}",
+    "outOfBounds": "지도의 범위를 벗어남"
   },
   "eval": {
     "success": "감사합니다! 제품 평가를 위해 피드백이 기록되었습니다.",

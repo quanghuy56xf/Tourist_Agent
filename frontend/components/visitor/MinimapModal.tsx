@@ -58,9 +58,11 @@ export default function MinimapModal({
 
   const userLocation = useMemo(
     () => resolveUserLocation(config, groupSlug),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, groupSlug, lastItemId]
   );
   const suggestedZone = resolveZoneForItem(config, suggestedItemId);
+
   const markers = useMemo(
     () =>
       buildVisitorMapMarkers(config, groupSlug, suggestedItemId, {
@@ -69,6 +71,7 @@ export default function MinimapModal({
         suggestedLocationAria: (name) =>
           t.minimap.suggestedLocationAria.replace("{name}", name),
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [config, groupSlug, suggestedItemId, t.minimap, lastItemId]
   );
 

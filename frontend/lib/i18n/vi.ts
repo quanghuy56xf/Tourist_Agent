@@ -376,6 +376,9 @@ export const vi = {
     notAvailable: "Bản đồ chưa khả dụng cho khu tham quan này.",
     currentLocationAria: "Vị trí hiện tại: {name}",
     suggestedLocationAria: "Điểm được gợi ý: {name}",
+    userGpsLabel: "Vị trí của bạn (GPS)",
+    gpsCoords: "Định vị GPS: {coords}",
+    outOfBounds: "Ngoài phạm vi bản đồ",
   },
   eval: {
     success: "Cảm ơn bạn! Đánh giá đã được ghi nhận cho Product Eval.",

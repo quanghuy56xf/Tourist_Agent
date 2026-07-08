@@ -376,6 +376,9 @@ export const en: DeepStringShape<typeof vi> = {
     notAvailable: "Map is not available for this heritage site.",
     currentLocationAria: "Current location: {name}",
     suggestedLocationAria: "Suggested point: {name}",
+    userGpsLabel: "Your location (GPS)",
+    gpsCoords: "GPS Location: {coords}",
+    outOfBounds: "Out of map bounds",
   },
   eval: {
     success: "Thank you! Your feedback has been recorded for Product Eval.",

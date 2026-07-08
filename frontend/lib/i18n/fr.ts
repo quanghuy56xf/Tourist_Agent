@@ -368,7 +368,10 @@ export const fr: VisitorTranslations = {
     "unknownLocation": "Emplacement inconnu",
     "notAvailable": "La carte n'est pas disponible pour ce site patrimonial.",
     "currentLocationAria": "Emplacement actuel : {name}",
-    "suggestedLocationAria": "Point suggere : {name}"
+    "suggestedLocationAria": "Point suggere : {name}",
+    "userGpsLabel": "Votre position (GPS)",
+    "gpsCoords": "Localisation GPS: {coords}",
+    "outOfBounds": "Hors des limites de la carte"
   },
   "eval": {
     "success": "Merci ! Vos commentaires ont été enregistrés pour l'évaluation du produit.",
