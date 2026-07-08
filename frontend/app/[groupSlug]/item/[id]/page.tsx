@@ -32,7 +32,6 @@ import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 import { useVisitorPersona } from "@/components/VisitorPersonaProvider";
 import EvalFeedbackPanel from "@/components/visitor/EvalFeedbackPanel";
 import VisitorInfoDialog from "@/components/visitor/VisitorInfoDialog";
-import MinimapButton from "@/components/visitor/MinimapButton";
 
 export default function ItemDetailPage() {
   const params = useParams();
@@ -448,7 +447,6 @@ export default function ItemDetailPage() {
       >
         <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
       </VisitorInfoDialog>
-      <MinimapButton elevated />
     </main>
   );
 }
