@@ -146,9 +146,9 @@ async function playSegmentedTts(
   };
 
   const revokePending = () => {
-    for (const fetchPromise of pending.values()) {
+    pending.forEach((fetchPromise) => {
       void fetchPromise.then((url) => URL.revokeObjectURL(url)).catch(() => undefined);
-    }
+    });
     pending.clear();
   };
 
