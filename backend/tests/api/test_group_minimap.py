@@ -95,6 +95,23 @@ def test_get_minimap_returns_404_when_not_configured(minimap_client, db_session)
     assert response.status_code == 404
 
 
+def test_get_minimap_resolves_fuzzy_item_names(minimap_client, db_session):
+    group = Group(name="Văn Miếu")
+    db_session.add(group)
+    db_session.flush()
+    gate_item = Item(name="Cổng chính Văn Miếu", description="Gate", group=group)
+    db_session.add(gate_item)
+    db_session.commit()
+
+    payload = _payload()
+    minimap_client.put(f"/api/groups/{group.id}/minimap", json=payload)
+
+    response = minimap_client.get(f"/api/groups/{group.id}/minimap")
+
+    assert response.status_code == 200
+    assert response.json()["zones"][0]["itemIds"] == [gate_item.id]
+
+
 def test_put_minimap_rejects_invalid_coordinates(minimap_client, db_session):
     group = Group(name="Văn Miếu")
     db_session.add(group)

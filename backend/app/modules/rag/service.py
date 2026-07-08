@@ -302,46 +302,16 @@ def build_chat_item_context(
     group_id: int | None = None,
     query: str | None = None,
 ) -> tuple[list[Document], bool]:
-    """Wider retrieval for chat: pass query-aligned group docs to the LLM.
-
-    ``has_verified`` still requires a substantive item description or at least
-    one group document that mentions the item. Once verified, the LLM receives
-    all retrieved group chunks (including lower-ranked matches), not only those
-    that explicitly name the artifact.
-    """
-    user_message = query or ""
-    retrieval_query = build_chat_retrieval_query(
-        item_name,
-        item_description,
-        user_message,
-    )
-    all_docs = build_item_context(
+    docs, has_verified, _ = build_chat_item_context_with_trace(
         item_id=item_id,
         item_name=item_name,
         item_description=item_description,
         retriever=retriever,
         top_k=top_k,
         group_id=group_id,
-        query=retrieval_query,
+        query=query,
     )
-    relevant_group_docs = filter_group_docs_for_item(
-        item_name,
-        item_description,
-        all_docs,
-    )
-    has_substantive_description = is_substantive_item_description(
-        item_description,
-        item_name,
-    )
-    has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
-
-    chat_docs = _order_chat_documents(
-        item_name=item_name,
-        item_description=item_description,
-        documents=all_docs,
-        vague_follow_up=is_vague_follow_up(user_message, item_name),
-    )
-    return chat_docs, has_verified_knowledge
+    return docs, has_verified
 
 
 def _preserve_sparse_winners(documents: list[Document], *, top_n: int = 1) -> list[Document]:
@@ -381,6 +351,121 @@ def _trim_context_documents(documents: list[Document]) -> list[Document]:
     return kept
 
 
+def _fetch_item_chat_documents(
+    *,
+    item_id: int,
+    item_name: str,
+    item_description: str,
+    retrieval_query: str,
+    retriever: Retriever | None,
+    group_id: int | None,
+    top_k: int,
+    trace: RagTraceContext,
+) -> list[Document]:
+    docs = [build_item_registration_document(item_id, item_description)]
+    if retriever is None or group_id is None:
+        return docs
+
+    retrieved: list[Document] = []
+    try:
+        candidate_top_k = top_k * max(1, RAG_RERANK_CANDIDATE_MULTIPLIER)
+        if hasattr(retriever, "retrieve_with_trace"):
+            retrieved, retrieval_trace = retriever.retrieve_with_trace(
+                retrieval_query,
+                top_k=candidate_top_k,
+                group_id=group_id,
+            )
+            trace.fallback_used = retrieval_trace.fallback_used
+            trace.fallback_reason = retrieval_trace.fallback_reason
+            trace.dense_max_score = retrieval_trace.dense_max_score
+            trace.retrieved_chunks = retrieval_trace.retrieved_chunks
+            trace.reranked_chunks = retrieval_trace.reranked_chunks
+        else:
+            retrieved = retriever.retrieve(
+                retrieval_query,
+                top_k=candidate_top_k,
+                group_id=group_id,
+            )
+            trace.retrieved_chunks = evidence_list(retrieved)
+    except (MemoryError, OSError, RuntimeError, FileNotFoundError) as exc:
+        logger.warning("RAG unavailable; using item description: %s", exc)
+        trace.fallback_used = True
+        trace.fallback_reason = type(exc).__name__
+        retrieved = []
+
+    if RAG_ENABLE_RERANKER and retrieved:
+        retrieved = rerank_documents(
+            query=retrieval_query,
+            item_name=item_name,
+            item_description=item_description,
+            documents=retrieved,
+        )
+        retrieved = _preserve_sparse_winners(retrieved)
+        trace.reranked_chunks = evidence_list(retrieved)
+
+    seen = {item_description.strip()}
+    for document in retrieved:
+        content = document.page_content.strip()
+        if content and content not in seen:
+            docs.append(document)
+            seen.add(content)
+    return docs
+
+
+def _finalize_item_chat_trace(
+    *,
+    item_name: str,
+    item_description: str,
+    docs: list[Document],
+    user_message: str,
+    top_k: int,
+    trace: RagTraceContext,
+    lens_chat: bool = False,
+    history: list[dict[str, str]] | None = None,
+) -> tuple[list[Document], bool]:
+    relevant_group_docs = filter_group_docs_for_item(
+        item_name,
+        item_description,
+        docs,
+    )
+    has_substantive_description = is_substantive_item_description(
+        item_description,
+        item_name,
+    )
+    has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
+    vague_follow_up = is_vague_follow_up(user_message, item_name)
+    related_group_docs: list[Document] = []
+
+    if lens_chat:
+        chat_docs, related_group_docs = _order_lens_chat_documents(
+            item_name=item_name,
+            item_description=item_description,
+            documents=docs,
+            vague_follow_up=vague_follow_up,
+        )
+    else:
+        chat_docs = _order_chat_documents(
+            item_name=item_name,
+            item_description=item_description,
+            documents=docs,
+            vague_follow_up=vague_follow_up,
+        )
+
+    chat_docs = _trim_context_documents(chat_docs[:top_k])
+    trace.context_chunks = evidence_list(chat_docs)
+    trace.confidence_score, trace.confidence_reasons = compute_confidence(
+        has_substantive_description=has_substantive_description,
+        relevant_group_docs=relevant_group_docs,
+        related_group_docs=related_group_docs if lens_chat else None,
+        fallback_used=trace.fallback_used,
+        dense_max_score=trace.dense_max_score,
+        vague_follow_up=vague_follow_up,
+        history_turn_count=len(history or []),
+        lens_chat=lens_chat,
+    )
+    return chat_docs, has_verified_knowledge
+
+
 def build_chat_item_context_with_trace(
     *,
     item_id: int,
@@ -398,77 +483,140 @@ def build_chat_item_context_with_trace(
         user_message,
     )
     trace = RagTraceContext(retrieval_query=retrieval_query, top_k=top_k)
-    docs = [build_item_registration_document(item_id, item_description)]
-
-    if retriever is not None and group_id is not None:
-        try:
-            candidate_top_k = top_k * max(1, RAG_RERANK_CANDIDATE_MULTIPLIER)
-            if hasattr(retriever, "retrieve_with_trace"):
-                retrieved, retrieval_trace = retriever.retrieve_with_trace(
-                    retrieval_query,
-                    top_k=candidate_top_k,
-                    group_id=group_id,
-                )
-                trace.fallback_used = retrieval_trace.fallback_used
-                trace.fallback_reason = retrieval_trace.fallback_reason
-                trace.dense_max_score = retrieval_trace.dense_max_score
-                trace.retrieved_chunks = retrieval_trace.retrieved_chunks
-                trace.reranked_chunks = retrieval_trace.reranked_chunks
-            else:
-                retrieved = retriever.retrieve(
-                    retrieval_query,
-                    top_k=candidate_top_k,
-                    group_id=group_id,
-                )
-                trace.retrieved_chunks = evidence_list(retrieved)
-        except (MemoryError, OSError, RuntimeError, FileNotFoundError) as exc:
-            logger.warning("RAG unavailable; using item description: %s", exc)
-            trace.fallback_used = True
-            trace.fallback_reason = type(exc).__name__
-            retrieved = []
-
-        if RAG_ENABLE_RERANKER and retrieved:
-            retrieved = rerank_documents(
-                query=retrieval_query,
-                item_name=item_name,
-                item_description=item_description,
-                documents=retrieved,
-            )
-            retrieved = _preserve_sparse_winners(retrieved)
-            trace.reranked_chunks = evidence_list(retrieved)
-
-        seen = {item_description.strip()}
-        for document in retrieved:
-            content = document.page_content.strip()
-            if content and content not in seen:
-                docs.append(document)
-                seen.add(content)
-
-    relevant_group_docs = filter_group_docs_for_item(
-        item_name,
-        item_description,
-        docs,
-    )
-    has_substantive_description = is_substantive_item_description(
-        item_description,
-        item_name,
-    )
-    has_verified_knowledge = has_substantive_description or bool(relevant_group_docs)
-    vague_follow_up = is_vague_follow_up(user_message, item_name)
-    chat_docs = _order_chat_documents(
+    docs = _fetch_item_chat_documents(
+        item_id=item_id,
         item_name=item_name,
         item_description=item_description,
-        documents=docs,
-        vague_follow_up=vague_follow_up,
-    )[:top_k]
-    chat_docs = _trim_context_documents(chat_docs)
-    trace.context_chunks = evidence_list(chat_docs)
-    trace.confidence_score, trace.confidence_reasons = compute_confidence(
-        has_substantive_description=has_substantive_description,
-        relevant_group_docs=relevant_group_docs,
-        fallback_used=trace.fallback_used,
-        dense_max_score=trace.dense_max_score,
-        vague_follow_up=vague_follow_up,
+        retrieval_query=retrieval_query,
+        retriever=retriever,
+        group_id=group_id,
+        top_k=top_k,
+        trace=trace,
+    )
+    chat_docs, has_verified_knowledge = _finalize_item_chat_trace(
+        item_name=item_name,
+        item_description=item_description,
+        docs=docs,
+        user_message=user_message,
+        top_k=top_k,
+        trace=trace,
+    )
+    return chat_docs, has_verified_knowledge, trace
+
+
+LENS_RELATED_GROUP_DOC_LIMIT = 2
+LENS_HISTORY_RETRIEVAL_TURNS = 2
+LENS_HISTORY_RETRIEVAL_MAX_CHARS = 400
+
+
+def _history_retrieval_snippets(
+    history: list[dict[str, str]] | None,
+    *,
+    max_turns: int = LENS_HISTORY_RETRIEVAL_TURNS,
+    max_chars: int = LENS_HISTORY_RETRIEVAL_MAX_CHARS,
+) -> str:
+    if not history:
+        return ""
+    snippets: list[str] = []
+    for message in history[-max_turns * 2 :]:
+        content = " ".join((message.get("content") or "").split()).strip()
+        if not content or content == "[Message removed by safety filter]":
+            continue
+        role = str(message.get("role") or "user")
+        prefix = "Khách" if role == "user" else "Trợ lý"
+        snippets.append(f"{prefix}: {content}")
+    return " | ".join(snippets)[:max_chars]
+
+
+def build_lens_chat_retrieval_query(
+    item_name: str,
+    item_description: str,
+    user_message: str,
+    history: list[dict[str, str]] | None = None,
+) -> str:
+    """Retrieval query for Ống Kính Di Sản item chat — history-aware, keeps vague questions."""
+    base = build_item_retrieval_query(item_name, item_description)
+    message = " ".join((user_message or "").split()).strip()
+    history_part = _history_retrieval_snippets(history)
+
+    parts = [base]
+    if history_part:
+        parts.append(f"Ngữ cảnh hội thoại gần đây: {history_part}")
+    if message:
+        parts.append(f"Câu hỏi của khách: {message}")
+    return " ".join(parts)
+
+
+def _order_lens_chat_documents(
+    *,
+    item_name: str,
+    item_description: str,
+    documents: list[Document],
+    vague_follow_up: bool,
+) -> tuple[list[Document], list[Document]]:
+    registration = [doc for doc in documents if is_item_registration_document(doc)]
+    item_group_docs = filter_group_docs_for_item(
+        item_name,
+        item_description,
+        documents,
+    )
+    item_group_ids = {id(doc) for doc in item_group_docs}
+    registration_ids = {id(doc) for doc in registration}
+    other_group_docs = [
+        doc
+        for doc in documents
+        if doc.metadata.get("source") == "group_doc"
+        and id(doc) not in registration_ids
+        and id(doc) not in item_group_ids
+    ]
+    if vague_follow_up:
+        related_group_docs = other_group_docs[:LENS_RELATED_GROUP_DOC_LIMIT]
+        ordered = registration + item_group_docs + related_group_docs
+    else:
+        related_group_docs = other_group_docs
+        ordered = registration + item_group_docs + other_group_docs
+    return ordered, related_group_docs
+
+
+def build_lens_chat_item_context_with_trace(
+    *,
+    item_id: int,
+    item_name: str,
+    item_description: str,
+    retriever: Retriever | None,
+    top_k: int = 8,
+    group_id: int | None = None,
+    query: str | None = None,
+    history: list[dict[str, str]] | None = None,
+) -> tuple[list[Document], bool, RagTraceContext]:
+    """RAG for item-page chat (Ống Kính Di Sản). Companion uses ``build_chat_item_context_with_trace``."""
+    user_message = query or ""
+    retrieval_query = build_lens_chat_retrieval_query(
+        item_name,
+        item_description,
+        user_message,
+        history=history,
+    )
+    trace = RagTraceContext(retrieval_query=retrieval_query, top_k=top_k)
+    docs = _fetch_item_chat_documents(
+        item_id=item_id,
+        item_name=item_name,
+        item_description=item_description,
+        retrieval_query=retrieval_query,
+        retriever=retriever,
+        group_id=group_id,
+        top_k=top_k,
+        trace=trace,
+    )
+    chat_docs, has_verified_knowledge = _finalize_item_chat_trace(
+        item_name=item_name,
+        item_description=item_description,
+        docs=docs,
+        user_message=user_message,
+        top_k=top_k,
+        trace=trace,
+        lens_chat=True,
+        history=history,
     )
     return chat_docs, has_verified_knowledge, trace
 

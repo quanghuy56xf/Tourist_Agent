@@ -8,12 +8,15 @@ from app.modules.rag.service import (
     build_chat_retrieval_query,
     build_item_context,
     build_item_retrieval_query,
+    build_lens_chat_item_context_with_trace,
+    build_lens_chat_retrieval_query,
     build_verified_item_context,
     filter_group_docs_for_item,
     is_substantive_item_description,
     is_vague_follow_up,
     _preserve_sparse_winners,
 )
+from app.modules.rag.tracing import compute_confidence
 
 
 class BrokenRetriever:
@@ -385,3 +388,74 @@ def test_verified_context_excludes_unrelated_group_docs_with_substantive_descrip
 
     assert has_verified is True
     assert [doc.metadata["page"] for doc in docs] == ["item-13", "kb-dai-thanh"]
+
+
+def test_lens_chat_retrieval_query_keeps_vague_question_and_history():
+    query = build_lens_chat_retrieval_query(
+        "Đền Khải Thánh",
+        "Công trình kiến trúc đồ sộ tại Văn Miếu.",
+        "cho biết thêm",
+        history=[
+            {"role": "user", "content": "Đền này thờ ai?"},
+            {"role": "assistant", "content": "Đền thờ các vị thần linh."},
+        ],
+    )
+
+    assert "Câu hỏi của khách: cho biết thêm" in query
+    assert "Ngữ cảnh hội thoại gần đây" in query
+    assert "Đền này thờ ai?" in query
+
+
+def test_lens_chat_context_keeps_related_group_docs_on_vague_follow_up():
+    retriever = WorkingRetriever()
+    retriever.retrieve = lambda query, top_k, group_id=None: [
+        Document(
+            page_content="Đền Khải Thánh là nơi thờ tổ tiên và các vị thần.",
+            metadata={"source": "group_doc", "page": "kb-khai-thanh"},
+        ),
+        Document(
+            page_content="Khoa cử thời Lê cho thấy vai trò giáo dục của Quốc Tử Giám.",
+            metadata={"source": "group_doc", "page": "kb-khoa-cu"},
+        ),
+    ]
+
+    chat_docs, has_verified, trace = build_lens_chat_item_context_with_trace(
+        item_id=21,
+        item_name="Đền Khải Thánh",
+        item_description=(
+            "Công trình kiến trúc đồ sộ, mái cong, cột gỗ chạm khắc tinh xảo tại khu Văn Miếu."
+        ),
+        retriever=retriever,
+        group_id=1,
+        query="cho biết thêm",
+        history=[
+            {"role": "user", "content": "Đền này thờ ai?"},
+            {"role": "assistant", "content": "Đền thờ các vị thần linh."},
+        ],
+        top_k=8,
+    )
+
+    assert has_verified is True
+    assert any(
+        "Khoa cử thời Lê" in doc.page_content for doc in chat_docs
+    ), "related group doc should remain for lens vague follow-up"
+    assert "vague_follow_up_with_history" in trace.confidence_reasons
+
+
+def test_lens_chat_confidence_skips_vague_penalty_with_history():
+    score, reasons = compute_confidence(
+        has_substantive_description=True,
+        relevant_group_docs=[],
+        related_group_docs=[
+            Document(page_content="related", metadata={"source": "group_doc"}),
+        ],
+        fallback_used=False,
+        dense_max_score=0.25,
+        vague_follow_up=True,
+        history_turn_count=2,
+        lens_chat=True,
+    )
+
+    assert score >= 0.45
+    assert "vague_follow_up_with_history" in reasons
+    assert "vague_follow_up" not in reasons

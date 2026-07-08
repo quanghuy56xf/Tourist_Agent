@@ -120,3 +120,33 @@ def test_output_guardrail_falls_back_without_verified_context():
     assert decision.allowed is False
     assert "chưa có đủ thông tin xác thực" in decision.sanitized_text
     assert "no_verified_context" in decision.reasons
+
+
+def test_lens_output_guardrail_allows_substantive_description_without_group_docs():
+    decision = apply_output_guardrails(
+        "Đền được xây dưới triều Lý.",
+        has_verified_knowledge=True,
+        confidence_score=0.35,
+        context_count=1,
+        relevant_group_doc_count=0,
+        language="Tiếng Việt",
+        lens_chat=True,
+    )
+
+    assert decision.allowed is True
+    assert "low_confidence_warn" in decision.warnings
+
+
+def test_lens_output_guardrail_blocks_only_when_no_group_docs_and_very_low_confidence():
+    decision = apply_output_guardrails(
+        "Một câu trả lời có vẻ khẳng định.",
+        has_verified_knowledge=True,
+        confidence_score=0.15,
+        context_count=1,
+        relevant_group_doc_count=0,
+        language="Tiếng Việt",
+        lens_chat=True,
+    )
+
+    assert decision.allowed is False
+    assert "low_confidence_block" in decision.reasons

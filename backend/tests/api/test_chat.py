@@ -31,7 +31,8 @@ def test_chat_uses_item_description_when_rag_is_unavailable(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"content": "Chat answer"}
+    payload = response.json()
+    assert payload["content"] == "Chat answer"
 
 
 def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
@@ -45,11 +46,15 @@ def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
     db_session.add(item)
     db_session.commit()
 
-    def fake_build_chat_item_context(**kwargs):
+    def fake_build_lens_chat_item_context_with_trace(**kwargs):
         captured.update(kwargs)
-        return [], True
+        return [], True, chat_router.RagTraceContext(retrieval_query=kwargs.get("query", ""), top_k=8)
 
-    monkeypatch.setattr(chat_router, "build_chat_item_context", fake_build_chat_item_context)
+    monkeypatch.setattr(
+        chat_router,
+        "build_lens_chat_item_context_with_trace",
+        fake_build_lens_chat_item_context_with_trace,
+    )
     monkeypatch.setattr(chat_router, "try_get_rag_retriever", lambda: None)
     monkeypatch.setattr(chat_router, "get_rag_generator", lambda: QueryGenerator())
 
@@ -64,6 +69,7 @@ def test_chat_uses_user_message_as_rag_query(client, db_session, monkeypatch):
 
     assert response.status_code == 200
     assert captured["query"] == "Ai là người xây dựng hiện vật này?"
+    assert captured["history"] == []
 
 
 def test_chat_preserves_complete_generated_response(

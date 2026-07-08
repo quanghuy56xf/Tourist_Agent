@@ -818,7 +818,11 @@ export async function chatWithAI(
   history: ChatMessage[],
   persona: string = "Mặc định",
   language: string = "Tiếng Việt",
-  tracking?: { sessionId?: string; searchSessionId?: string | null }
+  tracking?: {
+    sessionId?: string;
+    searchSessionId?: string | null;
+    introContext?: string;
+  }
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
@@ -829,6 +833,9 @@ export async function chatWithAI(
       history,
       persona,
       language,
+      intro_context: tracking?.introContext?.trim()
+        ? tracking.introContext.trim().slice(0, 1500)
+        : undefined,
       session_id: tracking?.sessionId,
       search_session_id: tracking?.searchSessionId ?? undefined,
     }),

@@ -8,7 +8,7 @@ import ChatAssistantBubble from "@/components/visitor/ChatAssistantBubble";
 import HeraGuidePanel, { HeraGuidePanelHandle } from "@/components/visitor/HeraGuidePanel";
 import ItemHeroSlideshow from "@/components/visitor/ItemHeroSlideshow";
 import { stopBrowserSpeech } from "@/lib/browserSpeech";
-import { playChatTts, stopChatTts } from "@/lib/chatTts";
+import { playChatTts, primeTtsAudioPlayback, stopChatTts } from "@/lib/chatTts";
 import {
   getItem,
   getItemContent,
@@ -19,7 +19,6 @@ import {
 } from "@/lib/api";
 import { getItemImageUrls } from "@/lib/itemImages";
 import { rememberMinimapItem } from "@/lib/minimapState";
-import MinimapButton from "@/components/visitor/MinimapButton";
 import { addVisitedItem } from "@/lib/companionState";
 import { groupPath } from "@/lib/groupSlug";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
@@ -157,7 +156,7 @@ export default function ItemDetailPage() {
   useEffect(() => {
     setChatHistory([]);
     setChatInput("");
-  }, [language]);
+  }, [language, itemId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -165,6 +164,7 @@ export default function ItemDetailPage() {
 
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatting) return;
+    primeTtsAudioPlayback();
     stopGuidePlayback();
     const userMsg: ChatMessage = { role: "user", content: chatInput.trim() };
     const updatedHistory = [...chatHistory, userMsg];
@@ -176,6 +176,7 @@ export default function ItemDetailPage() {
       const res = await chatWithAI(itemId, userMsg.content, chatHistory.slice(-10), persona, language, {
         sessionId: getVisitorSessionId(),
         searchSessionId: getActiveSearchSessionId(),
+        introContext: content.trim() || undefined,
       });
       assistantContent = res.content;
       setChatHistory([...updatedHistory, { role: "assistant", content: assistantContent }]);
@@ -448,8 +449,6 @@ export default function ItemDetailPage() {
       >
         <EvalFeedbackPanel groupId={readStoredGroupId()} itemId={itemId} />
       </VisitorInfoDialog>
-
-      <MinimapButton elevated={inTour} />
     </main>
   );
 }

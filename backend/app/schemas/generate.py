@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     language: str = "Tiếng Việt"
     history: list[ChatMessage] = Field(default_factory=list, max_length=20)
     message: str = Field(min_length=1, max_length=2000)
+    intro_context: str | None = Field(default=None, max_length=2000)
     session_id: str | None = Field(default=None, max_length=64)
     search_session_id: str | None = Field(default=None, max_length=64)
 

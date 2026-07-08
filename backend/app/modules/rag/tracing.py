@@ -75,6 +75,9 @@ def compute_confidence(
     fallback_used: bool,
     dense_max_score: float,
     vague_follow_up: bool,
+    related_group_docs: list[Document] | None = None,
+    history_turn_count: int = 0,
+    lens_chat: bool = False,
 ) -> tuple[float, list[str]]:
     score = 0.1
     reasons: list[str] = []
@@ -84,6 +87,9 @@ def compute_confidence(
     if relevant_group_docs:
         score += min(0.3, 0.16 + 0.04 * len(relevant_group_docs))
         reasons.append("matched_group_doc")
+    elif lens_chat and related_group_docs:
+        score += min(0.12, 0.06 + 0.03 * len(related_group_docs))
+        reasons.append("related_group_doc")
     if dense_max_score >= 0.45:
         score += 0.15
         reasons.append("strong_dense_score")
@@ -97,11 +103,17 @@ def compute_confidence(
         score += 0.05
         reasons.append("no_dense_fallback")
     if vague_follow_up:
-        score -= 0.03
-        reasons.append("vague_follow_up")
+        if lens_chat and history_turn_count >= 2:
+            reasons.append("vague_follow_up_with_history")
+        else:
+            score -= 0.03
+            reasons.append("vague_follow_up")
     if not has_substantive_description and not relevant_group_docs:
-        score = min(score, 0.15)
-        reasons.append("no_verified_knowledge")
+        if lens_chat and related_group_docs:
+            pass
+        else:
+            score = min(score, 0.15)
+            reasons.append("no_verified_knowledge")
     return round(max(0.0, min(1.0, score)), 3), reasons
 
 

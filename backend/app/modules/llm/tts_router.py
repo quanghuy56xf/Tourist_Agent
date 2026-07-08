@@ -13,11 +13,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["tts"])
 
 
-@router.post("/tts")
-def text_to_speech(request: TTSRequest):
-    cleaned = prepare_text_for_speech(request.text)
+def _clean_tts_text(text: str) -> str:
+    cleaned = prepare_text_for_speech(text)
     if not cleaned:
         raise HTTPException(status_code=400, detail="Không có văn bản để đọc thành audio")
+    return cleaned
+
+
+@router.post("/tts")
+def text_to_speech(request: TTSRequest):
+    cleaned = _clean_tts_text(request.text)
 
     try:
         result = synthesize_speech(cleaned, request.language, request.persona)
@@ -43,9 +48,7 @@ def text_to_speech(request: TTSRequest):
 
 @router.post("/tts/stream")
 async def text_to_speech_stream(request: TTSRequest):
-    cleaned = prepare_text_for_speech(request.text)
-    if not cleaned:
-        raise HTTPException(status_code=400, detail="Không có văn bản để đọc thành audio")
+    cleaned = _clean_tts_text(request.text)
 
     async def audio_stream():
         async for chunk in stream_speech_chunks(cleaned, request.language, request.persona):
@@ -55,7 +58,7 @@ async def text_to_speech_stream(request: TTSRequest):
         audio_stream(),
         media_type="audio/mpeg",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store",
             "X-Content-Type-Options": "nosniff",
         },
     )

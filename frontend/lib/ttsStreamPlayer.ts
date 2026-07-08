@@ -1,3 +1,10 @@
+import {
+  configurePlaybackAudio,
+  getSharedTtsAudio,
+  isIOS,
+  playAudioFromObjectUrl,
+} from "@/lib/ttsPlayback";
+
 function waitForSourceBuffer(sourceBuffer: SourceBuffer): Promise<void> {
   if (!sourceBuffer.updating) {
     return Promise.resolve();
@@ -34,6 +41,7 @@ async function appendToSourceBuffer(
 }
 
 export function canStreamMpegAudio(): boolean {
+  if (isIOS()) return false;
   return (
     typeof MediaSource !== "undefined" &&
     typeof MediaSource.isTypeSupported === "function" &&
@@ -58,6 +66,7 @@ export async function playMpegStreamResponse(
   hooks?.onObjectUrl?.(objectUrl);
 
   const audio = new Audio(objectUrl);
+  configurePlaybackAudio(audio);
   hooks?.onAudio?.(audio);
 
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = response.body.getReader();
@@ -146,18 +155,17 @@ export async function playBlobResponse(
 
   const objectUrl = URL.createObjectURL(blob);
   hooks?.onObjectUrl?.(objectUrl);
-  const audio = new Audio(objectUrl);
+  const audio = isIOS() ? getSharedTtsAudio() : new Audio();
+  configurePlaybackAudio(audio);
   hooks?.onAudio?.(audio);
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      audio.onended = () => resolve();
-      audio.onerror = () => reject(new Error("audio playback failed"));
-      audio.play().catch(reject);
-    });
+    await playAudioFromObjectUrl(audio, objectUrl, signal);
   } finally {
-    audio.pause();
-    audio.src = "";
+    if (!isIOS()) {
+      audio.pause();
+      audio.src = "";
+    }
     URL.revokeObjectURL(objectUrl);
   }
 }

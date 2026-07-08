@@ -10,6 +10,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { searchObject } from "@/lib/api";
 import { compressImage } from "@/lib/imageCompress";
 import { groupPath } from "@/lib/groupSlug";
+import { rememberMinimapItem } from "@/lib/minimapState";
 import { useGroupSlug } from "@/lib/useGroupPath";
 import { buildSearchTrackingContext, readStoredGroupId } from "@/lib/visitorAnalytics";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
@@ -268,6 +269,7 @@ export default function TourMatchPlayPage() {
 
       if (accepted && matchedId !== null) {
         setScanPhase("found");
+        rememberMinimapItem(groupSlug, matchedId);
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({
             type: "report_find",
