@@ -73,13 +73,30 @@ assert.match(buttonSource, /<MinimapModal[\s\S]*config=\{config\}/);
 const modalSource = read("components/visitor/MinimapModal.tsx");
 assert.match(modalSource, /config: MinimapConfig \| null/);
 assert.doesNotMatch(modalSource, /getMinimapConfig/);
-assert.match(modalSource, /zone\.itemIds\.includes\(lastItemId\)/);
+assert.match(modalSource, /HeritageMapCanvas/);
+assert.match(modalSource, /MINIMAP_UPDATED_EVENT/);
+assert.doesNotMatch(modalSource, /zone\.itemIds\.includes\(lastItemId\)/);
 
 const layoutSource = read("app/[groupSlug]/layout.tsx");
-assert.doesNotMatch(layoutSource, /<MinimapButton/);
+assert.match(layoutSource, /<MinimapButton/);
 
 const itemSource = read("app/[groupSlug]/item/[id]/page.tsx");
 assert.match(itemSource, /from "@\/lib\/minimapState"/);
-assert.match(itemSource, /<MinimapButton/);
+assert.doesNotMatch(itemSource, /<MinimapButton/);
+
+const layersSource = read("lib/minimapLayers.ts");
+assert.match(layersSource, /resolveUserLocation/);
+assert.match(layersSource, /buildVisitorMapMarkers/);
+assert.match(layersSource, /buildTourMatchMapMarkers/);
+
+const canvasSource = read("components/visitor/HeritageMapCanvas.tsx");
+assert.match(canvasSource, /MapMarkerLayer/);
+
+const tourMatchSource = read("components/visitor/TourMatchMinimap.tsx");
+assert.match(tourMatchSource, /HeritageMapCanvas/);
+assert.match(tourMatchSource, /buildTourMatchMapMarkers/);
+
+const scanSource = read("app/[groupSlug]/scan/page.tsx");
+assert.match(scanSource, /rememberMinimapItem/);
 
 console.log("Dynamic minimap checks passed.");

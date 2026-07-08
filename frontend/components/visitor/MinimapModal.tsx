@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MinimapConfig } from "@/lib/api";
-import { readRememberedMinimapItem } from "@/lib/minimapState";
+import {
+  buildVisitorMapMarkers,
+  resolveUserLocation,
+  resolveZoneForItem,
+} from "@/lib/minimapLayers";
+import {
+  MINIMAP_UPDATED_EVENT,
+  readRememberedMinimapItem,
+} from "@/lib/minimapState";
+import HeritageMapCanvas from "@/components/visitor/HeritageMapCanvas";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
 
 interface MinimapModalProps {
@@ -24,25 +33,44 @@ export default function MinimapModal({
 }: MinimapModalProps) {
   const { t } = useVisitorLocale();
   const [lastItemId, setLastItemId] = useState<number | null>(null);
-  const currentZone =
-    lastItemId === null
-      ? null
-      : config?.zones.find((zone) => zone.itemIds.includes(lastItemId)) ?? null;
-  const suggestedZone =
-    suggestedItemId === null
-      ? null
-      : config?.zones.find((zone) => zone.itemIds.includes(suggestedItemId)) ?? null;
 
   useEffect(() => {
     if (!open) return;
-    setLastItemId(readRememberedMinimapItem(groupSlug));
+
+    const refresh = () => setLastItemId(readRememberedMinimapItem(groupSlug));
+    refresh();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
+    const handleMinimapUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ groupSlug?: string }>).detail;
+      if (detail?.groupSlug === groupSlug) refresh();
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener(MINIMAP_UPDATED_EVENT, handleMinimapUpdate);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener(MINIMAP_UPDATED_EVENT, handleMinimapUpdate);
+    };
   }, [groupSlug, onClose, open]);
+
+  const userLocation = useMemo(
+    () => resolveUserLocation(config, groupSlug),
+    [config, groupSlug, lastItemId]
+  );
+  const suggestedZone = resolveZoneForItem(config, suggestedItemId);
+  const markers = useMemo(
+    () =>
+      buildVisitorMapMarkers(config, groupSlug, suggestedItemId, {
+        currentLocationAria: (name) =>
+          t.minimap.currentLocationAria.replace("{name}", name),
+        suggestedLocationAria: (name) =>
+          t.minimap.suggestedLocationAria.replace("{name}", name),
+      }),
+    [config, groupSlug, suggestedItemId, t.minimap, lastItemId]
+  );
 
   if (!open) return null;
 
@@ -78,43 +106,24 @@ export default function MinimapModal({
 
         {config ? (
           <>
-            <div className="relative overflow-hidden rounded-xl border border-amber-300/20 bg-[#211b12]">
-              <img
-                src={config.imageSrc}
-                alt={t.minimap.mapLabel}
-                className="block h-auto w-full"
-              />
-              {currentZone && (
-                <div
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: `${currentZone.x}%`, top: `${currentZone.y}%` }}
-                  aria-label={t.minimap.currentLocationAria.replace("{name}", currentZone.zoneName)}
-                >
-                  <span className="absolute -inset-2 animate-ping rounded-full bg-red-400/70" />
-                  <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.9)]" />
-                </div>
-              )}
-              {suggestedZone && suggestedZone.zoneId !== currentZone?.zoneId && (
-                <div
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: `${suggestedZone.x}%`, top: `${suggestedZone.y}%` }}
-                  aria-label={t.minimap.suggestedLocationAria.replace("{name}", suggestedZone.zoneName)}
-                >
-                  <span className="absolute -inset-3 animate-ping rounded-full bg-amber-300/60" />
-                  <span className="relative block h-4 w-4 rounded-full border-2 border-white bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
-                </div>
-              )}
-            </div>
+            <HeritageMapCanvas
+              imageSrc={config.imageSrc}
+              mapLabel={t.minimap.mapLabel}
+              markers={markers}
+            />
             <div className="mt-3 rounded-xl bg-white/[0.04] px-4 py-3">
               <p className="text-xs text-amber-200/65">
                 {t.minimap.nearestLocation}
               </p>
               <p className="mt-1 font-medium text-amber-50">
-                {currentZone?.zoneName ?? t.minimap.unknownLocation}
+                {userLocation?.zone.zoneName ?? t.minimap.unknownLocation}
               </p>
               {suggestedZone && (
                 <p className="mt-2 text-sm text-amber-300">
-                  {t.minimap.nextSuggestion} {suggestedItemName ? `${suggestedItemName} (${suggestedZone.zoneName})` : suggestedZone.zoneName}
+                  {t.minimap.nextSuggestion}{" "}
+                  {suggestedItemName
+                    ? `${suggestedItemName} (${suggestedZone.zoneName})`
+                    : suggestedZone.zoneName}
                 </p>
               )}
             </div>

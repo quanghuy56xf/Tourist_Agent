@@ -160,12 +160,19 @@ def apply_output_guardrails(
     confidence_score: float,
     context_count: int,
     language: str,
+    lens_chat: bool = False,
+    relevant_group_doc_count: int = 0,
 ) -> GuardrailDecision:
     warnings: list[str] = []
     reasons: list[str] = []
     if not has_verified_knowledge or context_count <= 0:
         reasons.append("no_verified_context")
-    if confidence_score < 0.3:
+    elif lens_chat:
+        if relevant_group_doc_count <= 0 and confidence_score < 0.2:
+            reasons.append("low_confidence_block")
+        elif confidence_score < 0.45:
+            warnings.append("low_confidence_warn")
+    elif confidence_score < 0.3:
         reasons.append("low_confidence_block")
     elif confidence_score < 0.45:
         warnings.append("low_confidence_warn")

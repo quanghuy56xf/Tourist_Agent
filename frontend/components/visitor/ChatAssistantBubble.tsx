@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { playChatTts } from "@/lib/chatTts";
+import { playChatTts, primeTtsAudioPlayback } from "@/lib/chatTts";
 
 interface ChatAssistantBubbleProps {
   content: string;
@@ -20,6 +20,7 @@ export default function ChatAssistantBubble({
 
   const handleSpeak = async () => {
     if (loading || !content.trim()) return;
+    primeTtsAudioPlayback();
     onBeforeSpeak?.();
     setLoading(true);
     try {

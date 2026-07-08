@@ -222,9 +222,17 @@ Mô tả đã viết lại:"""
         persona: str = "Mặc định",
         language: str = "Tiếng Việt",
         item_name: str = "",
+        intro_context: str | None = None,
     ) -> str:
         context = self._format_context(retrieved_docs) if retrieved_docs else "Không có ngữ cảnh bổ sung."
         artifact = " ".join((item_name or "").split()).strip() or "hiện vật đang xem"
+        intro = " ".join((intro_context or "").split()).strip()
+        intro_block = ""
+        if intro:
+            intro_block = f"""
+HERA đã giới thiệu sơ lược về {artifact} trước khi khách hỏi thêm:
+{intro}
+"""
 
         lang_instruction = answer_language_instruction(language)
 
@@ -258,7 +266,7 @@ Không nhắc đến "tài liệu" hay "nguồn tham khảo"."""
         system_prompt = f"""{base_instructions}
 
 {persona_instructions}
-
+{intro_block}
 Tài liệu được cung cấp (Context):
 {context}
 """

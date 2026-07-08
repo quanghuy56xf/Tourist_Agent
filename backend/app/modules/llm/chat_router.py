@@ -29,6 +29,8 @@ from app.modules.rag.service import (
     build_chat_item_context,
     build_chat_item_context_with_trace,
     build_group_chat_context_with_trace,
+    build_lens_chat_item_context_with_trace,
+    filter_group_docs_for_item,
     no_item_knowledge_message,
 )
 from app.modules.rag.security import (
@@ -267,32 +269,21 @@ def chat_with_ai(
         return ChatResponse(content=fallback)
 
     guarded_message = input_decision.sanitized_text
-    if build_chat_item_context is not _ORIGINAL_BUILD_CHAT_ITEM_CONTEXT:
-        docs, has_verified = build_chat_item_context(
-            item_id=item.id,
-            item_name=item.name,
-            item_description=item.description,
-            group_id=item.group_id,
-            retriever=try_get_rag_retriever(),
-            top_k=RAG_CHAT_TOP_K,
-            query=guarded_message,
-        )
-        rag_trace = RagTraceContext(retrieval_query=guarded_message, top_k=RAG_CHAT_TOP_K)
-    else:
-        docs, has_verified, rag_trace = build_chat_item_context_with_trace(
-            item_id=item.id,
-            item_name=item.name,
-            item_description=item.description,
-            group_id=item.group_id,
-            retriever=try_get_rag_retriever(),
-            top_k=RAG_CHAT_TOP_K,
-            query=guarded_message,
-        )
     history = sanitize_chat_history(
         [
             {"role": message.role, "content": message.content}
             for message in request.history
         ]
+    )
+    docs, has_verified, rag_trace = build_lens_chat_item_context_with_trace(
+        item_id=item.id,
+        item_name=item.name,
+        item_description=item.description,
+        group_id=item.group_id,
+        retriever=try_get_rag_retriever(),
+        top_k=RAG_CHAT_TOP_K,
+        query=guarded_message,
+        history=history,
     )
 
     if not has_verified:
@@ -338,6 +329,7 @@ def chat_with_ai(
             persona=request.persona,
             language=request.language,
             item_name=item.name,
+            intro_context=request.intro_context,
         )
     except LLMServiceUnavailableError:
         duration_ms = int((time.perf_counter() - started) * 1000)
@@ -373,12 +365,17 @@ def chat_with_ai(
         )
 
     polished = polish_generated_text(content)
+    relevant_group_doc_count = len(
+        filter_group_docs_for_item(item.name, item.description, docs)
+    )
     output_decision = apply_output_guardrails(
         polished,
         has_verified_knowledge=has_verified,
         confidence_score=rag_trace.confidence_score,
         context_count=len(rag_trace.context_chunks),
+        relevant_group_doc_count=relevant_group_doc_count,
         language=request.language,
+        lens_chat=True,
     )
     polished = output_decision.sanitized_text
     duration_ms = int((time.perf_counter() - started) * 1000)

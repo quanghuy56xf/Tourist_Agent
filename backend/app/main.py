@@ -23,6 +23,11 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Import langchain splitters before google.genai/LLM client on Windows to avoid
+# a native crash (exit 0xC0000005) when both stacks load in the reverse order.
+import langchain_text_splitters  # noqa: F401
+
 from app.modules.objects import groups_router as groups, objects_router as objects, register_router as register
 from app.modules.vision import router as search
 from app.modules.llm import chat_router, story_router, tts_router

@@ -591,8 +591,9 @@ export default function CompanionChat({
         storyStartedAtRef.current = null;
       }
 
-      if (nextItemId !== null && nextItemName && onSuggestNextPoint) {
+      if (nextItemId !== null && nextItemName) {
         setSuggestedNextPoint({ id: nextItemId, name: nextItemName });
+        rememberMinimapSuggestion(groupSlug, nextItemId);
       } else {
         setSuggestedNextPoint(null);
       }

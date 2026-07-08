@@ -10,6 +10,7 @@ import ScanViewfinderFrame from "@/components/visitor/ScanViewfinderFrame";
 import LanguageSelector from "@/components/LanguageSelector";
 import type { SearchResponse } from "@/lib/api/search";
 import { groupPath } from "@/lib/groupSlug";
+import { rememberMinimapItem } from "@/lib/minimapState";
 import { useGroupPath, useGroupSlug } from "@/lib/useGroupPath";
 import { useObjectSearch } from "@/lib/useObjectSearch";
 import { useVisitorLocale } from "@/components/VisitorLocaleProvider";
@@ -81,6 +82,7 @@ export default function SearchPage() {
       if (response.found && response.results.length > 0) {
         setScanPhase("found");
         const bestMatch = response.results[0];
+        rememberMinimapItem(groupSlug, bestMatch.item_id);
         setTimeout(() => {
           router.push(
             `${groupPath(groupSlug, `/item/${bestMatch.item_id}`)}?similarity=${bestMatch.similarity}`

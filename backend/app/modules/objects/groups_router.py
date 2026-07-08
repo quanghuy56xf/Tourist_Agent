@@ -50,6 +50,45 @@ DEFAULT_MINIMAP_TEMPLATE = {
 }
 
 
+def _normalize_minimap_name(name: str) -> str:
+    return name.strip().casefold()
+
+
+def _resolve_minimap_item_ids(
+    item_names: list[str],
+    ids_by_exact: dict[str, list[int]],
+    items: list,
+) -> list[int]:
+    resolved: list[int] = []
+    seen: set[int] = set()
+    normalized_index: dict[str, list[int]] = {}
+    for item in items:
+        normalized_index.setdefault(_normalize_minimap_name(item.name), []).append(item.id)
+
+    def add_ids(item_ids: list[int]) -> None:
+        for item_id in item_ids:
+            if item_id not in seen:
+                seen.add(item_id)
+                resolved.append(item_id)
+
+    for item_name in item_names:
+        if item_name in ids_by_exact:
+            add_ids(ids_by_exact[item_name])
+            continue
+
+        normalized = _normalize_minimap_name(item_name)
+        if normalized in normalized_index:
+            add_ids(normalized_index[normalized])
+            continue
+
+        for db_name, db_ids in normalized_index.items():
+            if normalized in db_name or db_name in normalized:
+                add_ids(db_ids)
+                break
+
+    return resolved
+
+
 def _group_rows_query(db: Session):
     return (
         db.query(
@@ -203,11 +242,7 @@ def get_group_minimap(
                 zoneName=zone.zoneName,
                 x=zone.x,
                 y=zone.y,
-                itemIds=[
-                    item_id
-                    for item_name in zone.itemNames
-                    for item_id in ids_by_name.get(item_name, [])
-                ],
+                itemIds=_resolve_minimap_item_ids(zone.itemNames, ids_by_name, items),
             )
             for zone in payload.zones
         ],
