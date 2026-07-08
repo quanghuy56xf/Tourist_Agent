@@ -81,10 +81,10 @@ export function calculateUserMapPosition(
 ): MapPoint | null {
   if (!userGps) return null;
 
-  // Lọc các zone có cấu hình GPS đầy đủ
   const gpsZones = zones.filter(
-    (z) => z.lat !== null && z.lat !== undefined && z.lng !== null && z.lng !== undefined
-  ) as Required<ZoneWithGps>[];
+    (z): z is ZoneWithGps & { lat: number; lng: number } =>
+      z.lat !== null && z.lat !== undefined && z.lng !== null && z.lng !== undefined
+  );
 
   if (gpsZones.length === 0) return null;
 

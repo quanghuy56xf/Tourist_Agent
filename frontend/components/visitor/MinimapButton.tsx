@@ -25,7 +25,13 @@ export default function MinimapButton() {
   const [config, setConfig] = useState<MinimapConfig | null>(null);
   const [suggestedItemId, setSuggestedItemId] = useState<number | null>(null);
 
-  const hideOnPage = pathname.includes("/tour-match/");
+  const hideOnPage =
+    pathname.includes("/tour") ||
+    pathname.endsWith("/method") ||
+    pathname.endsWith("/scan") ||
+    pathname === `/${groupSlug}` ||
+    pathname === `/${groupSlug}/` ||
+    pathname === "/";
   const elevated = pathname.includes("/item/") && Boolean(searchParams.get("tour"));
 
   useEffect(() => {
