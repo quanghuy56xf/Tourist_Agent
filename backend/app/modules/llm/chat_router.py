@@ -86,7 +86,10 @@ async def _get_companion_ack_audio(language: str) -> bytes:
         cached = _ACK_AUDIO_CACHE.get(key)
         if cached is not None:
             return cached
-        audio_bytes, _ = await _synthesize_speech_async(text, language, "Companion")
+        audio_bytes, _ = await asyncio.wait_for(
+            _synthesize_speech_async(text, language, "Companion"),
+            timeout=5.0
+        )
         _ACK_AUDIO_CACHE[key] = audio_bytes
         return audio_bytes
 
@@ -681,10 +684,13 @@ async def chat_with_companion_stream(
                 audio_bytes: bytes | None = None
                 for attempt in range(1, TTS_MAX_ATTEMPTS + 1):
                     try:
-                        audio_bytes, _ = await _synthesize_speech_async(
-                            text,
-                            request.language,
-                            "Companion",
+                        audio_bytes, _ = await asyncio.wait_for(
+                            _synthesize_speech_async(
+                                text,
+                                request.language,
+                                "Companion",
+                            ),
+                            timeout=8.0
                         )
                         logger.debug(
                             "Companion TTS segment worker=%s seq=%s attempt=%s start_ms=%s done_ms=%s chars=%s",
