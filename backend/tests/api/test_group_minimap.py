@@ -22,9 +22,11 @@ def _payload():
             {
                 "zoneId": "cong-chinh",
                 "zoneName": "Cổng chính",
-                "x": 50,
-                "y": 94,
+                "x": 50.0,
+                "y": 94.0,
                 "itemNames": ["Cổng chính"],
+                "lat": None,
+                "lng": None,
             }
         ],
     }
@@ -57,6 +59,8 @@ def test_put_and_get_minimap_maps_item_names_within_group(minimap_client, db_ses
                 "x": 50.0,
                 "y": 94.0,
                 "itemIds": [expected_item.id],
+                "lat": None,
+                "lng": None,
             }
         ],
     }
