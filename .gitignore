@@ -30,11 +30,6 @@ Thumbs.db
 .deepeval/
 .gemini/
 
-
-# Backend data
-backend/data/
-backend/uploads/
-
 # Node
 frontend/node_modules/
 frontend/.next/
@@ -58,10 +53,8 @@ frontend/.env.local
 cloudflared/config.yml
 cloudflared/*.json
 
-data/
 raw/
 .superpowers/
 draft/
 docs/reports/history/
-*.db
 backend/scratch/
